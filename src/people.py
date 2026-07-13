@@ -32,6 +32,13 @@ class Person:
     sex: Optional[str] = None
     child: bool = False
     aliases: tuple[str, ...] = field(default_factory=tuple)
+    # A deceased person's record is history, not something to maintain. No
+    # reconciliation, no reminders, no review prompts. The records themselves are
+    # kept exactly as they are.
+    deceased: bool = False
+    # A document dated before a child was born cannot be theirs. A pregnancy
+    # folder under a child's name holds the MOTHER's records.
+    born: Optional[str] = None
 
 
 def load_people() -> dict[str, Person]:
@@ -45,6 +52,8 @@ def load_people() -> dict[str, Person]:
             sex=entry.get("sex"),
             child=bool(entry.get("child")),
             aliases=tuple(entry.get("aliases") or ()),
+            deceased=bool(entry.get("deceased")),
+            born=entry.get("born"),
         )
         for folder, entry in raw.items()
         if not folder.startswith("_")

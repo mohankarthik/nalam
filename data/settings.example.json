@@ -1,15 +1,17 @@
 {
   "_comment": "Copy to data/settings.json and fill in. data/settings.json is gitignored: it names real people and real paths, and nothing personal belongs in the repository.",
-
   "medical_root": "~/drive/Medical",
   "paperless_url": "http://localhost:8100",
-
   "_document_type": "The Paperless document_type every ingested file is filed under.",
   "document_type": "Medical",
-
   "_master_sheet": "Optional. A pre-existing spreadsheet of hand-tracked results, used to seed the analyte codebook and as the extractor's golden test. Leave master_sheet_id empty if you have none -- everything still works, you just have no ground truth to check the extractor against.",
   "master_sheet_id": "",
   "master_sheet_tabs": {
-    "TabName": {"correspondent": "Person Name", "sex": "male"}
-  }
+    "TabName": {
+      "correspondent": "Person Name",
+      "sex": "male"
+    }
+  },
+  "_paperless_viewer": "The URL you open Paperless at in a BROWSER (may differ from the API url, e.g. behind a reverse proxy). Used for clickable links in review worksheets.",
+  "paperless_viewer_url": "https://paperless.example.com"
 }

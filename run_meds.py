@@ -91,7 +91,7 @@ def show_reconcile(con, person: str | None) -> None:
         if want and r["subject"] != want:
             continue
         person = people.get(r["subject"])
-        if person and person.child:
+        if person and (person.child or person.deceased):
             continue
         by_person.setdefault(r["subject"], []).append(r)
 

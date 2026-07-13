@@ -48,10 +48,13 @@ class TestBrandToMolecule:
         assert d.display == "Teneligliptin + Metformin (TENEPRIDE M)"
 
     def test_unconfirmed_brand_yields_no_molecule(self, table) -> None:
-        d = lookup("GB 29 SR", table)
+        """An unconfirmed brand keeps its own name rather than acquiring a
+        plausible-looking generic. (GB 29 SR used to live here; a human has since
+        confirmed it as methylcobalamin + pregabalin, which is the system working.)"""
+        d = lookup("PLATIFY", table)
         assert d is not None and not d.confirmed
-        assert molecules("GB 29 SR", table) == []
-        assert d.display == "GB 29 SR", "must not acquire a plausible-looking generic"
+        assert molecules("PLATIFY", table) == []
+        assert d.display == "PLATIFY", "must not acquire a plausible-looking generic"
 
     def test_unknown_brand_is_not_invented(self, table) -> None:
         assert lookup("SOMETHING NOBODY HAS HEARD OF", table) is None
@@ -197,3 +200,94 @@ class TestHistoryHidesNothing:
 
         assert len(meds.history(con, drug="cetirizine")) == 1, "molecule"
         assert len(meds.history(con, drug="CETZINE")) == 1, "brand"
+
+
+class TestCombinationBrandsAreNotTheirBaseDrug:
+    """GLYCOMET is metformin. GLYCOMET GP1 is metformin AND glimepiride.
+
+    A two-pass lookup matched the shorter brand first and returned there, so a
+    combination antidiabetic was recorded as plain metformin. That is not a
+    shorter name for the same drug -- it is a different drug, missing a
+    sulfonylurea. Longest match must win.
+    """
+
+    def test_the_combination_wins_over_its_base(self, table) -> None:
+        from src.drugs import molecules
+
+        assert molecules("T. Glycomet GP1", table) == ["Metformin", "Glimepiride"]
+        assert molecules("GLYCOMET", table) == ["Metformin"]
+
+    def test_indian_single_letter_form_prefixes(self, table) -> None:
+        """'T.' means tablet. Without stripping it, 'T. Glycomet GP1' does not
+        start with 'GLYCOMET' and maps to nothing at all."""
+        from src.drugs import molecules
+
+        assert molecules("T. Glycomet GP1", table) == ["Metformin", "Glimepiride"]
+        assert molecules("C. Becosules", table) == ["B-complex vitamins"]
+
+    def test_a_drug_merely_starting_with_t_is_safe(self, table) -> None:
+        """The single-letter prefix requires the dot, so TELMA is not read as
+        'T' + 'ELMA'."""
+        from src.drugs import molecules
+
+        assert molecules("TELMA", table) == ["Telmisartan"]
+
+
+class TestBrandSpelling:
+    """A typo in drugs.json is a drug that does not exist.
+
+    'ECOSPIRIN' was written where the brand is 'Ecosprin'. The misspelling
+    matched; the correct spelling did not. A post-stroke antiplatelet was
+    therefore absent from every "is he on aspirin?" query, silently.
+    """
+
+    def test_the_real_spelling_maps(self, table) -> None:
+        from src.drugs import molecules
+
+        assert molecules("Ecosprin", table) == ["Aspirin"]
+        assert molecules("ECOSPRIN 75", table) == ["Aspirin"]
+
+    def test_the_combination_still_wins(self, table) -> None:
+        from src.drugs import molecules
+
+        assert molecules("ECOSPRIN AV", table) == ["Aspirin", "Atorvastatin"]
+
+
+class TestPunctuationIsNotIdentity:
+    """The table says FOLVITE-MB; the prescription says FOLVITE MB.
+
+    Same drug, different punctuation. Left unfolded, a folic-acid + methylcobalamin
+    supplement mapped to nothing at all.
+    """
+
+    def test_hyphen_and_space_are_the_same_drug(self, table) -> None:
+        from src.drugs import molecules
+
+        assert molecules("FOLVITE-MB", table) == ["Folic acid", "Methylcobalamin"]
+        assert molecules("TAB FOLVITE MB", table) == ["Folic acid", "Methylcobalamin"]
+        assert molecules("Folvite MB", table) == ["Folic acid", "Methylcobalamin"]
+
+    def test_folding_does_not_merge_different_drugs(self, table) -> None:
+        """PAN and PAN-DSR are different formulations and must stay apart."""
+        from src.drugs import molecules
+
+        assert molecules("PAN", table) == ["Pantoprazole"]
+        assert molecules("TAB. PAN - DSR", table) == ["Pantoprazole", "Domperidone"]
+
+
+class TestKeyIsOrderIndependent:
+    """'Methylcobalamin + Pregabalin' and 'Pregabalin + Methylcobalamin' are one
+    drug written two ways. Counting them separately put the same molecule on the
+    live medication list twice."""
+
+    def test_molecule_order_does_not_create_a_second_drug(self) -> None:
+        a = Med("GB 29 SR", "Methylcobalamin + Pregabalin", None, "0-1-0", None,
+                "2023-02-25", "prescribed", "ok")
+        b = Med("Pevesca Plus", "Pregabalin + Methylcobalamin", "75mg", "0-0-1", None,
+                "2024-01-01", "prescribed", "ok")
+        assert a.key == b.key
+
+    def test_different_molecules_stay_apart(self) -> None:
+        a = Med("X", "Pregabalin + Methylcobalamin", None, None, None, "2024-01-01", "prescribed", "ok")
+        b = Med("Y", "Pregabalin + Nortriptyline", None, None, None, "2024-01-01", "prescribed", "ok")
+        assert a.key != b.key

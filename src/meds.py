@@ -47,11 +47,24 @@ class Med:
         """What makes two prescriptions 'the same drug'.
 
         The molecule, when we know it -- so GLUCONORM G2 and GEMER are one drug
-        (both glimepiride+metformin), and LOSAR and LOSARTAN are one drug. Where
-        the molecule is unknown we fall back to the brand, which is the honest
-        answer: we cannot tell.
+        (both glimepiride+metformin), and LOSAR and LOSARTAN are one drug.
+
+        Where the molecule is unknown, fall back to the brand -- but NORMALISED.
+        The raw string made "TAB. GALVUSMET", "AB. GALVUSMET" and "GALVUS MET"
+        three different medicines in the live list, which is nonsense: they are
+        one drug, a form prefix, and an OCR error.
         """
-        return (self.generic or self.drug).strip().lower()
+        if self.generic:
+            # Order is presentation, not identity. "Methylcobalamin + Pregabalin"
+            # and "Pregabalin + Methylcobalamin" are one drug written two ways,
+            # and counting them twice put the same molecule on the live list
+            # twice over.
+            parts = sorted(x.strip().lower() for x in self.generic.split("+") if x.strip())
+            return " + ".join(parts)
+
+        from src.drugs import _key
+
+        return _key(self.drug).lower() or self.drug.strip().lower()
 
     @property
     def display(self) -> str:

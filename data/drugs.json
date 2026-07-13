@@ -1,64 +1,1031 @@
 {
   "_comment": "Indian brand name -> the molecule(s) it actually contains. Display is 'generic (BRAND)', so the brand is never lost -- it is what appears on the strip in the cupboard and what the doctor wrote.",
-
   "_why": "Without this you cannot answer 'is this patient on metformin?' -- they may be, but the summary says TENEPRIDE M and GALVUS MET and GLUCONORM G2, which are three different brands of it. Nor can you catch a duplicate: GLUCONORM G2 and GEMER are both glimepiride+metformin. A brand list is a list of packages, not of drugs.",
-
   "_confirmed": "confirmed=false means I am NOT sure of the molecule and it must not be trusted. Guessing a drug is the most dangerous thing this system could do. Those rows stay in review until a human checks the strip or the prescription.",
-
   "_device": "device=true means it is not a drug at all -- it came out of a discharge medication list but is equipment.",
-
   "drugs": {
-    "AMLODAC":        {"generic": ["Amlodipine"], "class": "antihypertensive", "confirmed": true},
-    "ATORVA":         {"generic": ["Atorvastatin"], "class": "statin", "confirmed": true},
-    "CLOPILET":       {"generic": ["Clopidogrel"], "class": "antiplatelet", "confirmed": true},
-    "ECOSPIRIN":      {"generic": ["Aspirin"], "class": "antiplatelet", "confirmed": true},
-    "ECOSPRIN AV":    {"generic": ["Aspirin", "Atorvastatin"], "class": "antiplatelet + statin", "confirmed": true},
-    "LOSAR":          {"generic": ["Losartan"], "class": "antihypertensive", "confirmed": true},
-    "LOSARTAN":       {"generic": ["Losartan"], "class": "antihypertensive", "confirmed": true},
-    "TELMA":          {"generic": ["Telmisartan"], "class": "antihypertensive", "confirmed": true},
-
-    "GALVUS MET":     {"generic": ["Vildagliptin", "Metformin"], "class": "antidiabetic", "confirmed": true},
-    "TENEPRIDE M":    {"generic": ["Teneligliptin", "Metformin"], "class": "antidiabetic", "confirmed": true},
-    "GLUCONORM G2":   {"generic": ["Glimepiride", "Metformin"], "class": "antidiabetic", "confirmed": true},
-    "GEMER":          {"generic": ["Glimepiride", "Metformin"], "class": "antidiabetic", "confirmed": true},
-    "JANUVIA":        {"generic": ["Sitagliptin"], "class": "antidiabetic", "confirmed": true},
-
-    "FARONEM":        {"generic": ["Faropenem"], "class": "antibiotic", "confirmed": true},
-    "LINID":          {"generic": ["Linezolid"], "class": "antibiotic", "confirmed": true},
-    "CAP. REALCEF":   {"generic": ["Cefixime"], "class": "antibiotic", "confirmed": true},
-
-    "UDILIV":         {"generic": ["Ursodeoxycholic acid"], "class": "hepatobiliary", "confirmed": true},
-    "PAN":            {"generic": ["Pantoprazole"], "class": "PPI", "confirmed": true},
-    "TAB. PAN - DSR": {"generic": ["Pantoprazole", "Domperidone"], "class": "PPI", "confirmed": true},
-    "ESOGRESS -D":    {"generic": ["Esomeprazole", "Domperidone"], "class": "PPI", "confirmed": true},
-    "CREMAFFIN PLUS": {"generic": ["Liquid paraffin", "Milk of magnesia", "Sodium picosulfate"], "class": "laxative", "confirmed": true},
-    "CHYMORAL FORTE": {"generic": ["Trypsin", "Chymotrypsin"], "class": "anti-inflammatory enzyme", "confirmed": true},
-
-    "D RISE":         {"generic": ["Cholecalciferol"], "class": "vitamin D", "confirmed": true},
-    "LUPI-D3":        {"generic": ["Cholecalciferol"], "class": "vitamin D", "confirmed": true},
-    "FOLVITE-MB":     {"generic": ["Folic acid", "Methylcobalamin"], "class": "vitamin", "confirmed": true},
-    "CAP. BECOSULES": {"generic": ["B-complex vitamins"], "class": "vitamin", "confirmed": true},
-    "TAB. CCM":       {"generic": ["Calcium citrate malate"], "class": "supplement", "confirmed": true},
-    "TAB. OROFER XT": {"generic": ["Ferrous ascorbate", "Folic acid"], "class": "iron supplement", "confirmed": true},
-
-    "FORACORT":       {"generic": ["Budesonide", "Formoterol"], "class": "inhaled bronchodilator/steroid", "confirmed": true},
-    "LEVOLIN":        {"generic": ["Levosalbutamol"], "class": "bronchodilator", "confirmed": true},
-    "TAB. ABPHYLLINE N": {"generic": ["Etofylline", "Theophylline"], "class": "bronchodilator", "confirmed": true},
-    "TAB. PULMOPRES": {"generic": ["Tadalafil"], "class": "pulmonary vasodilator", "confirmed": true},
-    "TAB. LASIX":     {"generic": ["Furosemide"], "class": "diuretic", "confirmed": true},
-    "TAB. LANOXIN":   {"generic": ["Digoxin"], "class": "cardiac glycoside", "confirmed": true},
-    "TAB. FEMARA":    {"generic": ["Letrozole"], "class": "aromatase inhibitor (breast cancer)", "confirmed": true},
-    "TAB. MODALERT":  {"generic": ["Modafinil"], "class": "wakefulness agent", "confirmed": true},
-
+    "AMLODAC": {
+      "generic": [
+        "Amlodipine"
+      ],
+      "class": "antihypertensive",
+      "confirmed": true
+    },
+    "ATORVA": {
+      "generic": [
+        "Atorvastatin"
+      ],
+      "class": "statin",
+      "confirmed": true
+    },
+    "CLOPILET": {
+      "generic": [
+        "Clopidogrel"
+      ],
+      "class": "antiplatelet",
+      "confirmed": true
+    },
+    "ECOSPRIN AV": {
+      "generic": [
+        "Aspirin",
+        "Atorvastatin"
+      ],
+      "class": "antiplatelet + statin",
+      "confirmed": true
+    },
+    "LOSAR": {
+      "generic": [
+        "Losartan"
+      ],
+      "class": "antihypertensive",
+      "confirmed": true
+    },
+    "LOSARTAN": {
+      "generic": [
+        "Losartan"
+      ],
+      "class": "antihypertensive",
+      "confirmed": true
+    },
+    "TELMA": {
+      "generic": [
+        "Telmisartan"
+      ],
+      "class": "antihypertensive",
+      "confirmed": true
+    },
+    "GALVUS MET": {
+      "generic": [
+        "Vildagliptin",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "TENEPRIDE M": {
+      "generic": [
+        "Teneligliptin",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "GLUCONORM G2": {
+      "generic": [
+        "Glimepiride",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "GEMER": {
+      "generic": [
+        "Glimepiride",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "JANUVIA": {
+      "generic": [
+        "Sitagliptin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "FARONEM": {
+      "generic": [
+        "Faropenem"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "LINID": {
+      "generic": [
+        "Linezolid"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "CAP. REALCEF": {
+      "generic": [
+        "Cefixime"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "UDILIV": {
+      "generic": [
+        "Ursodeoxycholic acid"
+      ],
+      "class": "hepatobiliary",
+      "confirmed": true
+    },
+    "PAN": {
+      "generic": [
+        "Pantoprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "TAB. PAN - DSR": {
+      "generic": [
+        "Pantoprazole",
+        "Domperidone"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "ESOGRESS -D": {
+      "generic": [
+        "Esomeprazole",
+        "Domperidone"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "CREMAFFIN PLUS": {
+      "generic": [
+        "Liquid paraffin",
+        "Milk of magnesia",
+        "Sodium picosulfate"
+      ],
+      "class": "laxative",
+      "confirmed": true
+    },
+    "CHYMORAL FORTE": {
+      "generic": [
+        "Trypsin",
+        "Chymotrypsin"
+      ],
+      "class": "anti-inflammatory enzyme",
+      "confirmed": true
+    },
+    "D RISE": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D",
+      "confirmed": true
+    },
+    "LUPI-D3": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D",
+      "confirmed": true
+    },
+    "FOLVITE-MB": {
+      "generic": [
+        "Folic acid",
+        "Methylcobalamin"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "CAP. BECOSULES": {
+      "generic": [
+        "B-complex vitamins"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "TAB. CCM": {
+      "generic": [
+        "Calcium citrate malate"
+      ],
+      "class": "supplement",
+      "confirmed": true
+    },
+    "TAB. OROFER XT": {
+      "generic": [
+        "Ferrous ascorbate",
+        "Folic acid"
+      ],
+      "class": "iron supplement",
+      "confirmed": true
+    },
+    "FORACORT": {
+      "generic": [
+        "Budesonide",
+        "Formoterol"
+      ],
+      "class": "inhaled bronchodilator/steroid",
+      "confirmed": true
+    },
+    "LEVOLIN": {
+      "generic": [
+        "Levosalbutamol"
+      ],
+      "class": "bronchodilator",
+      "confirmed": true
+    },
+    "TAB. ABPHYLLINE N": {
+      "generic": [
+        "Etofylline",
+        "Theophylline"
+      ],
+      "class": "bronchodilator",
+      "confirmed": true
+    },
+    "TAB. PULMOPRES": {
+      "generic": [
+        "Tadalafil"
+      ],
+      "class": "pulmonary vasodilator",
+      "confirmed": true
+    },
+    "TAB. LASIX": {
+      "generic": [
+        "Furosemide"
+      ],
+      "class": "diuretic",
+      "confirmed": true
+    },
+    "TAB. LANOXIN": {
+      "generic": [
+        "Digoxin"
+      ],
+      "class": "cardiac glycoside",
+      "confirmed": true
+    },
+    "TAB. FEMARA": {
+      "generic": [
+        "Letrozole"
+      ],
+      "class": "aromatase inhibitor (breast cancer)",
+      "confirmed": true
+    },
+    "TAB. MODALERT": {
+      "generic": [
+        "Modafinil"
+      ],
+      "class": "wakefulness agent",
+      "confirmed": true
+    },
     "_unsure_comment": "Below: I am NOT confident of the molecule. They stay in review. Read the strip or the original prescription.",
-    "BENALGIS":       {"generic": [], "class": "analgesic?", "confirmed": false},
-    "GB 29 SR":       {"generic": [], "class": "?", "confirmed": false},
-    "GLUCONORM AV":   {"generic": [], "class": "? (75mg strength does not fit an antidiabetic; may be aspirin+atorvastatin despite the Gluconorm name)", "confirmed": false},
-    "HEPAGRSS":       {"generic": [], "class": "hepatoprotective?", "confirmed": false},
-    "PROHANCE -HP":   {"generic": [], "class": "high-protein nutrition supplement, not a drug", "confirmed": false},
-    "NATOCARE":       {"generic": [], "class": "prenatal nutrition supplement", "confirmed": false},
-    "TAB. TOLPA-D":   {"generic": [], "class": "muscle relaxant + NSAID?", "confirmed": false},
-
-    "BIPAP AT NIGHT": {"generic": [], "class": "DEVICE, not a drug", "confirmed": true, "device": true}
+    "BENALGIS": {
+      "generic": [
+        "Benfotiamine"
+      ],
+      "class": "vitamin B1 derivative (diabetic neuropathy)",
+      "confirmed": true
+    },
+    "GB 29 SR": {
+      "generic": [
+        "Methylcobalamin",
+        "Pregabalin"
+      ],
+      "class": "neuropathic pain",
+      "confirmed": true
+    },
+    "GLUCONORM AV": {
+      "generic": [],
+      "class": "? (75mg strength does not fit an antidiabetic; may be aspirin+atorvastatin despite the Gluconorm name)",
+      "confirmed": false
+    },
+    "HEPAGRSS": {
+      "generic": [
+        "Lactoferrin",
+        "Bacillus clausii"
+      ],
+      "class": "probiotic supplement (as printed on the discharge)",
+      "confirmed": true
+    },
+    "PROHANCE -HP": {
+      "generic": [],
+      "class": "high-protein nutrition supplement, not a drug",
+      "confirmed": false
+    },
+    "NATOCARE": {
+      "generic": [],
+      "class": "prenatal nutrition supplement",
+      "confirmed": false
+    },
+    "TAB. TOLPA-D": {
+      "generic": [],
+      "class": "muscle relaxant + NSAID?",
+      "confirmed": false
+    },
+    "BIPAP AT NIGHT": {
+      "generic": [],
+      "class": "DEVICE, not a drug",
+      "confirmed": true,
+      "device": true
+    },
+    "GLYCOMET GP": {
+      "generic": [
+        "Metformin",
+        "Glimepiride"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "GLYCOMET": {
+      "generic": [
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "ALPRAX": {
+      "generic": [
+        "Alprazolam"
+      ],
+      "class": "benzodiazepine",
+      "confirmed": true
+    },
+    "CILOSTAZOL": {
+      "generic": [
+        "Cilostazol"
+      ],
+      "class": "antiplatelet / vasodilator (peripheral arterial disease)",
+      "confirmed": true
+    },
+    "DYTOR": {
+      "generic": [
+        "Torsemide"
+      ],
+      "class": "loop diuretic",
+      "confirmed": true
+    },
+    "ECOSPRIN": {
+      "generic": [
+        "Aspirin"
+      ],
+      "class": "antiplatelet",
+      "confirmed": true
+    },
+    "ECOSPIRIN": {
+      "generic": [
+        "Aspirin"
+      ],
+      "class": "antiplatelet (common misspelling of Ecosprin)",
+      "confirmed": true
+    },
+    "CLEXANE": {
+      "generic": [
+        "Enoxaparin"
+      ],
+      "class": "low-molecular-weight heparin",
+      "confirmed": true
+    },
+    "LEVOFLOX": {
+      "generic": [
+        "Levofloxacin"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "PANTODAC": {
+      "generic": [
+        "Pantoprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "HYPONAT O": {
+      "generic": [
+        "Tolvaptan"
+      ],
+      "class": "vasopressin V2 antagonist (hyponatraemia)",
+      "confirmed": true
+    },
+    "HYPONAT": {
+      "generic": [
+        "Tolvaptan"
+      ],
+      "class": "vasopressin V2 antagonist (hyponatraemia)",
+      "confirmed": true
+    },
+    "SODAMINT": {
+      "generic": [
+        "Sodium bicarbonate"
+      ],
+      "class": "alkalinising agent",
+      "confirmed": true
+    },
+    "DESKAST": {
+      "generic": [
+        "Montelukast",
+        "Levocetirizine"
+      ],
+      "class": "antihistamine + leukotriene antagonist",
+      "confirmed": true
+    },
+    "FOLVITE": {
+      "generic": [
+        "Folic acid"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "HEPAGRESS": {
+      "generic": [
+        "Lactoferrin",
+        "Bacillus clausii"
+      ],
+      "class": "probiotic supplement",
+      "confirmed": true
+    },
+    "PROHANCE HP": {
+      "generic": [],
+      "class": "high-protein nutritional supplement (not a drug)",
+      "confirmed": true
+    },
+    "_document_error_note": "A discharge summary printed 'GLUCONORM AV 75'. No such product exists; it was ECOSPRIN AV 75. The extractor read the page correctly -- the PAGE was wrong. Corrections like this are why a human reviews a drug list.",
+    "METFORMIN": {
+      "generic": [
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "ATORVASTATIN": {
+      "generic": [
+        "Atorvastatin"
+      ],
+      "class": "statin",
+      "confirmed": true
+    },
+    "VILDAGLIPTIN": {
+      "generic": [
+        "Vildagliptin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "VILDAGLIPTIN 50/METFORMIN": {
+      "generic": [
+        "Vildagliptin",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "CALCIUM AND VITAMIN D3": {
+      "generic": [
+        "Calcium",
+        "Cholecalciferol"
+      ],
+      "class": "supplement",
+      "confirmed": true
+    },
+    "GLUCONORM G3": {
+      "generic": [
+        "Glimepiride",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "METFORMIN HYDROCHLORIDE PROLONGED RELEASE AND GLIMEPIRIDE": {
+      "generic": [
+        "Metformin",
+        "Glimepiride"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "CYTODROX": {
+      "generic": [
+        "Hydroxyurea"
+      ],
+      "class": "cytoreductive (MDS/MPN)",
+      "confirmed": true
+    },
+    "ELROMO": {
+      "generic": [
+        "Eltrombopag"
+      ],
+      "class": "thrombopoietin receptor agonist (MDS/MPN)",
+      "confirmed": true
+    },
+    "GALVUSMET": {
+      "generic": [
+        "Vildagliptin",
+        "Metformin"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "ARBITEL": {
+      "generic": [
+        "Telmisartan"
+      ],
+      "class": "antihypertensive",
+      "confirmed": true
+    },
+    "LIMCEE": {
+      "generic": [
+        "Ascorbic acid"
+      ],
+      "class": "vitamin C",
+      "confirmed": true
+    },
+    "ULTRACET": {
+      "generic": [
+        "Tramadol",
+        "Paracetamol"
+      ],
+      "class": "analgesic",
+      "confirmed": true
+    },
+    "RAPILIF": {
+      "generic": [
+        "Silodosin"
+      ],
+      "class": "alpha blocker (BPH)",
+      "confirmed": true
+    },
+    "PEVESCA PLUS": {
+      "generic": [
+        "Pregabalin",
+        "Methylcobalamin"
+      ],
+      "class": "neuropathic pain",
+      "confirmed": true
+    },
+    "PEVESCA": {
+      "generic": [
+        "Pregabalin"
+      ],
+      "class": "neuropathic pain",
+      "confirmed": true
+    },
+    "PREGABA NT": {
+      "generic": [
+        "Pregabalin",
+        "Nortriptyline"
+      ],
+      "class": "neuropathic pain",
+      "confirmed": true
+    },
+    "PLATIFY": {
+      "generic": [],
+      "class": "?",
+      "confirmed": false
+    },
+    "DIAFOOT": {
+      "generic": [],
+      "class": "diabetic foot cream (topical)",
+      "confirmed": true
+    },
+    "MOREASE": {
+      "generic": [
+        "Mebeverine"
+      ],
+      "class": "antispasmodic (IBS)",
+      "confirmed": true
+    },
+    "BENIZEP": {
+      "generic": [
+        "Mebeverine"
+      ],
+      "class": "antispasmodic (IBS)",
+      "confirmed": true
+    },
+    "SYMBULARDI": {
+      "generic": [
+        "Saccharomyces boulardii"
+      ],
+      "class": "probiotic",
+      "confirmed": true
+    },
+    "ESOGRESS-L": {
+      "generic": [
+        "Levosulpiride",
+        "Esomeprazole"
+      ],
+      "class": "PPI + prokinetic",
+      "confirmed": true
+    },
+    "ESUPRESS": {
+      "generic": [
+        "Esomeprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "ROSUVAS CV": {
+      "generic": [
+        "Rosuvastatin",
+        "Clopidogrel"
+      ],
+      "class": "statin + antiplatelet",
+      "confirmed": true
+    },
+    "ROSUVAS": {
+      "generic": [
+        "Rosuvastatin"
+      ],
+      "class": "statin",
+      "confirmed": true
+    },
+    "COLOWIPE": {
+      "generic": [],
+      "class": "bowel preparation (composition not recorded)",
+      "confirmed": true
+    },
+    "GLIMEPIRIDE": {
+      "generic": [
+        "Glimepiride"
+      ],
+      "class": "antidiabetic",
+      "confirmed": true
+    },
+    "CALCIUM CARBONATE +VIT D3": {
+      "generic": [
+        "Calcium carbonate",
+        "Cholecalciferol"
+      ],
+      "class": "supplement",
+      "confirmed": true
+    },
+    "ESTRABET": {
+      "generic": [
+        "Estradiol valerate"
+      ],
+      "class": "oestrogen (IVF)",
+      "confirmed": true
+    },
+    "DYDROCARE": {
+      "generic": [
+        "Dydrogesterone"
+      ],
+      "class": "progestogen (IVF)",
+      "confirmed": true
+    },
+    "DYDROGESTERONE": {
+      "generic": [
+        "Dydrogesterone"
+      ],
+      "class": "progestogen (IVF)",
+      "confirmed": true
+    },
+    "GESTONE": {
+      "generic": [
+        "Progesterone"
+      ],
+      "class": "progestogen injection (IVF)",
+      "confirmed": true
+    },
+    "E2V GEL": {
+      "generic": [
+        "Estradiol"
+      ],
+      "class": "oestrogen gel (IVF)",
+      "confirmed": true
+    },
+    "INVITRO-F": {
+      "generic": [],
+      "class": "fertility nutritional supplement",
+      "confirmed": true
+    },
+    "MENOPUR": {
+      "generic": [
+        "Menotropins"
+      ],
+      "class": "gonadotropin (IVF)",
+      "confirmed": true
+    },
+    "WYSOLONE": {
+      "generic": [
+        "Prednisolone"
+      ],
+      "class": "corticosteroid",
+      "confirmed": true
+    },
+    "CUTENOX": {
+      "generic": [
+        "Enoxaparin"
+      ],
+      "class": "low-molecular-weight heparin",
+      "confirmed": true
+    },
+    "PARIHEP": {
+      "generic": [
+        "Enoxaparin"
+      ],
+      "class": "low-molecular-weight heparin",
+      "confirmed": true
+    },
+    "EVANOGEST": {
+      "generic": [
+        "Progesterone"
+      ],
+      "class": "progestogen",
+      "confirmed": true
+    },
+    "SUGEST": {
+      "generic": [
+        "Progesterone"
+      ],
+      "class": "progestogen",
+      "confirmed": true
+    },
+    "PREGAFEM": {
+      "generic": [
+        "Progesterone"
+      ],
+      "class": "progestogen",
+      "confirmed": true
+    },
+    "VITKYCAL D3": {
+      "generic": [
+        "Calcium",
+        "Cholecalciferol"
+      ],
+      "class": "supplement",
+      "confirmed": true
+    },
+    "HCG": {
+      "generic": [
+        "Chorionic gonadotropin"
+      ],
+      "class": "gonadotropin (IVF)",
+      "confirmed": true
+    },
+    "L-ARGININE": {
+      "generic": [
+        "L-Arginine"
+      ],
+      "class": "supplement",
+      "confirmed": true
+    },
+    "PREGZIL": {
+      "generic": [
+        "Choline",
+        "Docosahexaenoic acid",
+        "L-Methylfolate",
+        "Methylcobalamin",
+        "Pyridoxal 5 phosphate"
+      ],
+      "class": "prenatal supplement",
+      "confirmed": true
+    },
+    "SIROSE LP": {
+      "generic": [
+        "Ferric pyrophosphate",
+        "Ascorbic acid",
+        "Methylcobalamin",
+        "Folic acid"
+      ],
+      "class": "liposomal iron (iron-deficiency anaemia)",
+      "confirmed": true
+    },
+    "MATILDA FORTE": {
+      "generic": [
+        "Methylcobalamin",
+        "Alpha lipoic acid",
+        "Folic acid",
+        "Pyridoxine",
+        "Biotin"
+      ],
+      "class": "neurotropic supplement",
+      "confirmed": true
+    },
+    "Q4LIC PLUS": {
+      "generic": [
+        "Methyltetrahydrofolic acid",
+        "Glucosamine salt",
+        "Methylcobalamin",
+        "Pyridoxine"
+      ],
+      "class": "folate + B-vitamin supplement",
+      "confirmed": true
+    },
+    "PROGYNOVA": {
+      "generic": [
+        "Estradiol valerate"
+      ],
+      "class": "oestrogen (IVF)",
+      "confirmed": true
+    },
+    "DUPHASTON": {
+      "generic": [
+        "Dydrogesterone"
+      ],
+      "class": "progestogen",
+      "confirmed": true
+    },
+    "SUSTEN": {
+      "generic": [
+        "Progesterone"
+      ],
+      "class": "vaginal progesterone",
+      "confirmed": true
+    },
+    "ESTROGEL": {
+      "generic": [
+        "Estradiol"
+      ],
+      "class": "oestrogen gel",
+      "confirmed": true
+    },
+    "SILDENAFIL": {
+      "generic": [
+        "Sildenafil"
+      ],
+      "class": "vasodilator (endometrial blood flow in IVF)",
+      "confirmed": true
+    },
+    "THYRONORM": {
+      "generic": [
+        "Levothyroxine"
+      ],
+      "class": "thyroid hormone",
+      "confirmed": true
+    },
+    "THYROXINE": {
+      "generic": [
+        "Levothyroxine"
+      ],
+      "class": "thyroid hormone",
+      "confirmed": true
+    },
+    "PRIMOLUT N": {
+      "generic": [
+        "Norethisterone"
+      ],
+      "class": "progestogen",
+      "confirmed": true
+    },
+    "LETROZOLE": {
+      "generic": [
+        "Letrozole"
+      ],
+      "class": "ovulation induction",
+      "confirmed": true
+    },
+    "FERTIGYN": {
+      "generic": [
+        "Chorionic gonadotropin"
+      ],
+      "class": "gonadotropin (IVF)",
+      "confirmed": true
+    },
+    "Q GOLD": {
+      "generic": [
+        "Coenzyme Q10"
+      ],
+      "class": "fertility supplement",
+      "confirmed": true
+    },
+    "EVION": {
+      "generic": [
+        "Vitamin E"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "DOXY": {
+      "generic": [
+        "Doxycycline"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "NORFLOX": {
+      "generic": [
+        "Norfloxacin"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "URISPAS": {
+      "generic": [
+        "Flavoxate"
+      ],
+      "class": "urinary antispasmodic",
+      "confirmed": true
+    },
+    "CITALKA": {
+      "generic": [
+        "Potassium citrate"
+      ],
+      "class": "urinary alkaliniser",
+      "confirmed": true
+    },
+    "DOLO": {
+      "generic": [
+        "Paracetamol"
+      ],
+      "class": "analgesic/antipyretic",
+      "confirmed": true
+    },
+    "NEUKINE": {
+      "generic": [
+        "Filgrastim"
+      ],
+      "class": "G-CSF",
+      "confirmed": true
+    },
+    "FOLADEX": {
+      "generic": [
+        "Folic acid"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "TAXIM-O": {
+      "generic": [
+        "Cefixime"
+      ],
+      "class": "antibiotic",
+      "confirmed": true
+    },
+    "OVACARE FORTE": {
+      "generic": [],
+      "class": "fertility nutritional supplement",
+      "confirmed": true
+    },
+    "B-LONGA": {
+      "generic": [
+        "B-complex vitamins"
+      ],
+      "class": "vitamin",
+      "confirmed": true
+    },
+    "ITRABOND": {
+      "generic": [
+        "Itraconazole"
+      ],
+      "class": "antifungal",
+      "confirmed": true
+    },
+    "FLUCONAZOLE": {
+      "generic": [
+        "Fluconazole"
+      ],
+      "class": "antifungal",
+      "confirmed": true
+    },
+    "ZYCEL": {
+      "generic": [
+        "Celecoxib"
+      ],
+      "class": "NSAID (COX-2)",
+      "confirmed": true
+    },
+    "NAPROF": {
+      "generic": [
+        "Naproxen"
+      ],
+      "class": "NSAID",
+      "confirmed": true
+    },
+    "RIFAXY": {
+      "generic": [
+        "Rifaximin"
+      ],
+      "class": "antibiotic (IBS)",
+      "confirmed": true
+    },
+    "MINOZ": {
+      "generic": [
+        "Minocycline"
+      ],
+      "class": "antibiotic (acne)",
+      "confirmed": true
+    },
+    "BREVOXYL": {
+      "generic": [
+        "Benzoyl peroxide"
+      ],
+      "class": "topical (acne)",
+      "confirmed": true
+    },
+    "NEXPRO RD": {
+      "generic": [
+        "Esomeprazole",
+        "Domperidone"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "TELEKAST-F": {
+      "generic": [
+        "Montelukast",
+        "Fexofenadine"
+      ],
+      "class": "antihistamine + leukotriene antagonist",
+      "confirmed": true
+    },
+    "ALLEGRA": {
+      "generic": [
+        "Fexofenadine"
+      ],
+      "class": "antihistamine",
+      "confirmed": true
+    },
+    "MYOSPAS-TH8": {
+      "generic": [
+        "Thiocolchicoside",
+        "Aceclofenac"
+      ],
+      "class": "muscle relaxant + NSAID",
+      "confirmed": true
+    }
   }
 }

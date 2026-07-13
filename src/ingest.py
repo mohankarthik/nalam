@@ -219,7 +219,7 @@ def ingest_discharge(
     """
     from src.extractor import extract_discharge
     from src.people import load_people, shared_name_tokens
-    from src.validator import names_a_baby, patient_matches
+    from src.validator import names_a_baby, parse_age_years, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -242,11 +242,40 @@ def ingest_discharge(
     people = load_people()
     shared = shared_name_tokens()
 
+    folder_person = people.get(subject)
+    printed_years = parse_age_years(printed_age)
+
     if names_a_baby(printed, printed_age):
-        if not people.get(subject, None) or not people[subject].child:
+        if not folder_person or not folder_person.child:
             logger.warning(
-                f"{rel_path}: names a baby ({printed!r}) but the folder is not a "
-                f"child's ({subject!r}). Filing per the folder; please check."
+                f"{rel_path}: reads as a child's document ({printed!r}, age "
+                f"{printed_age!r}) but the folder is not a child's ({subject!r})."
+            )
+    elif (
+        folder_person
+        and folder_person.born
+        and doc_date
+        and doc_date.isoformat() < folder_person.born
+    ):
+        # The document predates the child's birth, so it cannot be the child's --
+        # whatever the folder says. A pregnancy folder under a child's name holds
+        # the MOTHER's consultations, and her progesterone and enoxaparin were
+        # being recorded as her unborn son's medication.
+        for candidate in people.values():
+            if printed and patient_matches(printed, candidate.correspondent, shared):
+                misfiled_to = candidate.correspondent
+                break
+        if not misfiled_to:
+            logger.warning(
+                f"{rel_path}: dated {doc_date} but {subject} was born "
+                f"{folder_person.born}. Cannot be theirs, and the document names "
+                f"{printed or 'nobody'}. Needs a human."
+            )
+    elif folder_person and folder_person.child and printed_years is None:
+        if printed and not patient_matches(printed, subject, shared):
+            logger.warning(
+                f"{rel_path}: names {printed!r} in a child's folder but prints no "
+                f"age. Keeping the folder's answer ({subject!r})."
             )
     elif printed and not patient_matches(printed, subject, shared):
         for candidate in people.values():
@@ -308,8 +337,29 @@ def ingest_discharge(
         n_enc = 1
 
     effective = _iso(enc.get("discharged")) or (doc_date.isoformat() if doc_date else None)
+
+    # Re-ingesting a document must REPLACE its medications, not add another copy.
+    # Without this, every re-run duplicated them -- one document was ingested six
+    # times today (re-attribution, folder overrides) and its two drugs became
+    # twelve rows. Human corrections are kept: a person's decision outranks a
+    # re-read, and re-extracting must never silently discard it.
+    reviewed = {
+        r["raw_text"]
+        for r in con.execute(
+            "SELECT raw_text FROM medication_events "
+            "WHERE document_id = ? AND entered_by = 'human'",
+            (document_id,),
+        )
+    }
+    con.execute(
+        "DELETE FROM medication_events WHERE document_id = ? AND entered_by = 'extractor'",
+        (document_id,),
+    )
+
     n_med = 0
     for m in d.medications:
+        if json.dumps(m, ensure_ascii=False) in reviewed:
+            continue  # a human already ruled on this line
         drug = (m.get("drug") or "").strip()
         if not drug:
             continue
@@ -368,7 +418,7 @@ def ingest_prescription(
     """
     from src.extractor import extract_prescription
     from src.people import load_people, shared_name_tokens
-    from src.validator import names_a_baby, patient_matches
+    from src.validator import names_a_baby, parse_age_years, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -392,16 +442,29 @@ def ingest_prescription(
     people = load_people()
     shared = shared_name_tokens()
 
+    folder_person = people.get(subject)
+    printed_years = parse_age_years(printed_age)
+
     if names_a_baby(printed, printed_age):
-        # "B/O Alice Doe", age "1 Month 14 Days": the patient is that person's
-        # BABY, not that person. The folder knows which child; the document does
-        # not. Re-filing here would move a premature infant's retinopathy notes
-        # into his mother's record -- which is exactly what happened before this
-        # check existed.
-        if not people.get(subject, None) or not people[subject].child:
+        # A child's document, named for a parent. The folder knows WHICH child;
+        # the document only names the parent to identify it. Re-filing here moved
+        # a premature infant's retinopathy notes into his mother's record.
+        if not folder_person or not folder_person.child:
             logger.warning(
-                f"{rel_path}: names a baby ({printed!r}) but the folder is not a "
-                f"child's ({subject!r}). Filing per the folder; please check."
+                f"{rel_path}: reads as a child's document ({printed!r}, age "
+                f"{printed_age!r}) but the folder is not a child's ({subject!r}). "
+                f"Filing per the folder; please check."
+            )
+    elif folder_person and folder_person.child and printed_years is None:
+        # A child's folder, and the document gives no age to argue with. Do NOT
+        # re-file on a name alone: handwriting turns "B/O Alice Doe" into "Rlo
+        # Alice Dohe", whose only legible token is the mother's given name. The
+        # folder is the safer authority, and a wrongly re-filed child's record is
+        # worse than one left where it already was.
+        if printed and not patient_matches(printed, subject, shared):
+            logger.warning(
+                f"{rel_path}: names {printed!r} in a child's folder but prints no "
+                f"age. Keeping the folder's answer ({subject!r}); please check."
             )
     elif printed and not patient_matches(printed, subject, shared):
         for candidate in people.values():
@@ -462,8 +525,28 @@ def ingest_prescription(
             ),
         )
 
+    # Re-ingesting a document must REPLACE its medications, not add another copy.
+    # Without this, every re-run duplicated them -- one document was ingested six
+    # times today (re-attribution, folder overrides) and its two drugs became
+    # twelve rows. Human corrections are kept: a person's decision outranks a
+    # re-read, and re-extracting must never silently discard it.
+    reviewed = {
+        r["raw_text"]
+        for r in con.execute(
+            "SELECT raw_text FROM medication_events "
+            "WHERE document_id = ? AND entered_by = 'human'",
+            (document_id,),
+        )
+    }
+    con.execute(
+        "DELETE FROM medication_events WHERE document_id = ? AND entered_by = 'extractor'",
+        (document_id,),
+    )
+
     n_med = n_uncorroborated = 0
     for m in p.medications:
+        if json.dumps(m, ensure_ascii=False) in reviewed:
+            continue  # a human already ruled on this line
         drug = (m.get("drug") or "").strip()
         corroborated = bool(m.get("corroborated"))
         if not corroborated:
@@ -495,7 +578,10 @@ def ingest_prescription(
                 effective,
                 json.dumps(m, ensure_ascii=False),
                 "extractor",
-                "review",
+                # Corroborated by an independent reading of the page -> trusted.
+                # Not corroborated -> review. That distinction is the entire point
+                # of having an oracle; marking everything 'review' throws it away.
+                "ok" if corroborated else "review",
                 reason,
             ),
         )

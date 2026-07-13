@@ -99,3 +99,48 @@ class TestSharedSurnames:
 
     def test_completely_different_names_never_match(self) -> None:
         assert not patient_matches("Bob Smith", "Alice Doe", self.SHARED)
+
+
+class TestAgeIsTheDiscriminator:
+    """The label is what handwriting destroys. The age is what settles it.
+
+    A prefix check on "B/O" caught the printed neonatal charts. It did NOT catch
+    a handwritten one, where OCR turned "B/O Alice Doe" into "Rlo Alice Dohe"
+    -- whose only legible token is the mother's given name. No prefix pattern will
+    ever catch that.
+
+    But the same document said the patient was "3m" old. Nobody's mother is three
+    months old. Parse the age, and the question answers itself.
+    """
+
+    @pytest.mark.parametrize(
+        "age, years",
+        [
+            ("3m", 0.25),
+            ("1 Month 14 Days", 1 / 12 + 14 / 365),
+            ("6 Weeks", 6 / 52),
+            ("3 Days", 3 / 365),
+            ("2y", 2.0),
+            ("34 Yr(s)", 34.0),
+            ("84 Year(s)", 84.0),
+        ],
+    )
+    def test_ages_are_parsed_however_they_are_written(self, age, years) -> None:
+        from src.validator import parse_age_years
+
+        got = parse_age_years(age)
+        assert got is not None and abs(got - years) < 0.02
+
+    def test_the_document_that_broke_it(self) -> None:
+        """OCR of a handwritten neonatal chart. The name is unrecognisable; the
+        age is not."""
+        assert names_a_baby("Rlo Alice Dohe", "3m"), "3 months old is not a mother"
+
+    def test_an_adult_age_settles_it_the_other_way(self) -> None:
+        """A mother's delivery summary genuinely does sit in the child's folder.
+        An adult age must still re-file it to her."""
+        assert not names_a_baby("Alice Doe", "34 Yr(s)")
+
+    def test_no_age_falls_back_to_the_name(self) -> None:
+        assert names_a_baby("B/O ALICE DOE", "")
+        assert not names_a_baby("Alice Doe", "")

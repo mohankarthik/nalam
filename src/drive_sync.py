@@ -131,6 +131,9 @@ def collect(root: str = MEDICAL_ROOT) -> tuple[list[Doc], list[str]]:
     folder_to_person: dict[str, str] = {
         folder: entry["correspondent"] for folder, entry in people["people"].items()
     }
+    # A folder organised around an EVENT rather than a patient -- a pregnancy --
+    # collects the PARENTS' records under the child's name. Longest prefix wins.
+    overrides: dict[str, str] = people.get("folder_overrides", {})
     skip_folders: set[str] = set(people["skip_folders"])
     tag_map: dict[str, str] = specialties["tags"]
     default_tag: str = specialties["default_tag"]
@@ -155,6 +158,12 @@ def collect(root: str = MEDICAL_ROOT) -> tuple[list[Doc], list[str]]:
             unmapped.add(folder)
             continue
 
+        dir_correspondent = correspondent
+        for prefix, who in sorted(overrides.items(), key=lambda kv: -len(kv[0])):
+            if rel_dir == prefix or rel_dir.startswith(prefix + os.sep):
+                dir_correspondent = who
+                break
+
         # First path segment under the person that names a known specialty.
         tag = default_tag
         for part in parts[1:]:
@@ -169,6 +178,16 @@ def collect(root: str = MEDICAL_ROOT) -> tuple[list[Doc], list[str]]:
                 skipped.append(os.path.relpath(path, root))
                 continue
             rel = os.path.relpath(path, root)
+
+            # An override may name an exact FILE, not just a folder: a handwritten
+            # form with a blank name field gives the document nothing to override
+            # the folder with, so the folder's default would silently take it.
+            correspondent = dir_correspondent
+            for prefix, who in sorted(overrides.items(), key=lambda kv: -len(kv[0])):
+                if rel == prefix:
+                    correspondent = who
+                    break
+
             stem = os.path.splitext(name)[0]
             title, created = parse_name(stem, os.path.basename(dirpath))
             docs.append(

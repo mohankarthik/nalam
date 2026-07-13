@@ -1,5 +1,11 @@
 """SQLite store. `health.db` is the source of truth; the Sheet is a view of it.
 
+Identity columns are COLLATE NOCASE. `Ecosprin`, `ECOSPRIN` and `T. Ecosprin`
+are the same drug, and grouping them as three was simply wrong -- but LOWERCASING
+what we store would have been wrong too: the whole design rests on keeping the
+document's own words. So the stored text keeps its case and only the COMPARISON
+ignores it.
+
 Column names follow FHIR (Observation.subject / .code / .effectiveDateTime /
 .valueQuantity) even though this is plain SQLite. It costs nothing now and keeps
 a future move to Postgres or Medplum cheap.
@@ -29,11 +35,11 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
     id            INTEGER PRIMARY KEY,
     paperless_id  INTEGER UNIQUE,          -- link back to the scan + viewer
-    subject       TEXT    NOT NULL,        -- FHIR Patient: the correspondent
+    subject       TEXT COLLATE NOCASE    NOT NULL,        -- FHIR Patient: the correspondent
     source_path   TEXT    NOT NULL UNIQUE, -- path under the Drive Medical root
-    doc_type      TEXT    NOT NULL,        -- lab | prescription | radiology | ...
+    doc_type      TEXT COLLATE NOCASE    NOT NULL,        -- lab | prescription | radiology | ...
     doc_date      TEXT,                    -- ISO; from the filename
-    lab           TEXT,                    -- as printed on the document
+    lab           TEXT COLLATE NOCASE,                    -- as printed on the document
     model         TEXT,                    -- which LLM read it
     text_layer    INTEGER NOT NULL DEFAULT 0,  -- 1 = had extractable text
     extracted_at  TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -55,20 +61,20 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS observations (
     id            INTEGER PRIMARY KEY,
     document_id   INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    subject       TEXT    NOT NULL,   -- denormalised: every query filters on it
-    segment       TEXT,               -- panel: Glucose, KFT, LFT, CBC, ...
-    analyte       TEXT,               -- canonical name; NULL = not in codebook yet
-    printed_name  TEXT    NOT NULL,   -- what the lab actually called it
-    section       TEXT,               -- the report section it sat under
+    subject       TEXT COLLATE NOCASE    NOT NULL,   -- denormalised: every query filters on it
+    segment       TEXT COLLATE NOCASE,               -- panel: Glucose, KFT, LFT, CBC, ...
+    analyte       TEXT COLLATE NOCASE,               -- canonical name; NULL = not in codebook yet
+    printed_name  TEXT COLLATE NOCASE    NOT NULL,   -- what the lab actually called it
+    section       TEXT COLLATE NOCASE,               -- the report section it sat under
     effective     TEXT,               -- ISO collection date
     value_num     REAL,               -- exactly one of value_num / value_text
     value_text    TEXT,
     raw_value     TEXT    NOT NULL,   -- verbatim, as printed. Never lose this.
-    unit          TEXT,
+    unit          TEXT COLLATE NOCASE,
     ref_low       REAL,               -- the LAB's printed range (provenance only)
     ref_high      REAL,
     source_quality TEXT NOT NULL DEFAULT 'text',  -- text | image | handwritten
-    status        TEXT NOT NULL DEFAULT 'ok',     -- ok | review
+    status        TEXT COLLATE NOCASE NOT NULL DEFAULT 'ok',     -- ok | review
     review_reason TEXT,                           -- JSON array; NULL when ok
     UNIQUE (subject, printed_name, effective, raw_value)
 );
@@ -82,8 +88,8 @@ CREATE INDEX IF NOT EXISTS idx_obs_unnamed
 CREATE TABLE IF NOT EXISTS encounters (
     id             INTEGER PRIMARY KEY,
     document_id    INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    subject        TEXT NOT NULL,
-    hospital       TEXT,
+    subject        TEXT COLLATE NOCASE NOT NULL,
+    hospital       TEXT COLLATE NOCASE,
     admitted       TEXT,          -- ISO
     discharged     TEXT,          -- ISO
     reason         TEXT,          -- presenting complaint, as written
@@ -103,19 +109,19 @@ CREATE TABLE IF NOT EXISTS encounters (
 CREATE TABLE IF NOT EXISTS medication_events (
     id           INTEGER PRIMARY KEY,
     document_id  INTEGER REFERENCES documents(id) ON DELETE CASCADE,
-    subject      TEXT NOT NULL,
-    drug         TEXT NOT NULL,   -- as printed. Indian brand names are common.
-    generic      TEXT,            -- molecule(s), once mapped. NULL = not yet.
+    subject      TEXT COLLATE NOCASE NOT NULL,
+    drug         TEXT COLLATE NOCASE NOT NULL,   -- as printed. Indian brand names are common.
+    generic      TEXT COLLATE NOCASE,            -- molecule(s), once mapped. NULL = not yet.
     strength     TEXT,
-    form         TEXT,            -- tablet / capsule / syrup / injection
+    form         TEXT COLLATE NOCASE,            -- tablet / capsule / syrup / injection
     dose         TEXT,
     frequency    TEXT,            -- as written: "1-0-1", "BD", "once daily"
     duration     TEXT,
-    event        TEXT NOT NULL,   -- prescribed | stopped | changed | continued
+    event        TEXT COLLATE NOCASE NOT NULL,   -- prescribed | stopped | changed | continued
     effective    TEXT,            -- ISO
     raw_text     TEXT NOT NULL,   -- the line as printed. Never lose it.
-    entered_by   TEXT NOT NULL DEFAULT 'extractor',  -- extractor | human
-    status       TEXT NOT NULL DEFAULT 'review',     -- review | ok
+    entered_by   TEXT COLLATE NOCASE NOT NULL DEFAULT 'extractor',  -- extractor | human
+    status       TEXT COLLATE NOCASE NOT NULL DEFAULT 'review',     -- review | ok
     review_reason TEXT
 );
 
@@ -126,9 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_med_subject ON medication_events (subject, effect
 CREATE TABLE IF NOT EXISTS review_queue (
     id            INTEGER PRIMARY KEY,
     document_id   INTEGER REFERENCES documents(id) ON DELETE CASCADE,
-    subject       TEXT    NOT NULL,
-    kind          TEXT    NOT NULL,   -- patient_mismatch
-    printed_name  TEXT,
+    subject       TEXT COLLATE NOCASE    NOT NULL,
+    kind          TEXT COLLATE NOCASE    NOT NULL,   -- patient_mismatch
+    printed_name  TEXT COLLATE NOCASE,
     raw_value     TEXT,
     reasons       TEXT    NOT NULL,   -- JSON array of why
     resolved      INTEGER NOT NULL DEFAULT 0,

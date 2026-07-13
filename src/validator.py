@@ -96,21 +96,62 @@ _NEONATAL = re.compile(
     re.IGNORECASE,
 )
 
-# "1 Month 14 Days", "3 Days", "6 Weeks" -- nobody's mother is six weeks old.
-_INFANT_AGE = re.compile(
-    r"^\s*\d+\s*(day|days|week|weeks|month|months)\b", re.IGNORECASE
+# Ages are written every possible way: "1 Month 14 Days", "3m", "3 mo", "6 Weeks",
+# "34 Yr(s)", "84 Year(s)", "2y". Parse to years rather than pattern-matching a
+# label, because the LABEL is what the handwriting mangles and the AGE is what
+# actually settles the question.
+_AGE_PART = re.compile(
+    r"(\d+(?:\.\d+)?)\s*"
+    r"(y(?:ea)?rs?|y|yr\(s\)|year\(s\)|m(?:on)?(?:th)?s?|mo|w(?:ee)?ks?|w|d(?:ay)?s?|d)\b",
+    re.IGNORECASE,
 )
+_UNIT_YEARS = {
+    "y": 1.0, "yr": 1.0, "yrs": 1.0, "year": 1.0, "years": 1.0,
+    "yr(s)": 1.0, "year(s)": 1.0,
+    "m": 1 / 12, "mo": 1 / 12, "mon": 1 / 12, "month": 1 / 12, "months": 1 / 12,
+    "mths": 1 / 12, "mth": 1 / 12, "ms": 1 / 12,
+    "w": 1 / 52, "wk": 1 / 52, "wks": 1 / 52, "week": 1 / 52, "weeks": 1 / 52,
+    "d": 1 / 365, "day": 1 / 365, "days": 1 / 365, "ds": 1 / 365,
+}
+
+ADULT_YEARS = 18.0
+
+
+def parse_age_years(printed_age: str) -> Optional[float]:
+    """'3m' -> 0.25. '1 Month 14 Days' -> 0.12. '84 Year(s)' -> 84. None if unreadable."""
+    total = 0.0
+    found = False
+    for value, unit in _AGE_PART.findall(printed_age or ""):
+        factor = _UNIT_YEARS.get(unit.lower())
+        if factor is None:
+            continue
+        total += float(value) * factor
+        found = True
+    return total if found else None
 
 
 def names_a_baby(printed_name: str, printed_age: str = "") -> bool:
-    """Is this a NEONATAL record, labelled with the parent's name?
+    """Is the patient a CHILD, named on the page by reference to a parent?
 
-    True means: the patient is this person's baby, NOT this person. The folder
-    knows which child it is; the document does not.
+    True means: the patient is this person's child, NOT this person.
+
+    The AGE decides it, not the label. The label is the thing handwriting
+    destroys: "B/O Alice Doe" came back from OCR as "Rlo Alice Dohe", which no
+    prefix pattern will ever catch. But the same document said the patient was
+    "3m" old, and nobody's mother is three months old.
+
+    So: any age under 18 means the document is a child's, whatever name is on it.
+    The prefix check stays as a second signal for documents that print no age.
     """
-    if _NEONATAL.match((printed_name or "").strip()):
+    years = parse_age_years(printed_age)
+    if years is not None and years < ADULT_YEARS:
         return True
-    return bool(_INFANT_AGE.match((printed_age or "").strip()))
+    if years is not None and years >= ADULT_YEARS:
+        # An adult age settles it the other way: this really is the adult's
+        # document, even if it happens to sit in a child's folder (a mother's
+        # delivery summary does exactly that).
+        return False
+    return bool(_NEONATAL.match((printed_name or "").strip()))
 
 
 def patient_matches(
