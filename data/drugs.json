@@ -1385,6 +1385,61 @@
       ],
       "class": "alpha-blocker for BPH (Intas). NOT the same as RAPILIF, which is silodosin -- a different molecule.",
       "confirmed": true
+    },
+    "JALRA DP": {
+      "generic": [
+        "Dapagliflozin",
+        "Vildagliptin"
+      ],
+      "class": "SGLT2 inhibitor + DPP-4 inhibitor (USV). 10/100 = dapagliflozin 10mg + vildagliptin 100mg. NB: JALRA M ALSO contains vildagliptin.",
+      "confirmed": true
+    },
+    "JALRA M": {
+      "generic": [
+        "Vildagliptin",
+        "Metformin"
+      ],
+      "class": "DPP-4 inhibitor + biguanide (USV). 50/500. NB: JALRA DP ALSO contains vildagliptin.",
+      "confirmed": true
+    },
+    "ROSAVAS CP": {
+      "generic": [
+        "Rosuvastatin",
+        "Aspirin",
+        "Clopidogrel"
+      ],
+      "class": "statin + dual antiplatelet. NOT the same as ROSUVAS CV, which has no aspirin.",
+      "confirmed": true
+    },
+    "RESTYL": {
+      "generic": [
+        "Alprazolam"
+      ],
+      "class": "benzodiazepine (Cipla)",
+      "confirmed": true
+    },
+    "ECONORM": {
+      "generic": [
+        "Saccharomyces boulardii"
+      ],
+      "class": "probiotic (Dr Reddy's). Same molecule as SYMBULARDI.",
+      "confirmed": true
+    },
+    "CCM": {
+      "generic": [
+        "Calcium citrate malate",
+        "Cholecalciferol"
+      ],
+      "class": "calcium + vitamin D3 supplement (GSK). Composition varies by brand.",
+      "confirmed": true
+    },
+    "PAN D": {
+      "generic": [
+        "Pantoprazole",
+        "Domperidone"
+      ],
+      "class": "PPI + prokinetic (Alkem). 40mg + 30mg.",
+      "confirmed": true
     }
   }
 }
