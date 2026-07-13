@@ -26,7 +26,7 @@ from src.extractor import (
     classify,
     is_encrypted,
 )
-from src.ingest import ingest_discharge, ingest_lab, ingest_prescription
+from src.ingest import ingest_discharge, ingest_lab, ingest_prescription, ingest_radiology
 from src.paperless import Paperless, ocr_for
 
 logger = logging.getLogger(__name__)
@@ -211,6 +211,64 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
     )
 
 
+def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
+    """Ingest every document the classifier called an imaging report.
+
+    A deceased person's records are history, not something to maintain -- but they
+    are still their records, and radiology is read-only. They are ingested like
+    anyone else's; only the nagging (review, reconcile, reminders) skips them.
+    """
+    docs, _ = collect()
+    todo = [d for d in docs if d.suffix == ".pdf" and classified_type(d.rel) == "radiology"]
+    if person:
+        todo = [d for d in todo if d.correspondent == person]
+
+    done = {
+        r["source_path"]
+        for r in con.execute(
+            "SELECT source_path FROM documents WHERE doc_type = 'radiology'"
+        ).fetchall()
+    }
+    todo = [d for d in todo if d.rel not in done]
+    if limit:
+        todo = todo[:limit]
+
+    logger.info(f"{len(todo)} imaging reports to extract")
+    ocr = Paperless().ocr_index()
+    misfiled = untrusted = meas = find = 0
+
+    for i, d in enumerate(todo, 1):
+        try:
+            n_m, n_f, bad, moved = ingest_radiology(
+                con,
+                d.rel,
+                d.correspondent,
+                ocr_text=ocr_for(ocr, d.correspondent, d.rel),
+            )
+        except Exception as e:
+            logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
+            continue
+
+        meas += n_m
+        find += n_f
+        untrusted += bad
+        if moved:
+            misfiled += 1
+            logger.warning(
+                f"[{i}/{len(todo)}] MISFILED: {d.rel} names {moved}, not {d.correspondent}"
+            )
+        logger.info(
+            f"  [{i}/{len(todo)}] {d.correspondent} | {d.title[:34]} -> "
+            f"{n_m} measurements, {n_f} findings"
+        )
+
+    logger.info(
+        f"\ndone. {meas} measurements, {find} findings. "
+        f"{untrusted} were not corroborated by an independent reading (-> review). "
+        f"{misfiled} documents were filed under the wrong person."
+    )
+
+
 def show_review(con) -> None:
     """What is in health.db but not trusted, and why."""
     total = con.execute("SELECT count(*) FROM observations").fetchone()[0]
@@ -262,6 +320,7 @@ def main() -> None:
     p.add_argument(
         "--prescriptions", action="store_true", help="Extract consultations/prescriptions"
     )
+    p.add_argument("--radiology", action="store_true", help="Extract imaging reports")
     p.add_argument("--review", action="store_true", help="Show what is not trusted, and why")
     p.add_argument(
         "--reclassify",
@@ -286,6 +345,9 @@ def main() -> None:
         return
     if args.prescriptions:
         run_prescriptions(con, limit=args.limit, person=args.person)
+        return
+    if args.radiology:
+        run_radiology(con, limit=args.limit, person=args.person)
         return
 
     docs, _skipped = collect()

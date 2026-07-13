@@ -78,6 +78,111 @@ class TestTheDocumentStillWinsOtherwise:
         assert names_a_baby("B/O ALICE DOE"), "and the guard must catch it"
 
 
+class TestReconciledIsNotTheSameQuestionAsMatched:
+    """`resolve_patient()` answers "whose document is this?". `check_document()`
+    answers "does the printed name equal the folder?". They are not the same
+    question, and treating them as one refused two of a newborn's own scans.
+
+    A neonatal echo is printed "BABY OF <mother>" and filed, correctly, in the
+    baby's folder. check_document() sees a name that is not the baby's and hard-
+    fails. But the document is perfectly well reconciled: the folder says WHICH
+    child, and the mother's name is on the page only to identify him.
+
+    Committing nothing in that case is not the safe choice -- it is silently losing
+    an infant's cardiac imaging.
+    """
+
+    @pytest.fixture
+    def family(self, monkeypatch):
+        """An invented family. The real one lives in the gitignored data/people.json."""
+        from src import ingest
+        from src.people import Person
+
+        people = {
+            "Alice Doe": Person(folder="Alice", correspondent="Alice Doe", sex="female"),
+            "Bob Example": Person(folder="Bob", correspondent="Bob Example", sex="male"),
+            "Baby Doe": Person(
+                folder="Baby", correspondent="Baby Doe", child=True, born="2024-07-23"
+            ),
+        }
+        monkeypatch.setattr("src.people.load_people", lambda: people)
+        monkeypatch.setattr("src.people.shared_name_tokens", lambda: {"doe"})
+        return ingest.resolve_patient
+
+    @pytest.mark.parametrize("printed", ["BABY OF ALICE DOE", "Baby of ALICE DOE", "B/O Alice Doe"])
+    def test_a_newborns_scan_naming_the_mother_goes_to_the_baby(self, family, printed) -> None:
+        """The real failure: an infant's echo and neurosonogram, both printed
+        "BABY OF <mother>", both refused and committed to nobody."""
+        file_under, misfiled_to, reconciled = family(
+            "Baby/echo.pdf", "Baby Doe", {"name": printed, "age": "3 Days"}
+        )
+        assert reconciled, "an infant's own scan was refused for naming its mother"
+        assert file_under == "Baby Doe"
+        assert misfiled_to is None
+
+    def test_a_stranger_is_the_only_thing_that_blocks_a_commit(self, family) -> None:
+        """The one case where nothing may be committed: the document names someone
+        who is not in this family. We do not know whose record it is."""
+        file_under, misfiled_to, reconciled = family(
+            "Alice/scan.pdf", "Alice Doe", {"name": "Someone Unrelated", "age": "45 Yr(s)"}
+        )
+        assert not reconciled
+        assert misfiled_to is None
+
+    def test_a_relatives_document_is_still_re_filed(self, family) -> None:
+        """The original rule survives: a document that names another family member
+        is reconciled, and moves to them."""
+        file_under, misfiled_to, reconciled = family(
+            "Baby/scan.pdf", "Baby Doe", {"name": "Bob Example", "age": "40 Yr(s)"}
+        )
+        assert reconciled
+        assert file_under == misfiled_to == "Bob Example"
+
+    def test_no_printed_name_falls_back_to_the_folder(self, family) -> None:
+        file_under, misfiled_to, reconciled = family("Alice/scan.pdf", "Alice Doe", {"name": ""})
+        assert reconciled and file_under == "Alice Doe" and misfiled_to is None
+
+
+class TestPunctuationIsNotIdentity:
+    """A full stop is not a person.
+
+    normalise() keeps the '.' -- it has to, because it is shared with value matching
+    and "5.20" must stay "5.20". But _name_tokens() split on whitespace, so a report
+    printed "MRS.ALICE DOE", with no space after the stop, tokenised to
+    {"mrs.alice", "doe"}. "mrs.alice" matches nothing, leaving only the SURNAME --
+    which every relative shares, and which patient_matches() rightly will not accept
+    on its own.
+
+    Result: the document named the patient unambiguously, and the system refused to
+    recognise her. It threw away four of her own scans, and one more belonging to a
+    person whose printed name's only flaw was a trailing full stop.
+    """
+
+    SHARED = {"doe"}
+
+    @pytest.mark.parametrize(
+        "printed",
+        [
+            "MRS.ALICE DOE",  # no space after the honorific's full stop
+            "MRS. ALICE DOE",
+            "Mrs.Alice Doe",
+            "ALICE.",  # a name whose only defect is a trailing full stop
+            "ALICE,DOE",
+            "(ALICE DOE)",
+        ],
+    )
+    def test_punctuation_never_hides_the_person(self, printed: str) -> None:
+        assert patient_matches(
+            printed, "Alice Doe", self.SHARED
+        ), f"{printed!r} names Alice Doe. Refusing it discards her own medical records."
+
+    def test_it_still_refuses_a_different_relative(self) -> None:
+        """More permissive tokenising must not become a looser MATCH. Carol is still
+        not Alice, however the punctuation falls."""
+        assert not patient_matches("MRS.CAROL DOE", "Alice Doe", self.SHARED)
+        assert not patient_matches("CAROL.", "Alice Doe", self.SHARED)
+
+
 class TestSharedSurnames:
     """A family is where everyone is called the same thing.
 

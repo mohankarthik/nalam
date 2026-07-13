@@ -25,9 +25,12 @@ Two decisions worth knowing:
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from typing import Any, Iterable, Optional
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join("data", "health.db")
 
@@ -76,7 +79,21 @@ CREATE TABLE IF NOT EXISTS observations (
     source_quality TEXT NOT NULL DEFAULT 'text',  -- text | image | handwritten
     status        TEXT COLLATE NOCASE NOT NULL DEFAULT 'ok',     -- ok | review
     review_reason TEXT,                           -- JSON array; NULL when ok
-    UNIQUE (subject, printed_name, effective, raw_value)
+    -- SECTION IS PART OF THE IDENTITY, not decoration. Without it, two rows that
+    -- differ only by the section they sat under collide, and insert_observations()
+    -- uses INSERT OR IGNORE -- so the second one is not rejected, it is SILENTLY
+    -- DROPPED.
+    --
+    -- A follicular scan lists a "Follicle" of "18" in the right ovary and a
+    -- "Follicle" of "18" in the left ovary, on one date. Those are two follicles.
+    -- Without `section` in this key they become one, and nothing says so.
+    --
+    -- The same hole exists for labs and is only hidden by luck: "RBC" under
+    -- URINE ROUTINE and "RBC" under COMPLETE BLOOD COUNT survive today because
+    -- their values happen to differ. Print the same value on both and one
+    -- disappears. This is trap #2 in CLAUDE.md, in the schema rather than in
+    -- normalize.py.
+    UNIQUE (subject, printed_name, section, effective, raw_value)
 );
 
 CREATE INDEX IF NOT EXISTS idx_obs_subject_analyte
@@ -156,7 +173,32 @@ def connect(path: str = DB_PATH) -> sqlite3.Connection:
 
 
 def upsert_document(con: sqlite3.Connection, **fields: Any) -> int:
-    """Insert a document, or return the id of the one already recorded."""
+    """Insert a document, or return the id of the one already recorded.
+
+    The upsert deliberately does NOT change `doc_type`, and that silence is a trap
+    worth naming. Two routers can claim the same file -- is_lab() calls everything
+    tagged Medical/Reports a lab, and the page-1 classifier calls an echo in that
+    folder radiology -- so the second extractor to run gets back a row that is still
+    labelled with the FIRST one's type. The database then quietly disagrees with
+    itself about what the document is.
+
+    Left silent, that let a radiology ingest write into rows labelled 'lab' and
+    delete 448 lab observations. So a type change is now reported. It is still not
+    APPLIED: which extractor owns a document is a human's call (the classifier is
+    not reliably right either -- it called a health-checkup panel "radiology"), and
+    the caller is the one that must refuse.
+    """
+    existing = con.execute(
+        "SELECT doc_type FROM documents WHERE source_path = ?",
+        (fields["source_path"],),
+    ).fetchone()
+    if existing and existing["doc_type"] != fields["doc_type"]:
+        logger.warning(
+            f"{fields['source_path']}: recorded as {existing['doc_type']!r}, now being "
+            f"ingested as {fields['doc_type']!r}. The doc_type is NOT being changed. "
+            f"Two extractors claim this document; a human has to say which owns it."
+        )
+
     cur = con.execute(
         """INSERT INTO documents (paperless_id, subject, source_path, doc_type,
                                   doc_date, lab, model, text_layer)

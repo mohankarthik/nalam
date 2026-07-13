@@ -25,6 +25,12 @@ config is absent is how a guard becomes decoration.
 
     python -m tools.guard_pii            # checks staged content
     python -m tools.guard_pii --all      # checks the whole working tree
+    python -m tools.guard_pii --msg FILE # checks a commit message
+
+THE COMMIT MESSAGE IS PUBLISHED TOO. That is not obvious, and it nearly went
+wrong: a commit describing this very guard quoted a real patient's printed name to
+explain the bug it fixed. The staged files were spotless. The message was not, and
+`git log` on a public repository is as public as the code.
 """
 
 from __future__ import annotations
@@ -115,7 +121,38 @@ def load_denylist() -> list[str]:
     return terms
 
 
+def check_message(path: str, terms: list[str]) -> list[str]:
+    """A commit message is published exactly as surely as the code is."""
+    try:
+        text = open(path, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+
+    # Strip the comment lines git puts in the editor template.
+    body = "\n".join(ln for ln in text.splitlines() if not ln.startswith("#"))
+
+    failures = []
+    lowered = body.lower()
+    for term in terms:
+        if term.lower() in lowered:
+            failures.append(
+                f"  the commit message names {term!r}.\n"
+                f"      `git log` on a public repository is as public as the code.\n"
+                f"      Describe the bug with an invented name (Alice Doe, Bob Example)."
+            )
+    return failures
+
+
 def main() -> int:
+    if "--msg" in sys.argv:
+        path = sys.argv[sys.argv.index("--msg") + 1]
+        failures = check_message(path, load_denylist())
+        if failures:
+            print("\nguard_pii: REFUSING THIS COMMIT MESSAGE\n", file=sys.stderr)
+            print("\n".join(failures), file=sys.stderr)
+            return 1
+        return 0
+
     check_all = "--all" in sys.argv
     files = all_files() if check_all else staged_files()
     if not files:

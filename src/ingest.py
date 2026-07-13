@@ -399,6 +399,93 @@ def _iso(text: Optional[str]) -> Optional[str]:
     return d.isoformat() if d else None
 
 
+def resolve_patient(
+    rel_path: str,
+    subject: str,
+    patient: dict,
+) -> tuple[str, Optional[str], bool]:
+    """Whose document is this REALLY? Returns (file_under, misfiled_to, reconciled).
+
+    `reconciled` is False ONLY when the document names a person we cannot identify
+    as anyone in this family. That is the one case where nothing may be committed:
+    we do not know whose record this is, and guessing is how one person's medical
+    history ends up in another's.
+
+    It is NOT the same question as `validator.check_document().ok`, and conflating
+    the two is a bug this function exists to prevent. check_document() compares the
+    printed name against the folder and nothing else -- so a newborn's echo, printed
+    "BABY OF <mother>" and correctly filed in the baby's folder, FAILS it. Trusting
+    that verdict refused two of an infant's own scans. The document is perfectly
+    well reconciled; it simply names the mother, because that is how neonatal charts
+    are labelled.
+
+    The single implementation of the rule that matters most in this system. It
+    used to be copy-pasted per document type, and that is precisely how it
+    accumulated three bugs, each one introduced by the fix for the last. There is
+    one copy now, and every caller gets the same answer.
+
+    The document usually wins over the folder: a mother's surgical discharge sits
+    in her child's folder because that folder is organised around the pregnancy,
+    and it belongs to her.
+
+    EXCEPT when the document names a baby by its parent. A neonatal chart is
+    labelled "B/O <mother>", and reading that as "this is the mother's document"
+    moved a premature infant's retinopathy report into his mother's record. The
+    folder knows WHICH child; the document names the parent only to identify it.
+
+    And a folder is never overruled on a name alone when the document gives no age
+    to argue with: handwriting turns "B/O Alice Doe" into "Rlo Alice Dohe", whose
+    only legible token is the mother's given name. A wrongly re-filed child's
+    record is worse than one left where it already was.
+    """
+    from src.people import load_people, shared_name_tokens
+    from src.validator import names_a_baby, parse_age_years, patient_matches
+
+    misfiled_to: Optional[str] = None
+    printed = (patient.get("name") or "").strip()
+    printed_age = (patient.get("age") or "").strip()
+    people = load_people()
+    shared = shared_name_tokens()
+
+    folder_person = people.get(subject)
+    printed_years = parse_age_years(printed_age)
+
+    # No name printed at all: the folder is all we have, and it is authoritative.
+    if not printed:
+        return subject, None, True
+
+    if names_a_baby(printed, printed_age):
+        if not folder_person or not folder_person.child:
+            logger.warning(
+                f"{rel_path}: reads as a child's document ({printed!r}, age "
+                f"{printed_age!r}) but the folder is not a child's ({subject!r}). "
+                f"Filing per the folder; please check."
+            )
+        # Reconciled either way: we know WHICH child from the folder. The document
+        # names the parent only to identify the child, and that is not a mismatch.
+        return subject, None, True
+
+    if folder_person and folder_person.child and printed_years is None:
+        if not patient_matches(printed, subject, shared):
+            logger.warning(
+                f"{rel_path}: names {printed!r} in a child's folder but prints no "
+                f"age. Keeping the folder's answer ({subject!r}); please check."
+            )
+        return subject, None, True
+
+    if patient_matches(printed, subject, shared):
+        return subject, None, True
+
+    for candidate in people.values():
+        if patient_matches(printed, candidate.correspondent, shared):
+            misfiled_to = candidate.correspondent
+            return misfiled_to, misfiled_to, True
+
+    # Names someone who is not in this family. We do not know whose document this
+    # is, so nothing on it may be committed to anyone.
+    return subject, None, False
+
+
 def ingest_prescription(
     con,
     rel_path: str,
@@ -417,8 +504,6 @@ def ingest_prescription(
     most dangerous thing this system can emit.
     """
     from src.extractor import extract_prescription
-    from src.people import load_people, shared_name_tokens
-    from src.validator import names_a_baby, parse_age_years, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -432,44 +517,8 @@ def ingest_prescription(
 
     p = extract_prescription(pdf, subject, rel_path, ocr_text=ocr_text, expected_date=doc_date)
 
-    # Whose document is this, really? The document usually wins over the folder --
-    # but NOT when it names a baby by its parent.
-    misfiled_to: Optional[str] = None
     printed = (p.patient.get("name") or "").strip()
-    printed_age = (p.patient.get("age") or "").strip()
-    people = load_people()
-    shared = shared_name_tokens()
-
-    folder_person = people.get(subject)
-    printed_years = parse_age_years(printed_age)
-
-    if names_a_baby(printed, printed_age):
-        # A child's document, named for a parent. The folder knows WHICH child;
-        # the document only names the parent to identify it. Re-filing here moved
-        # a premature infant's retinopathy notes into his mother's record.
-        if not folder_person or not folder_person.child:
-            logger.warning(
-                f"{rel_path}: reads as a child's document ({printed!r}, age "
-                f"{printed_age!r}) but the folder is not a child's ({subject!r}). "
-                f"Filing per the folder; please check."
-            )
-    elif folder_person and folder_person.child and printed_years is None:
-        # A child's folder, and the document gives no age to argue with. Do NOT
-        # re-file on a name alone: handwriting turns "B/O Alice Doe" into "Rlo
-        # Alice Dohe", whose only legible token is the mother's given name. The
-        # folder is the safer authority, and a wrongly re-filed child's record is
-        # worse than one left where it already was.
-        if printed and not patient_matches(printed, subject, shared):
-            logger.warning(
-                f"{rel_path}: names {printed!r} in a child's folder but prints no "
-                f"age. Keeping the folder's answer ({subject!r}); please check."
-            )
-    elif printed and not patient_matches(printed, subject, shared):
-        for candidate in people.values():
-            if patient_matches(printed, candidate.correspondent, shared):
-                misfiled_to = candidate.correspondent
-                break
-    actual = misfiled_to or subject
+    actual, misfiled_to, reconciled = resolve_patient(rel_path, subject, p.patient)
 
     cons = p.consultation
     document_id = db.upsert_document(
@@ -483,8 +532,11 @@ def ingest_prescription(
         text_layer=p.oracle_source == "text_layer",
     )
 
-    # Names someone we cannot identify: commit nothing.
-    if printed and not misfiled_to and not p.usable:
+    # Names someone we cannot identify as anyone in this family: commit nothing.
+    # This asks resolve_patient(), NOT check_document(). check_document() compares
+    # the printed name to the folder and knows nothing about how a newborn's chart
+    # is labelled, so it fails an infant's own echo for naming its mother.
+    if not reconciled:
         db.queue_review(
             con,
             document_id,
@@ -591,3 +643,223 @@ def ingest_prescription(
 
     con.commit()
     return n_med, n_uncorroborated, misfiled_to
+
+
+def ingest_radiology(
+    con,
+    rel_path: str,
+    subject: str,
+    ocr_text: Optional[str] = None,
+    doc_date: Optional[datetime.date] = None,
+) -> tuple[int, int, int, Optional[str]]:
+    """Ingest an imaging report. Returns (measurements, findings, untrusted, misfiled_to).
+
+    An imaging report holds two kinds of fact, and both become observations --
+    because both are things that were true of a person on a date, which is what
+    that table is.
+
+    A MEASUREMENT lands as a number: value_num + unit. That is what makes it
+    TRENDABLE -- "what has his ejection fraction done over five years" is a
+    question a family health record should be able to answer, and it can only
+    answer it if the 55 was stored as 55 and not buried inside a sentence.
+
+    A FINDING lands as prose: value_text, verbatim. The impression is the single
+    most important line in the document -- it is the radiologist's own conclusion,
+    the thing a doctor reads first -- and it is stored word for word, never
+    summarised. `printed_name` is 'Impression' for that row, so it can be found.
+
+    `analyte` is left NULL for all of them: the codebook is a LAB codebook, and an
+    ejection fraction is not in it. That is not a loss. `--reclassify` re-resolves
+    NULL analytes for free, offline, whenever the codebook grows -- so adding
+    "Ejection Fraction" to it later names every echo ever ingested, retroactively,
+    at no cost.
+    """
+    from src.extractor import extract_radiology
+
+    # Does another extractor already own this document? Asked FIRST, before the file
+    # is even opened: this walks an rclone mount that fetches the whole object on
+    # open, so a skip must cost nothing.
+    #
+    # Two routers can claim one file and nothing arbitrates between them: is_lab()
+    # calls EVERY document tagged Medical/Reports a lab, and the page-1 classifier
+    # calls an echo in that same folder radiology. Both are "right". Meanwhile
+    # upsert_document() conflicts on source_path and never updates doc_type, so the
+    # first extractor to run owns the label for good -- and this function's
+    # DELETE ... WHERE document_id = ? would then wipe THAT extractor's rows.
+    #
+    # It did: 448 lab observations across 20 documents, silently replaced.
+    #
+    # Trusting the classifier instead is not the fix. It called a health-checkup
+    # panel (105 real lab values) "radiology". Neither source of truth is reliable
+    # enough to overrule the other, so this refuses to choose. The document is left
+    # exactly as it is and reported, and a human decides who owns it.
+    owner = con.execute(
+        "SELECT doc_type FROM documents WHERE source_path = ?", (rel_path,)
+    ).fetchone()
+    if owner and owner["doc_type"] != "radiology":
+        logger.warning(
+            f"{rel_path}: already ingested as {owner['doc_type']!r}. Skipped -- "
+            f"extracting it as radiology would delete that extractor's observations."
+        )
+        return 0, 0, 0, None
+
+    path = os.path.join(MEDICAL_ROOT, rel_path)
+    pdf = open(path, "rb").read()
+
+    if doc_date is None:
+        head = os.path.basename(rel_path)[:10]
+        try:
+            doc_date = datetime.date.fromisoformat(head)
+        except ValueError:
+            doc_date = None
+
+    r = extract_radiology(pdf, subject, rel_path, ocr_text=ocr_text, expected_date=doc_date)
+
+    printed = (r.patient.get("name") or "").strip()
+    actual, misfiled_to, reconciled = resolve_patient(rel_path, subject, r.patient)
+
+    study = r.study
+    document_id = db.upsert_document(
+        con,
+        subject=actual,
+        source_path=rel_path,
+        doc_type="radiology",
+        doc_date=doc_date.isoformat() if doc_date else None,
+        lab=r.patient.get("lab"),
+        model=r.model,
+        text_layer=r.oracle_source == "text_layer",
+    )
+
+    # Names someone we cannot identify as anyone in this family: commit nothing.
+    # A newborn's echo is printed "BABY OF <mother>" and belongs in the baby's
+    # folder. resolve_patient() knows that; check_document() does not, and asking
+    # the latter refused two of an infant's own scans.
+    if not reconciled:
+        db.queue_review(
+            con,
+            document_id,
+            [
+                {
+                    "subject": subject,
+                    "kind": "patient_mismatch",
+                    "printed_name": printed,
+                    "raw_value": None,
+                    "reasons": json.dumps(r.doc_verdict.hard),
+                }
+            ],
+        )
+        con.commit()
+        logger.error(f"{rel_path}: names {printed!r}, filed under {subject!r} -- not committed")
+        return 0, 0, 0, None
+
+    effective = _collection_date(r.patient, doc_date)
+
+    # The study title is the section a bare measurement belongs to. An echo that
+    # prints "EF 55%" under no heading still belongs to "2D ECHOCARDIOGRAPHY", and
+    # without that the row is an unattributed number.
+    study_name = (study.get("name") or study.get("modality") or "").strip()
+
+    # Re-ingesting must REPLACE this document's rows, not add a second copy. Every
+    # observation is extractor-produced -- unlike medication_events, this table has
+    # no entered_by column and carries no human rulings, so there is nothing here
+    # to preserve. If observations ever become human-correctable, this delete has
+    # to learn about it.
+    con.execute("DELETE FROM observations WHERE document_id = ?", (document_id,))
+
+    rows: list[dict] = []
+    untrusted = 0
+    n_meas = n_find = 0
+
+    for m in r.measurements:
+        raw = str(m.get("value") or "").strip()
+        name = str(m.get("name") or "").strip()
+        if not raw or not name:
+            continue
+
+        corroborated = bool(m.get("corroborated"))
+        if not corroborated:
+            untrusted += 1
+
+        number, qualitative = parse_value(raw)
+        low, high = _reference_range(str(m.get("reference_range") or ""))
+        n_meas += 1
+
+        rows.append(
+            {
+                "subject": actual,
+                "segment": None,
+                "analyte": None,
+                "printed_name": name,
+                "section": (m.get("section") or "").strip() or study_name,
+                "effective": effective,
+                # "1.2 x 0.8" is a dimension, not a number. It keeps its raw form
+                # rather than being coerced into a float it is not.
+                "value_num": number,
+                "value_text": None if number is not None else (qualitative or raw),
+                "raw_value": raw,
+                "unit": (m.get("unit") or "").strip() or None,
+                "ref_low": low,
+                "ref_high": high,
+                "source_quality": "text" if r.oracle_source == "text_layer" else "image",
+                "status": "ok" if corroborated else "review",
+                "review_reason": (
+                    None
+                    if corroborated
+                    else json.dumps(
+                        [
+                            f"the value was not corroborated by the independent reading "
+                            f"({r.oracle_source or 'no oracle available'})"
+                        ]
+                    )
+                ),
+            }
+        )
+
+    for f in r.findings:
+        prose = str(f.get("text") or "").strip()
+        if not prose:
+            continue
+
+        corroborated = bool(f.get("corroborated"))
+        if not corroborated:
+            untrusted += 1
+
+        section = (f.get("section") or "").strip()
+        is_impression = bool(f.get("is_impression"))
+        n_find += 1
+
+        rows.append(
+            {
+                "subject": actual,
+                "segment": None,
+                "analyte": None,
+                # The impression is findable by name, from any report, in any
+                # modality. Everything else is named for the structure it describes.
+                "printed_name": "Impression" if is_impression else (section or "Finding"),
+                "section": section or study_name,
+                "effective": effective,
+                "value_num": None,
+                "value_text": prose,
+                "raw_value": prose,
+                "unit": None,
+                "ref_low": None,
+                "ref_high": None,
+                "source_quality": "text" if r.oracle_source == "text_layer" else "image",
+                "status": "ok" if corroborated else "review",
+                "review_reason": (
+                    None
+                    if corroborated
+                    else json.dumps(
+                        [
+                            f"only {f.get('coverage', 0.0):.0%} of the words in this finding "
+                            f"appeared in the independent reading "
+                            f"({r.oracle_source or 'no oracle available'})"
+                        ]
+                    )
+                ),
+            }
+        )
+
+    db.insert_observations(con, document_id, rows)
+    con.commit()
+    return n_meas, n_find, untrusted, misfiled_to

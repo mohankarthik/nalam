@@ -24,6 +24,16 @@ repos:
         pass_filenames: false
         always_run: true
 
+      # The MESSAGE is published too, and the pre-commit stage never sees it. A
+      # commit describing the PII guard itself quoted a real patient's name to
+      # explain the bug it fixed; every staged file was clean. `git log` on a public
+      # repo is as public as the code.
+      - id: guard-pii-message
+        name: refuse to publish a name in the commit message
+        entry: ./venv/bin/python -m tools.guard_pii --msg
+        language: system
+        stages: [commit-msg]
+
       - id: black
         name: black
         entry: ./venv/bin/black

@@ -171,6 +171,7 @@ def extract_discharge(
 
 CLASSIFY_CONFIG = "data/configs/classify.json"
 PRESCRIPTION_CONFIG = "data/configs/prescription.json"
+RADIOLOGY_CONFIG = "data/configs/radiology.json"
 
 
 def is_encrypted(pdf_bytes: bytes) -> bool:
@@ -297,6 +298,163 @@ def extract_prescription(
         patient=patient,
         consultation=data.get("consultation") or {},
         medications=meds,
+        doc_verdict=verdict,
+        oracle_source=oracle.source,
+    )
+
+
+@dataclass
+class Radiology:
+    person: str
+    source: str
+    model: str
+    patient: dict[str, str]
+    study: dict[str, str]
+    measurements: list[dict[str, Any]]
+    findings: list[dict[str, Any]]
+    doc_verdict: validator.Verdict
+    oracle_source: str
+
+    @property
+    def usable(self) -> bool:
+        return self.doc_verdict.ok
+
+    @property
+    def impression(self) -> Optional[str]:
+        """The radiologist's own conclusion, if the report printed one.
+
+        Deliberately returns None rather than falling back to the last finding.
+        A descriptive line is not a conclusion, and promoting one to an
+        impression would put words in the radiologist's mouth.
+        """
+        for f in self.findings:
+            if f.get("is_impression") and (f.get("text") or "").strip():
+                return str(f["text"]).strip()
+        return None
+
+
+def _merge_studies(data: Any) -> dict[str, Any]:
+    """One PDF can hold SEVERAL studies. Fold them into one result.
+
+    A health-checkup pack is an echo AND an abdominal ultrasound AND a chest film,
+    stapled together. An endoscopy report is an OGD AND a colonoscopy. Asked to
+    describe "the study", the model correctly returns a LIST -- one object per
+    study -- because that is what is on the page. Assuming a single object crashed
+    on exactly those documents.
+
+    Merging must not lose which study a row came from: an "AO" of 24mm under the
+    echo and a "diameter" under the ultrasound are not in the same examination, and
+    a section is part of a row's identity (see the observations UNIQUE key). So each
+    row that carries no section of its own inherits its OWN study's name -- not the
+    first study's, which would file every finding under the wrong examination.
+    """
+    if isinstance(data, dict):
+        return data
+    if not isinstance(data, list):
+        return {}
+
+    studies = [s for s in data if isinstance(s, dict)]
+    if not studies:
+        return {}
+
+    merged: dict[str, Any] = {
+        "patient": next((s.get("patient") for s in studies if s.get("patient")), {}),
+        "study": studies[0].get("study") or {},
+        "measurements": [],
+        "findings": [],
+    }
+
+    for s in studies:
+        st = s.get("study") or {}
+        name = str(st.get("name") or st.get("modality") or "").strip()
+        for key in ("measurements", "findings"):
+            for row in s.get(key) or []:
+                if not isinstance(row, dict):
+                    continue
+                if not (row.get("section") or "").strip():
+                    row = {**row, "section": name}
+                merged[key].append(row)
+
+    return merged
+
+
+def extract_radiology(
+    pdf_bytes: bytes,
+    person: str,
+    source: str,
+    ocr_text: Optional[str] = None,
+    expected_date: Optional[datetime.date] = None,
+    models: Optional[list[str]] = None,
+) -> Radiology:
+    """Extract an imaging report: X-ray, USG, Doppler, CT, MRI, echo, TVS.
+
+    An imaging report carries two different kinds of fact and they are checked
+    two different ways.
+
+    A MEASUREMENT is a number, and a number is corroborated the way every other
+    number in this system is: it must appear, exactly, in an independent reading
+    of the same page.
+
+    A FINDING is prose, and prose cannot survive that test. One garbled character
+    in a 40-word paragraph breaks an exact match, and Tesseract garbles something
+    in nearly every paragraph -- so demanding one would quarantine every report,
+    which is indistinguishable from never reading them. Prose is corroborated by
+    word coverage instead (see oracle.coverage): a transcribed impression scores
+    near 1.0 even through bad OCR, an invented one scores near 0.0.
+
+    Neither check runs at all without an oracle. No independent reading, no
+    trust -- the whole document goes to review, as everywhere else.
+    """
+    from src import oracle as oracle_mod
+
+    with open(RADIOLOGY_CONFIG, encoding="utf-8") as f:
+        config = json.load(f)
+
+    text = text_layer(pdf_bytes)
+    oracle = oracle_mod.build(text, ocr_text)
+    data, model = call_with_pdf(
+        config["prompt"], pdf_bytes, models=models, source=source, doc_type="radiology"
+    )
+
+    data = _merge_studies(data)
+
+    patient = data.get("patient") or {}
+    verdict = validator.check_document(
+        patient=patient,
+        expected_person=person,
+        expected_date=expected_date,
+        text_layer=oracle.text,
+        max_drift_days=config["validation"]["collection_date_max_drift_days"],
+    )
+
+    measurements = []
+    for m in data.get("measurements") or []:
+        value = str(m.get("value") or "").strip()
+        name = str(m.get("name") or "").strip()
+        if not value or not name:
+            continue
+        # Name AND value, together and adjacent -- see Oracle.corroborates_measurement.
+        # Checking the bare value would mark every two-digit number on an echo
+        # unverifiable, which is most of them.
+        measurements.append({**m, "corroborated": oracle.corroborates_measurement(name, value)})
+
+    threshold = float(config["validation"]["prose_min_coverage"])
+    findings = []
+    for f in data.get("findings") or []:
+        prose = str(f.get("text") or "").strip()
+        if not prose:
+            continue
+        score = oracle.coverage(prose)
+        findings.append({**f, "coverage": score, "corroborated": score >= threshold})
+
+    return Radiology(
+        person=person,
+        source=source,
+        model=model,
+        patient=patient,
+        study=data.get("study") or {},
+        measurements=measurements,
+        findings=findings,
         doc_verdict=verdict,
         oracle_source=oracle.source,
     )

@@ -77,9 +77,24 @@ def value_in_text(value: str, text_layer: str) -> bool:
 
 
 def _name_tokens(name: str) -> set[str]:
-    """Meaningful name parts, minus the honorifics labs prepend."""
+    """Meaningful name parts, minus the honorifics labs prepend.
+
+    Split on ANY non-alphanumeric, not on whitespace. normalise() keeps the full
+    stop on purpose -- it is shared with value matching, where "5.20" must stay
+    "5.20" -- and for a NAME that punctuation is never identity.
+
+    Splitting on whitespace alone, a report printed "MRS.ALICE DOE" with no space
+    after the stop yields the tokens {"mrs.alice", "doe"}. "mrs.alice" matches
+    nothing, so the only usable token left is the SURNAME -- which every relative
+    shares, and which patient_matches() rightly refuses to match on alone. The
+    document names the person perfectly clearly and the system cannot see it.
+
+    That refused four of one patient's own scans, and another whose printed name's
+    sole defect was a trailing full stop.
+    """
     drop = {"mr", "mrs", "ms", "dr", "master", "miss", "baby", "b", "of", "smt", "sri"}
-    return {t for t in normalise(name).split() if t and t not in drop and len(t) > 1}
+    parts = re.split(r"[^a-z0-9]+", normalise(name))
+    return {t for t in parts if t and t not in drop and len(t) > 1}
 
 
 # A neonatal record is labelled by the MOTHER's name: "B/O Alice Doe",
