@@ -458,3 +458,81 @@ class TestConfirmingADrugMustNotEraseIt:
         con = self.build(tmp_path)
         meds.record_decision(con, "Alice Doe", "Ecosprin AV", "stopped", "2026-07-13")
         assert meds.current(con, "Alice Doe") == []
+
+
+class TestDoctorsDoNotWriteForSevenDays:
+    """The duration parser understood "7 days" and nothing a doctor actually writes.
+
+    Real scripts say "x 3d", "x30d", "5 dy", "x 2wk". Spelling the units out in full
+    parsed NOTHING on the real data: every course in the database came back
+    open-ended, so a THREE-DAY doxycycline course from 2022 was still a current
+    medication three years later. The prescription said when it ended. We could not
+    read it. That is most of the "nothing ever said stop" problem, and it was a
+    regex, not a missing fact.
+    """
+
+    def med(self, duration, effective="2022-08-02"):
+        from src.meds import Med
+
+        return Med(
+            drug="X",
+            generic=None,
+            strength=None,
+            frequency=None,
+            duration=duration,
+            effective=effective,
+            event="prescribed",
+            status="ok",
+        )
+
+    @pytest.mark.parametrize(
+        "duration, days",
+        [
+            ("x 3d", 3),
+            ("x30d", 30),
+            ("5 dy", 5),
+            ("x 2wk", 14),
+            ("1 week", 7),
+            ("3 Months", 90),
+            ("X 7. DAYS AF", 7),
+            ("FOR 1 MONTH AP", 30),
+        ],
+    )
+    def test_the_abbreviations_doctors_actually_use(self, duration, days) -> None:
+        import datetime
+
+        from src.meds import course_ends
+
+        got = course_ends(self.med(duration))
+        assert got == datetime.date(2022, 8, 2) + datetime.timedelta(days=days), duration
+
+    @pytest.mark.parametrize("duration", ["8", "10", "5"])
+    def test_a_bare_number_is_not_guessed(self, duration) -> None:
+        """It probably means days. "Probably" silently expires a drug somebody is
+        still taking, so it stays open and a human decides."""
+        from src.meds import course_ends
+
+        assert course_ends(self.med(duration)) is None
+
+    @pytest.mark.parametrize("duration", ["x 14clas", "x lodaf", "X bunthi"])
+    def test_ocr_wreckage_is_not_guessed(self, duration) -> None:
+        """The number is legible and the unit is not. Half a duration is not a
+        duration."""
+        from src.meds import course_ends
+
+        assert course_ends(self.med(duration)) is None
+
+    @pytest.mark.parametrize("duration", ["5 day / month", "5 days per month", "1 wk / month"])
+    def test_a_rate_is_not_a_duration(self, duration) -> None:
+        """ "5 days every month" is pulse therapy -- dermatology cycles itraconazole
+        exactly like this. Read as a five-day course it expires on day five, and a
+        drug the person is still cycling on disappears from the list."""
+        from src.meds import course_ends
+
+        assert course_ends(self.med(duration)) is None
+
+    @pytest.mark.parametrize("duration", ["continue", "SOS", "lifelong", "prn"])
+    def test_open_ended_stays_open(self, duration) -> None:
+        from src.meds import course_ends
+
+        assert course_ends(self.med(duration)) is None

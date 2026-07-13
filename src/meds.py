@@ -115,10 +115,48 @@ def _rows_to_meds(rows) -> list[Med]:
 # Doctors write durations by hand, and the real strings are messy:
 #   "X 7. DAYS AF"   "X 10DAYS A"   "FOR 7 DAY BF"   "FOR 1 MONTH AP"
 # so allow stray punctuation and a missing space between the number and the unit.
+# Doctors do not write "for 7 days". They write "x 3d", "x30d", "5 dy", "x 2wk".
+# Spelling the units out in full parsed NOTHING on the real data -- every course in
+# the database came back open-ended, so a THREE-DAY doxycycline course prescribed in
+# 2022 was still a current medication three years later. The script had said when it
+# ended; we could not read it.
 _DURATION = re.compile(
-    r"(?:x\s*)?(\d+)\s*[.,]?\s*(day|days|week|weeks|month|months)\b", re.IGNORECASE
+    r"(?:x\s*)?(\d+)\s*[.,]?\s*" r"(days?|dys?|d|weeks?|wks?|w|months?|mons?|mths?|mo|m)\b",
+    re.IGNORECASE,
 )
-_INDEFINITE = re.compile(r"(continue|continous|continuous|lifelong|regular)", re.I)
+_UNIT_DAYS = {
+    "d": 1,
+    "dy": 1,
+    "dys": 1,
+    "day": 1,
+    "days": 1,
+    "w": 7,
+    "wk": 7,
+    "wks": 7,
+    "week": 7,
+    "weeks": 7,
+    "m": 30,
+    "mo": 30,
+    "mon": 30,
+    "mons": 30,
+    "mth": 30,
+    "mths": 30,
+    "month": 30,
+    "months": 30,
+}
+
+# A bare number ("8", "10") is NOT parsed. It probably means days, and probably is
+# not worth a wrong answer: guessing the unit on a duration silently expires a drug
+# somebody is still taking. Same for OCR wreckage ("x 14clas", "x lodaf") -- the
+# number is legible and the unit is not, and half a duration is not a duration.
+# Both stay open and go to a human, which is what the review queue is for.
+_INDEFINITE = re.compile(r"(continue|continous|continuous|lifelong|regular|sos|prn)", re.I)
+
+# "5 day / month" is a RATE, not a duration: five days EVERY month, recurring --
+# dermatology pulses itraconazole exactly like this. Read as a five-day course it
+# expires on day five, and a drug the person is still cycling on vanishes from the
+# list. A rate means the course has no stated end; a human decides.
+_RATE = re.compile(r"(/|per\b)\s*(day|week|month|mth|mo|wk|m|w|d)\b", re.IGNORECASE)
 
 
 def course_ends(med: Med) -> Optional[datetime.date]:
@@ -132,7 +170,7 @@ def course_ends(med: Med) -> Optional[datetime.date]:
     """
     if not med.effective or not med.duration:
         return None
-    if _INDEFINITE.search(med.duration):
+    if _INDEFINITE.search(med.duration) or _RATE.search(med.duration):
         return None
 
     m = _DURATION.search(med.duration)
@@ -140,7 +178,10 @@ def course_ends(med: Med) -> Optional[datetime.date]:
         return None
 
     n, unit = int(m.group(1)), m.group(2).lower()
-    days = n * {"day": 1, "days": 1, "week": 7, "weeks": 7, "month": 30, "months": 30}[unit]
+    factor = _UNIT_DAYS.get(unit)
+    if factor is None:
+        return None
+    days = n * factor
     try:
         start = datetime.date.fromisoformat(med.effective)
     except ValueError:
