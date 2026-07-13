@@ -22,34 +22,53 @@ import pytest
 
 from tools.guard_secrets import scan
 
-# Fabricated, structurally-valid credentials. None of these is real -- but each has
-# the SHAPE of the real thing, which is the only part the guard can see, and a guard
-# tested against fakes that do not look real is not tested.
+# Fabricated credentials, ASSEMBLED AT RUNTIME. Every prefix is split from its body,
+# so no contiguous key shape ever exists in this file on disk -- while the string the
+# guard actually sees is complete, and exercises the real regex.
 #
-# Which means this file trips its own guard. Each line therefore carries an explicit
-# `pragma: allowlist secret`. That pragma is per-line by design: a file-level
-# exemption would let a genuine key hide here forever.
+# The first version of this file did NOT do that. It held the fakes as plain literals
+# and silenced the local guard with `# pragma: allowlist secret`. GitHub's secret
+# scanner does not honour that pragma, flagged the fixture as a live Google API key
+# within minutes of the push, and marked it publicly leaked. The key was fake and no
+# real credential was ever exposed -- but a string that is structurally
+# indistinguishable from a live key does not become safe because a comment nearby says
+# it is. Providers scan, and some of them try the key.
+#
+# So: never write a realistic key literal, not even as a fixture, not even with a
+# pragma. Split it.
+_G, _A, _O, _H, _K, _S = "AIza", "sk-ant-", "sk-", "ghp_", "AKIA", "xox"
+
 FAKE_CREDENTIALS = {
-    "google/gemini": 'K = "AIzaSyC1nQmVQ3xK9pLmZ7wRtY2bN4vH8jD6fA0"',  # pragma: allowlist secret
-    "anthropic": 'key = "sk-ant-api03-abcdefghijklmnopqrst"',  # pragma: allowlist secret
-    "openai": 'key = "sk-' + "A" * 40 + '"',  # pragma: allowlist secret
-    "github": "token = 'ghp_" + "a" * 36 + "'",  # pragma: allowlist secret
-    "aws": 'AWS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"',  # pragma: allowlist secret
-    "slack": 'hook = "xoxb-123456789012-abcdefghijkl"',  # pragma: allowlist secret
-    "private key": "-----BEGIN RSA PRIVATE KEY-----",  # pragma: allowlist secret
-    "jwt": 'j = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc"',  # pragma: allowlist secret
-    "plain password": 'pwd = "hunter2istoolong"',  # pragma: allowlist secret
+    "google/gemini": 'K = "' + _G + 'SyC1nQmVQ3xK9pLmZ7wRtY2bN4vH8jD6fA0"',
+    "anthropic": 'key = "' + _A + 'api03-abcdefghijklmnopqrst"',
+    "openai": 'key = "' + _O + "A" * 40 + '"',
+    "github": "token = '" + _H + "a" * 36 + "'",
+    "aws": 'AWS_KEY_ID = "' + _K + 'IOSFODNN7EXAMPLE"',
+    "slack": 'hook = "' + _S + 'b-123456789012-abcdefghijkl"',
+    "private key": "-----BEGIN RSA " + "PRIVATE KEY-----",
+    "jwt": 'j = "ey' + "JhbGciOiJIUzI1NiJ9.ey" + 'JzdWIiOiIxMjM0NTY3ODkwIn0.abc"',
+    # Split for the same reason as the rest: written whole, this line is itself a
+    # credential-shaped assignment, and the guard rightly refuses it.
+    "plain password": 'pwd = "hunter' + '2istoolong"',
 }
 
 
-def test_the_allowlist_pragma_is_the_only_thing_saving_this_file() -> None:
-    """If the pragma ever stops working, this file becomes a hole. Prove it is
-    load-bearing: the same lines WITHOUT the pragma must all be caught."""
-    for label, line in FAKE_CREDENTIALS.items():
-        assert scan("x.py", line), f"{label} is no longer detected at all"
-        assert not scan("x.py", line + "  # pragma: allowlist secret"), (
-            f"the allowlist pragma did not suppress {label} -- this file's own "
-            f"fixtures would block every commit"
+def test_no_key_shape_is_written_literally_in_this_file() -> None:
+    """The regression that matters. If someone 'tidies' the concatenations above back
+    into plain literals, this file becomes a live-looking key on a public repo again."""
+    import re
+
+    source = open(__file__, encoding="utf-8").read()
+    literal_key_shapes = [
+        r"AIza[0-9A-Za-z_\-]{35}",
+        r"sk-ant-[0-9A-Za-z_\-]{20,}",
+        r"\bAKIA[0-9A-Z]{16}\b",
+        r"\bghp_[0-9A-Za-z]{36}\b",
+    ]
+    for shape in literal_key_shapes:
+        assert not re.search(shape, source), (
+            f"a literal matching {shape!r} is written out in this file. Split it: "
+            f"GitHub's scanner reads the file, and it does not care that the key is fake."
         )
 
 
