@@ -1,0 +1,26 @@
+{
+  "_comment": "Discharge summary extraction. A new document type is a new config file here, not new code.",
+
+  "doc_type": "discharge",
+
+  "_routing_comment": "An Admissions FOLDER groups an EPISODE, not a document type: most of what is in it are the labs and scans from the stay, already ingested by the lab extractor. Only a handful are actual summaries. So route on the title.",
+
+  "_patient_warning": "Some are filed under the WRONG PERSON: a mother's laparoscopy and delivery summaries can sit in the CHILD's folder, because that folder is organised around the pregnancy rather than the patient. The document names the mother; the folder says the child. The patient cross-check must fire on these, and the ingest must trust the DOCUMENT over the folder. This is the single most dangerous class of error in the system.",
+
+  "routing": {
+    "tags": [],
+    "title_patterns": [
+      "\\bdischarge\\b",
+      "\\bsummary\\b",
+      "\\bcase\\s*sheet\\b",
+      "\\bhospital\\s*course\\b"
+    ]
+  },
+
+  "prompt": "You are a precise medical data transcription assistant.\n\nThis is a hospital DISCHARGE SUMMARY. Extract it.\n\nCopy every value EXACTLY as printed. Do NOT reformat, re-order, translate, expand abbreviations, correct spelling, or infer anything that is not written. TRANSCRIBE, NEVER INTERPRET. If a drug is written 'Tab. Glycomet GP1', write 'Tab. Glycomet GP1'. If a dose is written '1-0-1', write '1-0-1' -- do NOT convert it to 'twice daily'.\n\nReturn a JSON object with exactly these keys:\n\n\"patient\": what the DOCUMENT prints about whose record this is. Read it from the page; never infer it from context.\n- \"name\": the patient name exactly as printed. Empty string if absent.\n- \"age\": as printed. Empty string if absent.\n- \"sex\": as printed. Empty string if absent.\n\n\"encounter\":\n- \"hospital\": the hospital or facility name as printed. Empty string if absent.\n- \"admitted\": the date of admission as printed. Empty string if absent.\n- \"discharged\": the date of discharge as printed. Empty string if absent.\n- \"reason\": the presenting complaint / reason for admission, copied verbatim. Empty string if absent.\n- \"diagnoses\": an array of the final diagnoses, each copied verbatim as a separate string. Empty array if none printed.\n- \"procedures\": an array of procedures or surgeries performed, each verbatim. Empty array if none.\n- \"follow_up\": the follow-up instruction copied verbatim (e.g. 'Review in OPD after 2 weeks'). Empty string if none printed.\n- \"follow_up_date\": the follow-up date IF an explicit date is printed. If the summary only says 'after 2 weeks' and gives no date, leave this EMPTY -- do not calculate it.\n\n\"medications\": the medicines the patient is to take ON DISCHARGE. One object per medicine actually listed. Do not invent a medicine, and do not omit one. Each object:\n- \"drug\": the drug name copied verbatim, including any brand name and prefix (e.g. 'Tab. Glycomet GP1', 'Inj. Monocef').\n- \"strength\": as printed (e.g. '500mg'). Empty string if absent.\n- \"form\": as printed (e.g. 'Tab', 'Cap', 'Syrup', 'Inj'). Empty string if absent.\n- \"dose\": as printed. Empty string if absent.\n- \"frequency\": as printed, VERBATIM (e.g. '1-0-1', 'BD', 'OD', 'SOS'). Do not translate it.\n- \"duration\": as printed (e.g. '5 days', 'to continue'). Empty string if absent.\n\nIf this document is NOT a discharge summary, return empty values -- do not force a reading.",
+
+  "validation": {
+    "patient_name_must_match_folder": true,
+    "collection_date_max_drift_days": 30
+  }
+}

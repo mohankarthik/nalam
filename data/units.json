@@ -1,0 +1,50 @@
+{
+  "_comment": "Canonical unit per analyte, and the factor to convert a lab's unit into it. The canonical unit is whatever the master sheet's reference range is expressed in -- the sheet is the source of truth, so the database must speak its units.",
+
+  "_why": "A 2021 report printed Vitamin D as '31.29 nmol/L' while the codebook range (30-80) is ng/mL. Unconverted, that reading looks normal against the wrong scale. Same trap for platelets printed as 215 x10^3/uL against a range of 150000-410000. An unknown unit is NEVER assumed -- it goes to review.",
+
+  "_format": "analyte: {canonical: '<unit>', convert: {'<printed unit>': <multiply by>}}. Unit strings are compared case- and punctuation-insensitively (see src/units.py).",
+
+  "Vitamin D":        {"canonical": "ng/mL",   "convert": {"nmol/L": 0.4006}},
+  "Vitamin B12":      {"canonical": "pg/mL",   "convert": {"pmol/L": 1.355}},
+
+  "Platelet Count":   {"canonical": "/uL",     "convert": {"10^3/uL": 1000, "x10^3/uL": 1000, "thou/uL": 1000, "10^9/L": 1000, "lakhs/cumm": 100000}},
+  "WBC":              {"canonical": "/uL",     "convert": {"10^3/uL": 1000, "x10^3/uL": 1000, "thou/uL": 1000, "10^9/L": 1000}},
+  "RBC":              {"canonical": "mill/uL", "convert": {"10^6/uL": 1, "x10^6/uL": 1, "10^12/L": 1, "mill/cumm": 1, "million/uL": 1}},
+
+  "Fasting Blood Sugar": {"canonical": "mg/dL", "convert": {"mmol/L": 18.016}},
+  "PP Blood Sugar":      {"canonical": "mg/dL", "convert": {"mmol/L": 18.016}},
+  "HbA1c":               {"canonical": "%",     "convert": {}},
+
+  "Cholesterol":      {"canonical": "mg/dL",   "convert": {"mmol/L": 38.67}},
+  "HDL":              {"canonical": "mg/dL",   "convert": {"mmol/L": 38.67}},
+  "LDL":              {"canonical": "mg/dL",   "convert": {"mmol/L": 38.67}},
+  "VLDL":             {"canonical": "mg/dL",   "convert": {"mmol/L": 38.67}},
+  "TGL":              {"canonical": "mg/dL",   "convert": {"mmol/L": 88.57}},
+
+  "Creatinine":       {"canonical": "mg/dL",   "convert": {"umol/L": 0.0113}},
+  "Urea":             {"canonical": "mg/dL",   "convert": {"mmol/L": 6.006}},
+  "BUN (Urease/GLDH)":{"canonical": "mg/dL",   "convert": {"mmol/L": 2.801}},
+  "Uric Acid":        {"canonical": "mg/dL",   "convert": {"umol/L": 0.0168}},
+  "Calcium":          {"canonical": "mg/dL",   "convert": {"mmol/L": 4.008}},
+  "Phosphorus":       {"canonical": "mg/dL",   "convert": {"mmol/L": 3.097}},
+
+  "Total Bilrubin":   {"canonical": "mg/dL",   "convert": {"umol/L": 0.0585}},
+  "Direct Bilirubin": {"canonical": "mg/dL",   "convert": {"umol/L": 0.0585}},
+  "Total Protien":    {"canonical": "g/dL",    "convert": {"g/L": 0.1}},
+  "Albumin":          {"canonical": "g/dL",    "convert": {"g/L": 0.1}},
+  "Globulin":         {"canonical": "g/dL",    "convert": {"g/L": 0.1}},
+
+  "T3":               {"canonical": "ng/mL",   "convert": {"nmol/L": 0.651}},
+  "T4":               {"canonical": "nmol/L",  "convert": {"ug/dL": 12.87, "micg/dL": 12.87, "mcg/dL": 12.87}},
+  "TSH":              {"canonical": "uIU/mL",  "convert": {"mIU/L": 1.0}},
+
+  "Serum Ferritin":   {"canonical": "ng/mL",   "convert": {"ug/L": 1.0}},
+  "Iron (TPTZ)":      {"canonical": "ug/dL",   "convert": {"umol/L": 5.587}},
+  "Iron Binding Capacity (PSAP)": {"canonical": "ug/dL", "convert": {"umol/L": 5.587}},
+  "PSA":              {"canonical": "ng/mL",   "convert": {"ug/L": 1.0}},
+
+  "Haemoglobin":      {"canonical": "g/dL",    "convert": {"g/L": 0.1}},
+  "Packed cell volume": {"canonical": "%",     "convert": {"L/L": 100}},
+  "Erythrocyte Sedimentation Rate": {"canonical": "mm/hr", "convert": {}}
+}

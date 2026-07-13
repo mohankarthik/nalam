@@ -1,0 +1,36 @@
+{
+  "_comment": "Maps a specialty subfolder under a person to a Paperless tag, following the existing 'Category/Subcategory' convention already used in Paperless (Work/Payslip, Identity/Aadhar, ...). Several source folders collapse onto one tag - the folder tree grew organically and says the same thing two ways.",
+
+  "tags": {
+    "Reports": "Medical/Reports",
+    "Vaccination": "Medical/Vaccination",
+    "Insurance": "Medical/Insurance",
+    "Bills": "Medical/Insurance",
+    "Admissions": "Medical/Admissions",
+
+    "Pulmonary": "Medical/Pulmonology",
+    "Pulmonology": "Medical/Pulmonology",
+    "Dermatology": "Medical/Dermatology",
+    "Skin": "Medical/Dermatology",
+    "Migraine": "Medical/Neurology",
+    "UTI": "Medical/Urology",
+    "Ear": "Medical/ENT",
+
+    "Dental": "Medical/Dental",
+    "Eye": "Medical/Ophthalmology",
+    "Gastro": "Medical/Gastroenterology",
+    "GP": "Medical/GP",
+    "Ortho": "Medical/Orthopaedics",
+    "Cancer": "Medical/Oncology",
+    "COVID": "Medical/COVID",
+
+    "Conception": "Medical/Pregnancy",
+    "Pregnancy": "Medical/Pregnancy",
+    "Birth": "Medical/Birth",
+
+    "Final": "Medical/End-of-life"
+  },
+
+  "_default_comment": "Files sitting directly under a person folder, with no specialty subfolder. The Phase 1 extractor reclassifies these once it reads them.",
+  "default_tag": "Medical/General"
+}

@@ -1,0 +1,41 @@
+{
+  "_comment": "Copy to data/people.json and fill in. data/people.json is gitignored: it names real people.",
+
+  "_folder": "The folder under `medical_root` that holds this person's documents. THE FOLDER IS THE PATIENT -- an unmapped folder aborts the sync rather than being guessed, because a document filed against the wrong person is the worst failure this system can have.",
+
+  "_sex": "Used to pick a reference range when a lab printed none. Male and female normals genuinely differ (creatinine, uric acid, HDL, haemoglobin).",
+
+  "_child": "Adult reference ranges are WRONG for children -- paediatric normals differ hugely by age. For a child we only ever use the range the LAB printed on the report, which is age-appropriate. If no range is printed, we flag nothing: an absent flag is honest, a wrong one is dangerous.",
+
+  "_aliases": "Optional. Whatever YOU call this person -- 'dad', 'appa', 'the boss'. Purely your own vocabulary, so the agent can answer 'when did my dad have this'. Relationships live here, in your config, and never in the code: every family names itself differently.",
+
+  "people": {
+    "Alice": {
+      "correspondent": "Alice Example",
+      "sex": "female",
+      "child": false,
+      "aliases": ["wife"]
+    },
+    "Bob": {
+      "correspondent": "Bob Example",
+      "sex": "male",
+      "child": false,
+      "aliases": ["me", "self"]
+    },
+    "Carol": {
+      "correspondent": "Carol Example",
+      "sex": "female",
+      "child": true,
+      "aliases": ["daughter"]
+    },
+    "Shared": {
+      "correspondent": "Family",
+      "sex": null,
+      "child": false,
+      "aliases": ["household"]
+    }
+  },
+
+  "_skip_folders": "Folders to ignore entirely -- e.g. a duplicate copy of another person's folder.",
+  "skip_folders": []
+}

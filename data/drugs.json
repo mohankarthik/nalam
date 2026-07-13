@@ -1,0 +1,64 @@
+{
+  "_comment": "Indian brand name -> the molecule(s) it actually contains. Display is 'generic (BRAND)', so the brand is never lost -- it is what appears on the strip in the cupboard and what the doctor wrote.",
+
+  "_why": "Without this you cannot answer 'is this patient on metformin?' -- they may be, but the summary says TENEPRIDE M and GALVUS MET and GLUCONORM G2, which are three different brands of it. Nor can you catch a duplicate: GLUCONORM G2 and GEMER are both glimepiride+metformin. A brand list is a list of packages, not of drugs.",
+
+  "_confirmed": "confirmed=false means I am NOT sure of the molecule and it must not be trusted. Guessing a drug is the most dangerous thing this system could do. Those rows stay in review until a human checks the strip or the prescription.",
+
+  "_device": "device=true means it is not a drug at all -- it came out of a discharge medication list but is equipment.",
+
+  "drugs": {
+    "AMLODAC":        {"generic": ["Amlodipine"], "class": "antihypertensive", "confirmed": true},
+    "ATORVA":         {"generic": ["Atorvastatin"], "class": "statin", "confirmed": true},
+    "CLOPILET":       {"generic": ["Clopidogrel"], "class": "antiplatelet", "confirmed": true},
+    "ECOSPIRIN":      {"generic": ["Aspirin"], "class": "antiplatelet", "confirmed": true},
+    "ECOSPRIN AV":    {"generic": ["Aspirin", "Atorvastatin"], "class": "antiplatelet + statin", "confirmed": true},
+    "LOSAR":          {"generic": ["Losartan"], "class": "antihypertensive", "confirmed": true},
+    "LOSARTAN":       {"generic": ["Losartan"], "class": "antihypertensive", "confirmed": true},
+    "TELMA":          {"generic": ["Telmisartan"], "class": "antihypertensive", "confirmed": true},
+
+    "GALVUS MET":     {"generic": ["Vildagliptin", "Metformin"], "class": "antidiabetic", "confirmed": true},
+    "TENEPRIDE M":    {"generic": ["Teneligliptin", "Metformin"], "class": "antidiabetic", "confirmed": true},
+    "GLUCONORM G2":   {"generic": ["Glimepiride", "Metformin"], "class": "antidiabetic", "confirmed": true},
+    "GEMER":          {"generic": ["Glimepiride", "Metformin"], "class": "antidiabetic", "confirmed": true},
+    "JANUVIA":        {"generic": ["Sitagliptin"], "class": "antidiabetic", "confirmed": true},
+
+    "FARONEM":        {"generic": ["Faropenem"], "class": "antibiotic", "confirmed": true},
+    "LINID":          {"generic": ["Linezolid"], "class": "antibiotic", "confirmed": true},
+    "CAP. REALCEF":   {"generic": ["Cefixime"], "class": "antibiotic", "confirmed": true},
+
+    "UDILIV":         {"generic": ["Ursodeoxycholic acid"], "class": "hepatobiliary", "confirmed": true},
+    "PAN":            {"generic": ["Pantoprazole"], "class": "PPI", "confirmed": true},
+    "TAB. PAN - DSR": {"generic": ["Pantoprazole", "Domperidone"], "class": "PPI", "confirmed": true},
+    "ESOGRESS -D":    {"generic": ["Esomeprazole", "Domperidone"], "class": "PPI", "confirmed": true},
+    "CREMAFFIN PLUS": {"generic": ["Liquid paraffin", "Milk of magnesia", "Sodium picosulfate"], "class": "laxative", "confirmed": true},
+    "CHYMORAL FORTE": {"generic": ["Trypsin", "Chymotrypsin"], "class": "anti-inflammatory enzyme", "confirmed": true},
+
+    "D RISE":         {"generic": ["Cholecalciferol"], "class": "vitamin D", "confirmed": true},
+    "LUPI-D3":        {"generic": ["Cholecalciferol"], "class": "vitamin D", "confirmed": true},
+    "FOLVITE-MB":     {"generic": ["Folic acid", "Methylcobalamin"], "class": "vitamin", "confirmed": true},
+    "CAP. BECOSULES": {"generic": ["B-complex vitamins"], "class": "vitamin", "confirmed": true},
+    "TAB. CCM":       {"generic": ["Calcium citrate malate"], "class": "supplement", "confirmed": true},
+    "TAB. OROFER XT": {"generic": ["Ferrous ascorbate", "Folic acid"], "class": "iron supplement", "confirmed": true},
+
+    "FORACORT":       {"generic": ["Budesonide", "Formoterol"], "class": "inhaled bronchodilator/steroid", "confirmed": true},
+    "LEVOLIN":        {"generic": ["Levosalbutamol"], "class": "bronchodilator", "confirmed": true},
+    "TAB. ABPHYLLINE N": {"generic": ["Etofylline", "Theophylline"], "class": "bronchodilator", "confirmed": true},
+    "TAB. PULMOPRES": {"generic": ["Tadalafil"], "class": "pulmonary vasodilator", "confirmed": true},
+    "TAB. LASIX":     {"generic": ["Furosemide"], "class": "diuretic", "confirmed": true},
+    "TAB. LANOXIN":   {"generic": ["Digoxin"], "class": "cardiac glycoside", "confirmed": true},
+    "TAB. FEMARA":    {"generic": ["Letrozole"], "class": "aromatase inhibitor (breast cancer)", "confirmed": true},
+    "TAB. MODALERT":  {"generic": ["Modafinil"], "class": "wakefulness agent", "confirmed": true},
+
+    "_unsure_comment": "Below: I am NOT confident of the molecule. They stay in review. Read the strip or the original prescription.",
+    "BENALGIS":       {"generic": [], "class": "analgesic?", "confirmed": false},
+    "GB 29 SR":       {"generic": [], "class": "?", "confirmed": false},
+    "GLUCONORM AV":   {"generic": [], "class": "? (75mg strength does not fit an antidiabetic; may be aspirin+atorvastatin despite the Gluconorm name)", "confirmed": false},
+    "HEPAGRSS":       {"generic": [], "class": "hepatoprotective?", "confirmed": false},
+    "PROHANCE -HP":   {"generic": [], "class": "high-protein nutrition supplement, not a drug", "confirmed": false},
+    "NATOCARE":       {"generic": [], "class": "prenatal nutrition supplement", "confirmed": false},
+    "TAB. TOLPA-D":   {"generic": [], "class": "muscle relaxant + NSAID?", "confirmed": false},
+
+    "BIPAP AT NIGHT": {"generic": [], "class": "DEVICE, not a drug", "confirmed": true, "device": true}
+  }
+}

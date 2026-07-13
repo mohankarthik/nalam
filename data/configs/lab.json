@@ -1,0 +1,29 @@
+{
+  "_comment": "Lab report extraction. New document types are added as another file here, not as new code (gajana's data/configs/{type}-{bank}.json pattern).",
+  "doc_type": "lab",
+  "_routing_comment": "Which documents are lab reports. The FOLDER is authoritative for WHO the patient is, but NOT for what kind of document this is: many lab reports live outside a folder named 'Reports' -- they end up under a specialty folder or an admission folder instead. Routing on the folder alone silently skips every one of them.",
+  "_routing_limits": "This is keyword matching on the title, not classification. It MISSES an oddly-named report (that document stays invisible to health.db, though it is still in Paperless and searchable), and it MISFIRES on a consult note that merely mentions a test (harmless: the extractor finds no results and records nothing). The real fix is a page-1 classifier that reads the document; this buys most of the coverage for no API cost.",
+  "routing": {
+    "tags": [
+      "Medical/Reports"
+    ],
+    "title_patterns": [
+      "\\b(cbc|lft|kft|rft|tft)\\b",
+      "\\b(lipid|thyroid|electrolyte|haemogram|hemogram)\\b",
+      "\\b(hba1c|tsh|t3|t4|psa|esr|crp|b12|ferritin)\\b",
+      "\\b(sugar|glucose|urea|creat\\w*|uric)\\b",
+      "\\b(vit\\s?-?\\s?d|vitamin)\\b",
+      "\\b(hiv|hbsag|vdrl|hcv)\\b",
+      "\\b(urine|culture)\\b",
+      "\\b(mhc|profile|panel)\\b",
+      "\\breports?\\b"
+    ]
+  },
+  "prompt": "You are a precise medical data transcription assistant.\n\nExtract every test result from this report.\n\nCopy every value EXACTLY as printed. Do NOT reformat, convert units, round, compute, translate or normalise anything. TRANSCRIBE, NEVER INTERPRET. If the report prints \"5.20\", write \"5.20\", not \"5.2\". If it prints \"< 0.5\", write \"< 0.5\". If it prints \"112 #\", write \"112 #\". A value you alter is a value that is wrong.\n\nReturn a JSON object with two keys: \"patient\" and \"results\".\n\n\"patient\": what the report itself prints about who it belongs to. This is an independent cross-check, so read it from the report -- never infer it.\n- \"name\": the patient name exactly as printed. Empty string if absent.\n- \"age\": as printed. Empty string if absent.\n- \"sex\": as printed. Empty string if absent.\n- \"collected_at\": the sample COLLECTION date as printed (not the report/print date). Empty string if absent.\n- \"lab\": the name of the laboratory or hospital as printed. Empty string if absent.\n\n\"results\": an array, one object per test result actually printed on the report. Do not invent a test that is not there, and do not omit one that is. Each object has exactly these fields:\n- \"section\": the SECTION HEADING this result appeared under, copied verbatim (e.g. \"BIOCHEMISTRY\", \"URINE ROUTINE\", \"COMPLETE BLOOD COUNT\", \"2D ECHOCARDIOGRAPHY\", \"OPHTHALMOLOGY\", \"ULTRASOUND ABDOMEN\"). This matters: a health-checkup report bundles several different examinations, and the SAME test name means different things in different sections -- \"RBC\" under URINE ROUTINE is a dipstick finding, \"RBC\" under COMPLETE BLOOD COUNT is a blood cell count. If a result sits under no heading, use an empty string.\n- \"name\": the test name copied verbatim as printed (e.g. \"Glycosylated Haemoglobin (HbA1c)\").\n- \"value\": the result copied verbatim, with no units (e.g. \"5.2\", \"Not Reactive\", \"< 0.5\").\n- \"unit\": the unit copied verbatim (e.g. \"mg/dL\", \"%\", \"nmol/L\", \"10^3/uL\"). Empty string if none is printed. Copy the unit that is actually printed -- never the unit you expect.\n- \"reference_range\": the reference/normal range copied verbatim exactly as printed (e.g. \"4.0 - 5.6\", \"< 200\"). Empty string if none is printed.\n- \"method\": the method copied verbatim if printed (e.g. \"HPLC\"). Empty string otherwise.\n\nIgnore page headers, footers, disclaimers, doctor signatures, and any interpretive commentary. Extract only actual test results.",
+  "_validation_comment": "Enforced in code, not by the model. Hard failures quarantine the row to review; they never silently drop it.",
+  "validation": {
+    "value_must_appear_in_text_layer": true,
+    "patient_name_must_match_folder": true,
+    "collection_date_max_drift_days": 15
+  }
+}

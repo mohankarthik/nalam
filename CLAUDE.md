@@ -1,0 +1,199 @@
+# CLAUDE.md
+
+Guidance for Claude Code working in this repository.
+
+## What nalam is
+
+Family health record pipeline for 8 people. Scanned documents (labs, scans, consults,
+prescriptions, discharge summaries, insurance) land in Google Drive; nalam files them into
+Paperless-ngx, extracts structured observations into SQLite, answers questions over them, and pushes
+follow-up reminders to Todoist.
+
+Sibling service to **gajana** (personal finance, `~/gajana`). Same shape on purpose: supercronic in
+a long-running container, `secrets/` bind-mount, config-driven parsing, Uptime-Kuma push, ansible
+deploy. **When in doubt about how to do something here, look at how gajana does it.**
+
+## Commands
+
+**Always use the venv** (`./venv/bin/python`, or activate it). Like gajana, nalam has its own
+`venv/`; do not `pip install` into the system interpreter.
+
+```bash
+python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first time
+
+# --- Phase 0: Drive -> Paperless ---
+./venv/bin/python run_sync.py --dry-run     # plan; uploads nothing
+./venv/bin/python run_sync.py               # idempotent; safe to re-run
+./venv/bin/python run_sync.py --report      # what Paperless refused to consume
+
+# --- Phase 1: PDFs -> health.db ---
+./venv/bin/python run_extract.py --limit 5  # extract 5 lab reports
+./venv/bin/python run_extract.py            # all lab reports
+./venv/bin/python run_extract.py --discharge  # discharge summaries
+./venv/bin/python run_extract.py --review   # what is not trusted, and why
+./venv/bin/python run_extract.py --reclassify  # re-resolve unnamed analytes (FREE, no LLM)
+
+# --- Medicines ---
+./venv/bin/python run_meds.py --list --person a family member
+./venv/bin/python run_meds.py --reconcile
+./venv/bin/python run_meds.py --decide a family member "FARONEM" stopped 2023-03-04
+
+# --- Tests ---
+./venv/bin/python -m pytest              # 117 regressions, offline and free
+./venv/bin/python -m tools.extract_golden      # regenerate golden cache (slow, costs money)
+./venv/bin/python -m tools.import_master_sheet # re-import the codebook from the Sheet
+./venv/bin/python -m tools.export_analytes     # codebook -> ~/nalam-analytes-review.md
+```
+
+**Gemini billing is enabled**, so set `NALAM_GEMINI_MIN_INTERVAL=0` for bulk runs — the default
+7s pacing exists for the free tier (~20 req/day) and is pure dead time on a paid key. The key is
+shared with gajana; a heavy nalam backfill used to starve gajana's 06:00 statement run.
+
+**`pytest` is offline and costs nothing** — it reads cached extractions from
+`tests/fixtures/extracted/`. Only regenerate that cache when the prompt or the model
+changes, and when you do, **clear it first**: a cache half-built from two different
+prompts is a silent correctness trap.
+
+## The one rule that matters
+
+**The correspondent is the patient.** A document filed against the wrong family member is the worst
+failure this system can have — worse than not ingesting it at all. So:
+
+- `data/people.json` maps a Drive folder to a Paperless correspondent. An **unmapped folder aborts
+  the sync**; it is never guessed.
+- `Paperless.correspondent_id()` defaults to `create=False`. An unexpected person name means the map
+  is wrong, not that a new patient appeared.
+- Nothing infers a patient from document *content* while the folder path is authoritative.
+- `validator.check_document()` cross-checks the name **printed on the report** against the folder it
+  came from. Mismatch → the whole document is quarantined. This catches a misfiled scan.
+
+## The four traps (all of them cost real bugs; all have regression tests)
+
+The golden test caught every one of these. **Gemini transcribed correctly every single time** — each
+bug was in *our* post-processing. That is what the verbatim-copy prompt buys you: when something is
+wrong, you know where to look.
+
+1. **A qualifier is identity, not noise.** `serum`, `direct`, `total`, `fasting` must NEVER go in
+   `normalize.NOISE`. Stripping `direct` once reduced `Direct Bilirubin` to `{bilirubin}`, which then
+   also matched *Total* and *Indirect* Bilirubin — putting one test's value under another's name.
+
+2. **An MHC report is five examinations stapled together**, not a lab report. Test names collide
+   across sections and mean different things: `RBC` under `URINE ROUTINE` is a dipstick finding
+   (`Negative`), under `COMPLETE BLOOD COUNT` it's a cell count (`5.83`). `Impression` exists in both
+   the eye exam and the abdominal USG. The model reports the **section heading** and
+   `normalize._domain_compatible()` refuses cross-section matches.
+
+3. **Units are never assumed.** A 2021 report printed Vitamin D as `31.29 nmol/L`; the codebook keeps
+   it in ng/mL with a 30–80 range. Unconverted, it looks normal against a scale it doesn't belong to.
+   `src/units.py` converts to the codebook's unit, and an **unknown unit refuses** rather than
+   guessing. Guessing is how a value ends up 10× wrong while looking plausible.
+
+4. **Two results claiming one analyte are both untrusted.** If a report yields two `HbA1c` rows, one
+   is silently overwriting the other and we can't know which is real. `normalize.resolve()` refuses
+   both and sends them to review.
+
+The through-line: **refusing is safe, guessing is not.** Every ambiguity in this codebase resolves to
+the review queue, never to a coin flip.
+
+## Ground truth (`tests/fixtures/golden.json`)
+
+824 values the user typed by hand from the original reports, 2010–2025; 481 have a source PDF still
+in Drive. This is the only thing that can tell us whether the LLM is lying, and most projects like
+this have nothing equivalent.
+
+`tests/test_golden.py` distinguishes two failures, and **they are not the same severity**:
+
+- **MISMATCH** — we produced a different value than the human. A wrong number in a medical record.
+  Fails the build.
+- **UNCOVERED** — the human has a value we didn't produce. A missing alias, or a value quarantined
+  for good reason. Reported, does not fail. *A gap is not a lie*, and conflating the two would train
+  us to paper over real errors.
+
+Adjudicated disagreements — cases where the DOCUMENT is right and the SHEET is wrong, each proven
+against the PDF's own text layer — live in `tests/fixtures/sheet_errors.json` (gitignored: they
+contain real values). The golden test excludes them but still prints them, so they stay visible
+facts rather than folklore.
+
+## Nothing personal in this repository
+
+Real names, real paths, real values, real health records: **none of it is committed.** The code holds
+the shape of the problem; the config holds the family.
+
+| Committed (generic) | Gitignored (personal) |
+|---|---|
+| `data/settings.example.json`, `data/people.example.json` | `data/settings.json`, `data/people.json` |
+| `data/aliases.json`, `data/units.json`, `data/drugs.json`, `data/analytes_extra.json` — medical knowledge, no identities | `data/analytes.json` — generated from the user's own sheet |
+| `src/`, `tests/`, `tools/` | `data/health.db`, `data/state/`, `secrets/` |
+| | `tests/fixtures/` — golden values, raw extractions, adjudicated errors |
+
+**Relationships are config, not code.** `data/people.json` carries each person's own aliases
+("dad", "appa"); `src/people.resolve()` just looks them up. Every family names itself differently and
+the software should have no opinion about it.
+
+If you add an example to a docstring, invent one. Do not paste a real name, a real value, or a real
+file path into anything that gets committed.
+
+## Data flow
+
+```
+{medical_root}/{Person}/{Specialty}/{YYYY-MM-DD} - {Title}.pdf
+        │            │              │
+        │            │              └─ title + document date
+        │            └───────────────── tag   (data/specialties.json)
+        └────────────────────────────── correspondent = patient (data/people.json)
+        │
+        ▼  src/drive_sync.py
+Paperless-ngx  (OCR, dedupe, full-text search, viewer — pre-existing, not ours)
+        │
+        ▼
+data/health.db  →  Sheets view / MCP server / Telegram bot / Todoist reminders
+```
+
+## Key facts about the source data
+
+Established by survey; don't re-derive:
+
+- **The Drive folder may contain byte-identical duplicate copies of a person's folder** under a
+  slightly different name. Verified by checksum; listed in `skip_folders`.
+- **Extension is unreliable.** Some real PDFs have no extension at all. `sniff()` reads magic bytes,
+  but only for the unlabelled ones — this walks an rclone mount that fetches the whole object on
+  open, so opening every file to read 8 bytes downloads the entire folder.
+- **Office files cannot be consumed.** Paperless without a Tika/Gotenberg container skips xlsx/docx.
+  They are reported, never silently dropped.
+- **Most filenames start with `YYYY-MM-DD`**, so the document date is usually free.
+- Image files are mostly *not* handwriting — many are DICOM exports. Real handwriting lives inside
+  scanned PDFs.
+
+## Paperless conventions (pre-existing — follow them, don't invent)
+
+Paperless already held 140 documents before nalam. Its taxonomy:
+
+- **correspondent** = the person (`Patient A`, `Patient B`, `Family`, …)
+- **document_type** = top-level category (`Medical`, `Work`, `Identity`, …)
+- **tag** = `Category/Subcategory` (`Medical/Insurance`, `Work/Payslip`, …)
+
+Insurance is filed against the `Family` correspondent, not a person. 11 insurance PDFs were already
+imported by hand; Paperless rejects them on re-upload by checksum, which is the intended behaviour.
+
+## Uploads go through the REST API, not the consume folder
+
+The consume directory cannot set correspondent, tags or document date. `src/paperless.py` posts to
+`/api/documents/post_document/` instead. Requires an API token in `secrets/paperless.json`
+(`{"token": "..."}`) — mint it in the Paperless UI under the user menu → My Profile → API Auth Token.
+
+## Planned (not yet built)
+
+Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisions:
+
+- **Verbatim extraction.** The LLM copies values exactly as printed and never reformats, converts, or
+  computes. Deterministic code does all parsing. Copied from gajana's `_EXTRACTION_PROMPT`.
+- **The PDF text layer is the token oracle.** A value not literally present in the text layer is
+  quarantined, not committed. Copied from gajana's `StatementValidator`.
+- **Documents check themselves.** Cross-check the patient name printed on the report against the
+  folder it came from. Mismatch → quarantine. (gajana's `reconcile_summary` trick.)
+- **`the master sheet` Google Sheet is the codebook**, not an output to be redesigned: 71–73
+  analytes, 20 segments, **per-person** reference ranges chosen by the user (not the lab's). It seeds
+  `data/analytes.json`, and its ~20 hand-entered historical dates are the extractor's golden test.
+- **`health.db` is the source of truth; the Sheet is a generated view.** Opposite of gajana, where
+  Sheets is primary. Consequence: the Sheet is read-only to humans; corrections go through the
+  Telegram review cards.

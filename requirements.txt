@@ -1,0 +1,11 @@
+# runtime
+litellm
+pypdf
+requests
+
+# dev / test
+pytest
+pytest-cov
+black
+flake8
+mypy

@@ -1,0 +1,33 @@
+# Secrets and credentials
+secrets/
+
+# Personal configuration: real names, real paths, real spreadsheet.
+# The *.example.json files in data/ are the committed schema.
+data/settings.json
+data/people.json
+
+# The codebook is generated from the user's own spreadsheet and encodes which
+# tests they track and the ranges they chose. Personal.
+data/analytes.json
+
+# Extracted health records.
+data/health.db
+data/health.db.*
+data/state/
+
+# Test fixtures built from real medical records: hand-typed values, raw
+# extractions, adjudicated errors. Real people's health data does NOT go in git.
+tests/fixtures/golden.json
+tests/fixtures/sheet_errors.json
+tests/fixtures/extracted/
+tests/fixtures/golden_set.json
+
+logs/
+venv/
+__pycache__/
+*.pyc
+.coverage
+NOTES.local.md
+
+# Raw LLM responses. The expensive artefact -- backed up, never committed.
+data/llm/
