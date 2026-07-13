@@ -231,8 +231,19 @@ def current(
         if not m.generic:
             m.generic = molecule.get(brand_key(m.drug).lower())
 
+    # AS OF A DATE means as of a date. An event that had not happened yet cannot be
+    # used to answer a question about the past: a drug stopped in 2026 was still
+    # being taken in 2024, and "was she on aspirin when she had the stroke?" is
+    # exactly the question this exists to answer. `as_of` used to filter course
+    # expiry and nothing else, so it read the whole future of the log and gave the
+    # 2026 answer to a 2020 question.
+    #
+    # An undated event is kept: it has no date to be after.
+    cutoff = as_of.isoformat()
+    visible = [m for m in all_meds if not m.effective or m.effective <= cutoff]
+
     latest: dict[str, Med] = {}
-    for med in all_meds:
+    for med in visible:
         latest.setdefault(med.key, med)
 
     # A human's "yes, still on it" is a `continued` event with no strength and no
@@ -242,22 +253,43 @@ def current(
     # morning, at an unknown dose. That is worse than the stale flag it replaced.
     #
     # So the confirmation decides the STATUS, and the prescriptions still supply the
-    # facts: the earliest event is when it started, and the most recent event that
-    # actually carried a dose is the dose.
+    # facts.
     for key, m in latest.items():
-        same = [x for x in all_meds if x.key == key]
+        same = [x for x in visible if x.key == key]  # newest first
 
-        # A start date is a fact from a DOCUMENT. It is never the day someone
-        # confirmed the drug is still being taken -- a prescription with no date at
-        # all would then appear to have started the moment it was reconciled, which
-        # is how a wash somebody has used for years came to say "started today".
-        # No dated prescription, no start date: '?' is the honest answer.
-        dated = [x.effective for x in same if x.effective and x.entered_by != "human"]
+        # THE CURRENT EPISODE, not the whole history. A drug can be started,
+        # stopped, and started again years later -- and then it has two separate
+        # courses, not one long one. Walking back from the newest event and halting
+        # at the most recent `stopped` gives the episode the person is in NOW; the
+        # earlier course is history, and history is what --history is for.
+        #
+        # Without this, a drug stopped in 2016 and restarted in 2024 reports
+        # "started 2015", which reads as an unbroken nine-year course that never
+        # happened.
+        episode = []
+        for x in same:
+            if x.event == "stopped":
+                break
+            episode.append(x)
+
+        # A start date comes from a PRESCRIPTION, never from a confirmation. That is
+        # a distinction about the EVENT, not about who recorded it: a `continued`
+        # event is dated the day someone said "yes, still on it", and letting that be
+        # the start date made a wash somebody has used for years say "started today".
+        #
+        # But a human saying "he started this in 2023" IS a start. Excluding humans
+        # rather than confirmations threw that away too -- and a drug switched at a
+        # clinic and never written down has no other source for its start date.
+        #
+        # No prescription in this episode, no start date. '?' is the honest answer.
+        dated = [
+            x.effective for x in episode if x.effective and x.event in ("prescribed", "changed")
+        ]
         m.started = min(dated) if dated else None
         if m.strength is None:
-            m.strength = next((x.strength for x in same if x.strength), None)
+            m.strength = next((x.strength for x in episode if x.strength), None)
         if m.frequency is None:
-            m.frequency = next((x.frequency for x in same if x.frequency), None)
+            m.frequency = next((x.frequency for x in episode if x.frequency), None)
 
     from src.drugs import load_drugs, lookup
 
@@ -439,12 +471,22 @@ def history(
     `drug` matches the brand OR the molecule, so searching "cetirizine" finds it
     under whatever brand it was written as.
     """
+    # LEFT JOIN, not JOIN. A human's decision -- "he stopped taking it" -- has no
+    # document: nobody wrote it down, which is the entire reason a person had to say
+    # so. An inner join therefore dropped every stop ever recorded, and "when did he
+    # stop taking it?" could not be answered by the one view whose whole promise is
+    # that it hides nothing.
+    #
+    # And `event` is selected now. A stop is not a prescription, and a log that
+    # cannot tell them apart cannot show a drug that was taken, stopped, and started
+    # again -- which is a thing that happens.
     sql = """
         SELECT m.subject, m.drug, m.generic, m.strength, m.frequency, m.duration,
-               m.effective, m.status, d.doc_type, d.source_path,
+               m.effective, m.status, m.event, m.entered_by,
+               d.doc_type, d.source_path,
                e.diagnoses, e.reason
         FROM medication_events m
-        JOIN documents d ON d.id = m.document_id
+        LEFT JOIN documents d ON d.id = m.document_id
         LEFT JOIN encounters e ON e.document_id = m.document_id
         WHERE 1=1
     """

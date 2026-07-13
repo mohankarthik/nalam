@@ -143,7 +143,14 @@ def show_reconcile(con, person: str | None) -> None:
 
 
 def show_history(con, person: str | None, drug: str | None) -> None:
-    """Every prescription, unfiltered. Short courses and children included."""
+    """Every EVENT, unfiltered: prescribed, continued, changed, stopped.
+
+    Not "every prescription" -- it used to say that, and it was wrong twice over. A
+    STOP is not a prescription, and a drug that was taken, stopped, and started
+    again a few years later is a thing that happens; a log that cannot show the stop
+    cannot show the two courses either. The event is printed, so a stop reads as a
+    stop.
+    """
     subject = resolve_person(person) if person else None
     rows = meds.history(con, subject=subject, drug=drug)
 
@@ -153,8 +160,8 @@ def show_history(con, person: str | None, drug: str | None) -> None:
         print(f"\nNo record of {what} for {who}.")
         return
 
-    print(f"\n{what} — {who} — {len(rows)} prescriptions, most recent first\n")
-    print(f"  {'DATE':<12} {'PERSON':<17} {'MEDICINE':<34} {'DOSE':<9} FOR")
+    print(f"\n{what} — {who} — {len(rows)} events, most recent first\n")
+    print(f"  {'DATE':<12} {'EVENT':<11} {'PERSON':<17} {'MEDICINE':<30} {'DOSE':<9} FOR")
     for r in rows:
         name = f"{r['generic']} ({r['drug']})" if r["generic"] else r["drug"]
         why = ""
@@ -166,9 +173,13 @@ def show_history(con, person: str | None, drug: str | None) -> None:
         elif r["reason"]:
             why = str(r["reason"])[:26]
         mark = "" if r["status"] == "ok" else " [unconfirmed]"
+        # A human's decision has no document behind it -- nobody wrote it down, which
+        # is why a person had to say so. Mark it, so the log never blurs what a
+        # document recorded with what someone remembered.
+        event = r["event"] + ("*" if r["entered_by"] == "human" else "")
         print(
-            f"  {(r['effective'] or '?'):<12} {r['subject'][:17]:<17} "
-            f"{name[:34]:<34} {(r['strength'] or '-'):<9} {why}{mark}"
+            f"  {(r['effective'] or '?'):<12} {event:<11} {r['subject'][:17]:<17} "
+            f"{name[:30]:<30} {(r['strength'] or '-'):<9} {why}{mark}"
         )
 
 
