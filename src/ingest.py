@@ -115,9 +115,7 @@ def ingest_lab(
         value_text: Optional[str] = None
 
         if number is not None and analyte:
-            converted, _canonical, reason = convert(
-                analyte, number, r.get("unit", ""), units
-            )
+            converted, _canonical, reason = convert(analyte, number, r.get("unit", ""), units)
             if reason:
                 status, reasons = "review", [reason]
             else:
@@ -301,13 +299,15 @@ def ingest_discharge(
         db.queue_review(
             con,
             document_id,
-            [{
-                "subject": subject,
-                "kind": "patient_mismatch",
-                "printed_name": printed,
-                "raw_value": None,
-                "reasons": json.dumps(d.doc_verdict.hard),
-            }],
+            [
+                {
+                    "subject": subject,
+                    "kind": "patient_mismatch",
+                    "printed_name": printed,
+                    "raw_value": None,
+                    "reasons": json.dumps(d.doc_verdict.hard),
+                }
+            ],
         )
         con.commit()
         logger.error(f"{rel_path}: names {printed!r}, filed under {subject!r} -- not committed")
@@ -430,9 +430,7 @@ def ingest_prescription(
         except ValueError:
             doc_date = None
 
-    p = extract_prescription(
-        pdf, subject, rel_path, ocr_text=ocr_text, expected_date=doc_date
-    )
+    p = extract_prescription(pdf, subject, rel_path, ocr_text=ocr_text, expected_date=doc_date)
 
     # Whose document is this, really? The document usually wins over the folder --
     # but NOT when it names a baby by its parent.
@@ -490,13 +488,15 @@ def ingest_prescription(
         db.queue_review(
             con,
             document_id,
-            [{
-                "subject": subject,
-                "kind": "patient_mismatch",
-                "printed_name": printed,
-                "raw_value": None,
-                "reasons": json.dumps(p.doc_verdict.hard),
-            }],
+            [
+                {
+                    "subject": subject,
+                    "kind": "patient_mismatch",
+                    "printed_name": printed,
+                    "raw_value": None,
+                    "reasons": json.dumps(p.doc_verdict.hard),
+                }
+            ],
         )
         con.commit()
         logger.error(f"{rel_path}: names {printed!r}, filed under {subject!r} -- not committed")
@@ -554,10 +554,12 @@ def ingest_prescription(
 
         reason = None
         if not corroborated:
-            reason = json.dumps([
-                f"the drug name was not corroborated by the independent reading "
-                f"({p.oracle_source or 'no oracle available'})"
-            ])
+            reason = json.dumps(
+                [
+                    f"the drug name was not corroborated by the independent reading "
+                    f"({p.oracle_source or 'no oracle available'})"
+                ]
+            )
 
         con.execute(
             """INSERT INTO medication_events

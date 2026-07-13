@@ -48,9 +48,7 @@ def is_lab(doc) -> bool:
 
     if doc.tag in routing["tags"]:
         return True
-    return any(
-        re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"]
-    )
+    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
 
 
 def is_discharge(doc) -> bool:
@@ -62,9 +60,7 @@ def is_discharge(doc) -> bool:
     """
     with open(DISCHARGE_CONFIG, encoding="utf-8") as f:
         routing = json.load(f)["routing"]
-    return any(
-        re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"]
-    )
+    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
 
 
 def run_discharge(con, limit: int = 0) -> None:
@@ -92,7 +88,10 @@ def run_discharge(con, limit: int = 0) -> None:
             continue
         note = ""
         if misfiled:
-            note = f"  ** MISFILED: folder says {d.correspondent}, document says {misfiled} -> filed under {misfiled}"
+            note = (
+                f"  ** MISFILED: folder says {d.correspondent}, "
+                f"document says {misfiled} -> filed under {misfiled}"
+            )
         logger.info(
             f"[{i}/{len(todo)}] {d.correspondent} | {d.title} -> "
             f"{encs} encounter, {meds} medications{note}"
@@ -131,14 +130,23 @@ def run_classify(limit: int = 0) -> None:
                 # No model can read it, and no key is configured. Record the fact
                 # rather than burning two API calls to be told so.
                 cache.save(
-                    source=d.rel, doc_type="classify",
+                    source=d.rel,
+                    doc_type="classify",
                     prompt=open(CLASSIFY_CONFIG, encoding="utf-8").read(),
-                    raw=json.dumps({"doc_type": "encrypted", "confidence": "high",
-                                    "has_medications": False,
-                                    "reason": "PDF is password protected"}),
-                    parsed={"doc_type": "encrypted", "confidence": "high",
+                    raw=json.dumps(
+                        {
+                            "doc_type": "encrypted",
+                            "confidence": "high",
                             "has_medications": False,
-                            "reason": "PDF is password protected"},
+                            "reason": "PDF is password protected",
+                        }
+                    ),
+                    parsed={
+                        "doc_type": "encrypted",
+                        "confidence": "high",
+                        "has_medications": False,
+                        "reason": "PDF is password protected",
+                    },
                     model="none",
                 )
                 logger.warning(f"[{i}/{len(todo)}] encrypted, skipped: {d.title[:40]}")
@@ -150,9 +158,7 @@ def run_classify(limit: int = 0) -> None:
         if i % 25 == 0 or i == len(todo):
             logger.info(f"  [{i}/{len(todo)}] {c['doc_type']:<12} {d.title[:34]}")
 
-    counts = collections.Counter(
-        classified_type(d.rel) or "unclassified" for d in pdfs
-    )
+    counts = collections.Counter(classified_type(d.rel) or "unclassified" for d in pdfs)
     logger.info("\nDocument types:")
     for t, n in counts.most_common():
         logger.info(f"  {n:>4}  {t}")
@@ -161,10 +167,7 @@ def run_classify(limit: int = 0) -> None:
 def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
     """Ingest every document the classifier called a prescription."""
     docs, _ = collect()
-    todo = [
-        d for d in docs
-        if d.suffix == ".pdf" and classified_type(d.rel) == "prescription"
-    ]
+    todo = [d for d in docs if d.suffix == ".pdf" and classified_type(d.rel) == "prescription"]
     if person:
         todo = [d for d in todo if d.correspondent == person]
 
@@ -185,7 +188,9 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
     for i, d in enumerate(todo, 1):
         try:
             n, bad, moved = ingest_prescription(
-                con, d.rel, d.correspondent,
+                con,
+                d.rel,
+                d.correspondent,
                 ocr_text=ocr_for(ocr, d.correspondent, d.rel),
             )
         except Exception as e:
@@ -209,33 +214,25 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
 def show_review(con) -> None:
     """What is in health.db but not trusted, and why."""
     total = con.execute("SELECT count(*) FROM observations").fetchone()[0]
-    ok = con.execute(
-        "SELECT count(*) FROM observations WHERE status = 'ok'"
-    ).fetchone()[0]
+    ok = con.execute("SELECT count(*) FROM observations WHERE status = 'ok'").fetchone()[0]
     logger.info(f"{ok}/{total} observations trusted; {total - ok} need review")
 
     logger.info("\nUnnamed tests (add an alias, then --reclassify; no re-extraction):")
-    rows = con.execute(
-        """SELECT printed_name, section, count(*) n, count(DISTINCT subject) people
+    rows = con.execute("""SELECT printed_name, section, count(*) n, count(DISTINCT subject) people
            FROM observations WHERE analyte IS NULL
-           GROUP BY printed_name ORDER BY n DESC LIMIT 30"""
-    ).fetchall()
+           GROUP BY printed_name ORDER BY n DESC LIMIT 30""").fetchall()
     for r in rows:
         logger.info(
             f"  {r['n']:>3}x ({r['people']} people)  [{(r['section'] or '')[:18]:<18}] "
             f"{r['printed_name'][:44]}"
         )
 
-    for r in con.execute(
-        """SELECT count(*) n, review_reason FROM observations
+    for r in con.execute("""SELECT count(*) n, review_reason FROM observations
            WHERE status='review' AND analyte IS NOT NULL
-           GROUP BY review_reason ORDER BY n DESC LIMIT 10"""
-    ):
+           GROUP BY review_reason ORDER BY n DESC LIMIT 10"""):
         logger.info(f"  {r['n']:>3}x  {str(r['review_reason'])[:80]}")
 
-    bad = con.execute(
-        "SELECT count(*) FROM review_queue WHERE resolved = 0"
-    ).fetchone()[0]
+    bad = con.execute("SELECT count(*) FROM review_queue WHERE resolved = 0").fetchone()[0]
     if bad:
         logger.error(f"\n{bad} DOCUMENTS failed their patient check (possible misfile)")
 
@@ -251,9 +248,7 @@ def reclassify(con) -> None:
         segment = codebook[analyte].get("segment") if analyte else None
         return analyte, segment
 
-    before = con.execute(
-        "SELECT count(*) FROM observations WHERE analyte IS NULL"
-    ).fetchone()[0]
+    before = con.execute("SELECT count(*) FROM observations WHERE analyte IS NULL").fetchone()[0]
     fixed = db.reclassify(con, resolver)
     logger.info(f"named {fixed} of {before} previously-unnamed observations")
 
@@ -264,10 +259,15 @@ def main() -> None:
     p.add_argument("--person", help="Only this correspondent")
     p.add_argument("--discharge", action="store_true", help="Extract discharge summaries")
     p.add_argument("--classify", action="store_true", help="Ask each document what it IS (cached)")
-    p.add_argument("--prescriptions", action="store_true", help="Extract consultations/prescriptions")
+    p.add_argument(
+        "--prescriptions", action="store_true", help="Extract consultations/prescriptions"
+    )
     p.add_argument("--review", action="store_true", help="Show what is not trusted, and why")
-    p.add_argument("--reclassify", action="store_true",
-                   help="Re-resolve unnamed observations after editing aliases (free, no LLM)")
+    p.add_argument(
+        "--reclassify",
+        action="store_true",
+        help="Re-resolve unnamed observations after editing aliases (free, no LLM)",
+    )
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -293,10 +293,7 @@ def main() -> None:
     if args.person:
         labs = [d for d in labs if d.correspondent == args.person]
 
-    done = {
-        r["source_path"]
-        for r in con.execute("SELECT source_path FROM documents").fetchall()
-    }
+    done = {r["source_path"] for r in con.execute("SELECT source_path FROM documents").fetchall()}
     todo = [d for d in labs if d.rel not in done]
     if args.limit:
         todo = todo[: args.limit]

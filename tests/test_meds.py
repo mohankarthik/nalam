@@ -34,8 +34,8 @@ class TestBrandToMolecule:
             ("GALVUS MET", ["Vildagliptin", "Metformin"]),
             ("GLUCONORM G2", ["Glimepiride", "Metformin"]),
             ("CLOPILET", ["Clopidogrel"]),
-            ("Tab. Lasix", ["Furosemide"]),          # form prefix is not the brand
-            ("CAP. REALCEF 200MG", ["Cefixime"]),    # strength glued to the name
+            ("Tab. Lasix", ["Furosemide"]),  # form prefix is not the brand
+            ("CAP. REALCEF 200MG", ["Cefixime"]),  # strength glued to the name
         ],
     )
     def test_maps(self, table, printed, expected) -> None:
@@ -108,9 +108,9 @@ class TestCourseEnds:
     @pytest.mark.parametrize(
         "duration, days",
         [
-            ("X 7. DAYS AF", 7),     # a stray period between number and unit
-            ("X 10DAYS A", 10),      # no space at all
-            ("FOR 7 DAY BF", 7),     # singular
+            ("X 7. DAYS AF", 7),  # a stray period between number and unit
+            ("X 10DAYS A", 10),  # no space at all
+            ("FOR 7 DAY BF", 7),  # singular
             ("X 7 DAYS WITH WATER-", 7),
         ],
     )
@@ -134,15 +134,17 @@ class TestReconciliationRestraint:
     def test_a_finite_course_is_not_long_term(self) -> None:
         from src.meds import is_long_term
 
-        antibiotic = Med("FARONEM", "Faropenem", "300", "1-0-1",
-                         "X 7 DAYS", "2023-02-25", "prescribed", "ok")
+        antibiotic = Med(
+            "FARONEM", "Faropenem", "300", "1-0-1", "X 7 DAYS", "2023-02-25", "prescribed", "ok"
+        )
         assert not is_long_term(antibiotic), "the prescription already says when it ends"
 
     def test_an_open_ended_drug_is_long_term(self) -> None:
         from src.meds import is_long_term
 
-        statin = Med("ATORVA", "Atorvastatin", "40 mg", "0-0-1",
-                     None, "2023-08-16", "prescribed", "ok")
+        statin = Med(
+            "ATORVA", "Atorvastatin", "40 mg", "0-0-1", None, "2023-08-16", "prescribed", "ok"
+        )
         assert is_long_term(statin), "nothing says when this ends, so a human must"
 
     def test_to_continue_is_long_term(self) -> None:
@@ -169,16 +171,33 @@ class TestHistoryHidesNothing:
 
         con = db.connect(":memory:")
         doc = db.upsert_document(
-            con, subject="A Child", source_path="x.pdf", doc_type="prescription",
-            doc_date="2024-03-01", model="test", text_layer=True,
+            con,
+            subject="A Child",
+            source_path="x.pdf",
+            doc_type="prescription",
+            doc_date="2024-03-01",
+            model="test",
+            text_layer=True,
         )
         con.execute(
             """INSERT INTO medication_events
                  (document_id, subject, drug, generic, strength, frequency, duration,
                   event, effective, raw_text, entered_by, status)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (doc, "A Child", "CETZINE", "Cetirizine", "5mg", "0-0-1", "5 days",
-             "prescribed", "2024-03-01", "{}", "extractor", "ok"),
+            (
+                doc,
+                "A Child",
+                "CETZINE",
+                "Cetirizine",
+                "5mg",
+                "0-0-1",
+                "5 days",
+                "prescribed",
+                "2024-03-01",
+                "{}",
+                "extractor",
+                "ok",
+            ),
         )
         con.commit()
         return con
@@ -281,13 +300,33 @@ class TestKeyIsOrderIndependent:
     live medication list twice."""
 
     def test_molecule_order_does_not_create_a_second_drug(self) -> None:
-        a = Med("GB 29 SR", "Methylcobalamin + Pregabalin", None, "0-1-0", None,
-                "2023-02-25", "prescribed", "ok")
-        b = Med("Pevesca Plus", "Pregabalin + Methylcobalamin", "75mg", "0-0-1", None,
-                "2024-01-01", "prescribed", "ok")
+        a = Med(
+            "GB 29 SR",
+            "Methylcobalamin + Pregabalin",
+            None,
+            "0-1-0",
+            None,
+            "2023-02-25",
+            "prescribed",
+            "ok",
+        )
+        b = Med(
+            "Pevesca Plus",
+            "Pregabalin + Methylcobalamin",
+            "75mg",
+            "0-0-1",
+            None,
+            "2024-01-01",
+            "prescribed",
+            "ok",
+        )
         assert a.key == b.key
 
     def test_different_molecules_stay_apart(self) -> None:
-        a = Med("X", "Pregabalin + Methylcobalamin", None, None, None, "2024-01-01", "prescribed", "ok")
-        b = Med("Y", "Pregabalin + Nortriptyline", None, None, None, "2024-01-01", "prescribed", "ok")
+        a = Med(
+            "X", "Pregabalin + Methylcobalamin", None, None, None, "2024-01-01", "prescribed", "ok"
+        )
+        b = Med(
+            "Y", "Pregabalin + Nortriptyline", None, None, None, "2024-01-01", "prescribed", "ok"
+        )
         assert a.key != b.key

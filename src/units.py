@@ -41,7 +41,7 @@ def _fold(unit: str) -> str:
     u = u.replace("ι", "l").replace("Ι", "l").replace("ⅼ", "l")
     u = u.replace("**", "^").replace("*", "^")
     u = u.replace(".", "")
-    u = re.sub(r"\bmic\s*g\b", "ug", u)      # "mic g/dl" -> "ug/dl"
+    u = re.sub(r"\bmic\s*g\b", "ug", u)  # "mic g/dl" -> "ug/dl"
     u = re.sub(r"\bmicg\b", "ug", u)
     u = re.sub(r"\bmcg\b", "ug", u)
     u = re.sub(r"\s+", "", u)

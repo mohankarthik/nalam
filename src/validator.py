@@ -106,12 +106,30 @@ _AGE_PART = re.compile(
     re.IGNORECASE,
 )
 _UNIT_YEARS = {
-    "y": 1.0, "yr": 1.0, "yrs": 1.0, "year": 1.0, "years": 1.0,
-    "yr(s)": 1.0, "year(s)": 1.0,
-    "m": 1 / 12, "mo": 1 / 12, "mon": 1 / 12, "month": 1 / 12, "months": 1 / 12,
-    "mths": 1 / 12, "mth": 1 / 12, "ms": 1 / 12,
-    "w": 1 / 52, "wk": 1 / 52, "wks": 1 / 52, "week": 1 / 52, "weeks": 1 / 52,
-    "d": 1 / 365, "day": 1 / 365, "days": 1 / 365, "ds": 1 / 365,
+    "y": 1.0,
+    "yr": 1.0,
+    "yrs": 1.0,
+    "year": 1.0,
+    "years": 1.0,
+    "yr(s)": 1.0,
+    "year(s)": 1.0,
+    "m": 1 / 12,
+    "mo": 1 / 12,
+    "mon": 1 / 12,
+    "month": 1 / 12,
+    "months": 1 / 12,
+    "mths": 1 / 12,
+    "mth": 1 / 12,
+    "ms": 1 / 12,
+    "w": 1 / 52,
+    "wk": 1 / 52,
+    "wks": 1 / 52,
+    "week": 1 / 52,
+    "weeks": 1 / 52,
+    "d": 1 / 365,
+    "day": 1 / 365,
+    "days": 1 / 365,
+    "ds": 1 / 365,
 }
 
 ADULT_YEARS = 18.0
@@ -154,9 +172,7 @@ def names_a_baby(printed_name: str, printed_age: str = "") -> bool:
     return bool(_NEONATAL.match((printed_name or "").strip()))
 
 
-def patient_matches(
-    printed: str, expected: str, shared: Optional[set[str]] = None
-) -> bool:
+def patient_matches(printed: str, expected: str, shared: Optional[set[str]] = None) -> bool:
     """Does the name printed on the report plausibly refer to the expected patient?
 
     Lenient on FORM (initials, honorifics, reordered names, an abbreviated given
@@ -209,9 +225,7 @@ def check_result(
         # is a smell, not a lie.
         soft.append(f"test name {name!r} not found verbatim in text layer")
 
-    if not result.get("unit") and not re.fullmatch(
-        r"[a-z ]+", normalise(value) or "x"
-    ):
+    if not result.get("unit") and not re.fullmatch(r"[a-z ]+", normalise(value) or "x"):
         soft.append("numeric result with no unit printed")
 
     return Verdict(ok=not hard, hard=hard, soft=soft)
@@ -255,9 +269,16 @@ def check_document(
 
 
 _DATE_FORMATS = (
-    "%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y",
-    "%d %b %Y", "%d-%b-%Y", "%d/%b/%Y", "%b %d, %Y",
-    "%d %B %Y", "%Y/%m/%d",
+    "%d/%m/%Y",
+    "%d-%m-%Y",
+    "%Y-%m-%d",
+    "%d.%m.%Y",
+    "%d %b %Y",
+    "%d-%b-%Y",
+    "%d/%b/%Y",
+    "%b %d, %Y",
+    "%d %B %Y",
+    "%Y/%m/%d",
 )
 
 

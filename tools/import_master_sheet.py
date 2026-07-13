@@ -41,9 +41,13 @@ NOT_A_VALUE = {"", "#N/A", "N/A", "-", "NA"}
 def read_tab(tab: str) -> list[list[str]]:
     out = subprocess.run(
         [
-            "gws", "sheets", "+read",
-            "--spreadsheet", SPREADSHEET_ID,
-            "--range", f"{tab}!A1:AZ200",
+            "gws",
+            "sheets",
+            "+read",
+            "--spreadsheet",
+            SPREADSHEET_ID,
+            "--range",
+            f"{tab}!A1:AZ200",
         ],
         capture_output=True,
         text=True,
@@ -136,8 +140,10 @@ def main() -> None:
 
     numeric = sum(1 for g in golden if g["value"] is not None)
     print(f"\ndata/analytes.json:        {len(codebook)} analytes")
-    print(f"tests/fixtures/golden.json: {len(golden)} hand-entered values "
-          f"({numeric} numeric, {len(golden) - numeric} free text)")
+    print(
+        f"tests/fixtures/golden.json: {len(golden)} hand-entered values "
+        f"({numeric} numeric, {len(golden) - numeric} free text)"
+    )
 
 
 if __name__ == "__main__":

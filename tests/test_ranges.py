@@ -34,9 +34,9 @@ class TestRangeParsing:
     @pytest.mark.parametrize(
         "text, expected",
         [
-            ("0.6 - 1.2", (0.6, 1.2)),      # the separator is NOT a minus sign
+            ("0.6 - 1.2", (0.6, 1.2)),  # the separator is NOT a minus sign
             ("0.6-1.2", (0.6, 1.2)),
-            ("4.0 – 5.6", (4.0, 5.6)),      # en-dash
+            ("4.0 – 5.6", (4.0, 5.6)),  # en-dash
             ("70 -100", (70.0, 100.0)),
             ("1,50,000 - 4,10,000", (150000.0, 410000.0)),  # Indian grouping
             ("< 200", (None, 200.0)),
@@ -90,10 +90,10 @@ class TestUnitsMustAgree:
         result, source = flag_observation(
             ADULT_M,
             "T3",
-            raw_value="1.73",     # as printed, nmol/L
-            value_num=1.13,       # converted, ng/mL
+            raw_value="1.73",  # as printed, nmol/L
+            value_num=1.13,  # converted, ng/mL
             lab_low=1.30,
-            lab_high=3.10,        # the lab's band, nmol/L
+            lab_high=3.10,  # the lab's band, nmol/L
             codebook=codebook,
         )
         assert source == "lab"
@@ -107,7 +107,7 @@ class TestFlag:
             (9.47, 0.0, 5.7, "high"),
             (0.52, 0.64, 1.52, "low"),
             (5.2, 4.0, 6.5, "normal"),
-            (5.2, None, None, ""),      # no range -> no opinion
+            (5.2, None, None, ""),  # no range -> no opinion
             (None, 1.0, 2.0, ""),
         ],
     )
@@ -125,14 +125,10 @@ class TestDegenerateLabRange:
     """
 
     def test_degenerate_lab_range_falls_back_to_the_codebook(self, codebook) -> None:
-        low, high, source = reference_range(
-            ADULT_M, "HbA1c", codebook, lab_low=6.0, lab_high=6.0
-        )
+        low, high, source = reference_range(ADULT_M, "HbA1c", codebook, lab_low=6.0, lab_high=6.0)
         assert source == "codebook (male)"
         assert (low, high) == (0.0, 5.7)
 
     def test_a_real_band_is_still_used(self, codebook) -> None:
-        low, high, source = reference_range(
-            ADULT_M, "HbA1c", codebook, lab_low=4.0, lab_high=5.6
-        )
+        low, high, source = reference_range(ADULT_M, "HbA1c", codebook, lab_low=4.0, lab_high=5.6)
         assert (low, high, source) == (4.0, 5.6, "lab")

@@ -40,9 +40,7 @@ TABLES = ["documents", "observations", "encounters", "medication_events", "revie
 
 
 def ddl_for(table: str) -> str:
-    m = re.search(
-        rf"CREATE TABLE IF NOT EXISTS {table} \(.*?^\);", db.SCHEMA, re.S | re.M
-    )
+    m = re.search(rf"CREATE TABLE IF NOT EXISTS {table} \(.*?^\);", db.SCHEMA, re.S | re.M)
     if not m:
         raise SystemExit(f"no DDL found for {table}")
     return m.group(0)
@@ -62,9 +60,7 @@ def main() -> None:
     con.execute("PRAGMA foreign_keys = OFF")
     con.execute("PRAGMA legacy_alter_table = ON")
 
-    existing = {
-        r["name"] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    }
+    existing = {r["name"] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 
     # Recover from a half-finished previous run: the data may be sitting under a
     # _tmp or _old name because the process died between the rename and the copy.
@@ -83,8 +79,7 @@ def main() -> None:
             raise SystemExit(f"cannot find any table holding {t}")
 
     before = {
-        t: con.execute(f"SELECT count(*) FROM '{src}'").fetchone()[0]
-        for t, src in sources.items()
+        t: con.execute(f"SELECT count(*) FROM '{src}'").fetchone()[0] for t, src in sources.items()
     }
     print("  found data in:")
     for t, src in sources.items():
@@ -120,9 +115,7 @@ def main() -> None:
             if merged[t] < 0:
                 raise RuntimeError(f"{t}: gained rows ({before[t]} -> {after})")
             if merged[t] > MAX_MERGE:
-                raise RuntimeError(
-                    f"{t}: {merged[t]} rows merged, more than expected -- refusing"
-                )
+                raise RuntimeError(f"{t}: {merged[t]} rows merged, more than expected -- refusing")
 
         for stmt in indexes():
             con.execute(stmt)
@@ -136,11 +129,11 @@ def main() -> None:
     for t in TABLES:
         n = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
         if merged.get(t):
-            print(f"     {merged[t]} duplicate row(s) merged in {t} "
-                  f"(differed only by letter case)")
-        sql = con.execute(
-            "SELECT sql FROM sqlite_master WHERE name = ?", (t,)
-        ).fetchone()["sql"]
+            print(
+                f"     {merged[t]} duplicate row(s) merged in {t} "
+                f"(differed only by letter case)"
+            )
+        sql = con.execute("SELECT sql FROM sqlite_master WHERE name = ?", (t,)).fetchone()["sql"]
         print(f"  ok {t:<20} {n:>5} rows, {sql.count('COLLATE NOCASE')} case-insensitive columns")
 
     con.execute("PRAGMA foreign_keys = ON")

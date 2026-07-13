@@ -32,10 +32,8 @@ def main() -> None:
     con = db.connect()
     table = load_drugs()
 
-    rows = con.execute(
-        """SELECT id, subject, drug, generic, status FROM medication_events
-           WHERE status = 'ok' ORDER BY subject, drug"""
-    ).fetchall()
+    rows = con.execute("""SELECT id, subject, drug, generic, status FROM medication_events
+           WHERE status = 'ok' ORDER BY subject, drug""").fetchall()
 
     filled, conflicts = [], []
     for r in rows:

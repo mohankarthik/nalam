@@ -51,13 +51,11 @@ def main() -> None:
     table = load_drugs()
     links = paperless_ids()
 
-    rows = con.execute(
-        """SELECT m.id, m.subject, m.drug, m.strength, m.frequency, m.duration,
+    rows = con.execute("""SELECT m.id, m.subject, m.drug, m.strength, m.frequency, m.duration,
                   m.review_reason, d.doc_date, d.source_path, d.doc_type
            FROM medication_events m JOIN documents d ON d.id = m.document_id
            WHERE m.status = 'review'
-           ORDER BY m.subject, d.doc_date DESC, m.id"""
-    ).fetchall()
+           ORDER BY m.subject, d.doc_date DESC, m.id""").fetchall()
 
     by_doc: dict[tuple[str, str, str], list] = defaultdict(list)
     for r in rows:
@@ -96,9 +94,7 @@ def main() -> None:
             lines += [f"# {subject}", ""]
             current_person = subject
 
-        doc_id = links.get(
-            (subject, fold_filename(os.path.basename(source)))
-        )
+        doc_id = links.get((subject, fold_filename(os.path.basename(source))))
         title = os.path.basename(source)
         if doc_id:
             heading = f"## [{date} — {title}]({VIEWER}/documents/{doc_id}/details)"
@@ -127,7 +123,7 @@ def main() -> None:
 
     print(f"wrote {OUT}")
     print(f"  {len(rows)} drugs across {len(by_doc)} documents")
-    print(f"  each document links to its scan in Paperless")
+    print("  each document links to its scan in Paperless")
 
 
 if __name__ == "__main__":

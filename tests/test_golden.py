@@ -52,9 +52,7 @@ def _adjudicated() -> dict[tuple[str, str, str], dict]:
     rather than quietly-tolerated folklore.
     """
     data = json.load(open(SHEET_ERRORS, encoding="utf-8"))
-    return {
-        (e["person"], e["date"], e["analyte"]): e for e in data["errors"]
-    }
+    return {(e["person"], e["date"], e["analyte"]): e for e in data["errors"]}
 
 
 def _cached() -> list[dict]:
@@ -118,20 +116,15 @@ def compare() -> tuple[list[str], list[str], list[str], int]:
                 # The lab printed "N/A" / "Not Done". That is the absence of a
                 # result, not a result that contradicts the human's.
                 uncovered.append(
-                    f"{doc['person']} {doc['sheet_date']} {analyte} "
-                    f"(lab printed {value!r})"
+                    f"{doc['person']} {doc['sheet_date']} {analyte} " f"(lab printed {value!r})"
                 )
                 continue
 
             if number is not None:
-                converted, canonical, reason = convert(
-                    analyte, number, r.get("unit", ""), units
-                )
+                converted, canonical, reason = convert(analyte, number, r.get("unit", ""), units)
                 if reason:
                     # An untrusted unit is a review item, not a disagreement.
-                    uncovered.append(
-                        f"{doc['person']} {doc['sheet_date']} {analyte} ({reason})"
-                    )
+                    uncovered.append(f"{doc['person']} {doc['sheet_date']} {analyte} ({reason})")
                     continue
                 value = f"{converted}"
 
@@ -167,7 +160,7 @@ def compare() -> tuple[list[str], list[str], list[str], int]:
 
             mismatches.append(
                 f"{doc['person']} {doc['sheet_date']} {analyte}: extracted "
-                f"{r['value']!r} {r.get('unit','')!r} (= {value}) but "
+                f"{r['value']!r} {r.get('unit', '')!r} (= {value}) but "
                 f"hand-typed {hand_value!r}"
             )
 
@@ -191,7 +184,5 @@ def test_no_value_disagrees_with_the_human() -> None:
 
 def test_no_document_fails_its_patient_check() -> None:
     """A report whose printed patient contradicts its folder is a misfiled scan."""
-    bad = [
-        f"{d['source']}: {d['doc_hard']}" for d in _cached() if not d["doc_ok"]
-    ]
+    bad = [f"{d['source']}: {d['doc_hard']}" for d in _cached() if not d["doc_ok"]]
     assert not bad, "\n".join(["Documents failed the patient check:", *bad])

@@ -37,10 +37,7 @@ def golden_set() -> list[tuple[str, str, str]]:
     if not os.path.exists(GOLDEN_SET):
         return []
     with open(GOLDEN_SET, encoding="utf-8") as f:
-        return [
-            (d["person"], d["sheet_date"], d["source"])
-            for d in json.load(f)["documents"]
-        ]
+        return [(d["person"], d["sheet_date"], d["source"]) for d in json.load(f)["documents"]]
 
 
 def slug(person: str, rel: str) -> str:
@@ -50,7 +47,7 @@ def slug(person: str, rel: str) -> str:
 def main() -> None:
     os.makedirs(CACHE, exist_ok=True)
     if not golden_set():
-        print(f'No {GOLDEN_SET}. Nothing to extract -- you have no ground truth.')
+        print(f"No {GOLDEN_SET}. Nothing to extract -- you have no ground truth.")
         return
     for person, sheet_date, rel in golden_set():
         out = os.path.join(CACHE, slug(person, rel) + ".json")

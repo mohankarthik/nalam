@@ -10,6 +10,10 @@ data/people.json
 # tests they track and the ranges they chose. Personal.
 data/analytes.json
 
+# The deny-list the pre-commit PII guard reads. It names real people, so
+# committing it would be the exact thing it exists to prevent.
+data/pii_denylist.txt
+
 # Extracted health records.
 data/health.db
 data/health.db.*

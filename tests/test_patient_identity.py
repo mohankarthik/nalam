@@ -32,7 +32,7 @@ class TestNeonatalNaming:
             "B/O Alice Doe",
             "BABY OF ALICE DOE",
             "Baby of Alice Example",
-            "Blo Alice doe",   # OCR: the slash in B/O becomes an l
+            "Blo Alice doe",  # OCR: the slash in B/O becomes an l
             "BIO ALICE EXAMPLE",  # OCR: B/O -> BIO
             "Newborn of Alice",
         ],
@@ -72,9 +72,9 @@ class TestTheDocumentStillWinsOtherwise:
         """patient_matches() alone matches 'B/O Alice Doe' to Alice -- which is
         precisely how an infant's records ended up in his mother's file. The
         names_a_baby() guard must run FIRST."""
-        assert patient_matches("B/O ALICE DOE", "Alice Doe"), (
-            "the name tokens do match -- which is exactly why the guard is needed"
-        )
+        assert patient_matches(
+            "B/O ALICE DOE", "Alice Doe"
+        ), "the name tokens do match -- which is exactly why the guard is needed"
         assert names_a_baby("B/O ALICE DOE"), "and the guard must catch it"
 
 
@@ -90,9 +90,9 @@ class TestSharedSurnames:
 
     def test_a_surname_alone_is_not_an_identity(self) -> None:
         assert patient_matches("Carol Doe", "Alice Doe"), "tokens do overlap..."
-        assert not patient_matches("Carol Doe", "Alice Doe", self.SHARED), (
-            "...but only on the surname, which every relative shares"
-        )
+        assert not patient_matches(
+            "Carol Doe", "Alice Doe", self.SHARED
+        ), "...but only on the surname, which every relative shares"
 
     def test_a_distinguishing_token_still_matches(self) -> None:
         assert patient_matches("MRS. ALICE DOE", "Alice Doe", self.SHARED)

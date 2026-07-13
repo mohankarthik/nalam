@@ -1,0 +1,23 @@
+# Copy to data/pii_denylist.txt and fill in. THE REAL ONE IS GITIGNORED.
+#
+# One term per line. tools/guard_pii.py refuses any commit whose staged content
+# contains one of them, case-insensitively. Blank lines and #-comments ignored.
+#
+# This file holds the mechanism; the real one holds the family. That split is the
+# same one the rest of the repository makes -- the code is generic, the config is
+# yours -- and it is why the deny-list can never itself be committed.
+#
+# What belongs here:
+#   * every family member's name, and the surnames
+#   * the OCR manglings you have actually seen, if you have added them to a test
+#   * doctors' and hospitals' names, if they appear anywhere but the data
+#   * your Paperless hostname, Drive paths, and any other real identifier
+#
+# Use invented names in code, comments, tests and docstrings. The suite already
+# has a convention: Alice Doe, Bob Example, Carol Example.
+
+Alice Realname
+Bob Realname
+Realname
+
+paperless.example-host.invalid

@@ -78,7 +78,7 @@ class Reconciliation:
     subject: str
     as_of: Optional[str]
     started: list[Med] = field(default_factory=list)
-    stopped: list[Med] = field(default_factory=list)   # PROPOSED, not decided
+    stopped: list[Med] = field(default_factory=list)  # PROPOSED, not decided
     continued: list[Med] = field(default_factory=list)
     changed: list[tuple[Med, Med]] = field(default_factory=list)  # (was, now)
 
@@ -116,8 +116,10 @@ def course_ends(med: Med) -> Optional[datetime.date]:
     """When a course explicitly ENDS, per the document. None = open-ended.
 
     This is not inferring that a drug stopped -- it is reading what the
-    prescription actually says. An antibiotic prescribed 'X 7 DAYS' ended seven days after discharge, and
-    treating a years-old antibiotic as a current medication is simply wrong. A drug with no stated duration stays open and needs a human.
+    prescription actually says. An antibiotic prescribed 'X 7 DAYS' ended seven
+    days after discharge, and treating a years-old antibiotic as a current
+    medication is simply wrong. A drug with no stated duration stays open and
+    needs a human.
     """
     if not med.effective or not med.duration:
         return None
@@ -240,9 +242,9 @@ def reconcile(
         old = before.get(key)
         if old is None:
             rec.started.append(med)
-        elif (old.strength or "") != (med.strength or "") or (
-            old.frequency or ""
-        ) != (med.frequency or ""):
+        elif (old.strength or "") != (med.strength or "") or (old.frequency or "") != (
+            med.frequency or ""
+        ):
             rec.changed.append((old, med))
         else:
             rec.continued.append(med)

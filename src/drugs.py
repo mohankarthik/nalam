@@ -37,7 +37,7 @@ DRUGS = "data/drugs.json"
 # safe.
 _FORM = re.compile(
     r"^(?:"
-    r"(?:t|c|s|d|e|i)\.\s*"                       # T. C. S. — always dotted
+    r"(?:t|c|s|d|e|i)\.\s*"  # T. C. S. — always dotted
     r"|(?:tab|tabs|tablet|cap|caps|capsule|inj|injection|syp|syrup|susp|"
     r"oint|cream|drops|drop|neb|nebulization|nebulisation|liq|lotion|gel|"
     r"powder|sachet|sr|xr|er|ab)(?:\.\s*|\s+)"  # "ab." = OCR of "tab."
@@ -66,11 +66,7 @@ class Drug:
 
 def load_drugs() -> dict[str, dict]:
     with open(DRUGS, encoding="utf-8") as f:
-        return {
-            k: v
-            for k, v in json.load(f)["drugs"].items()
-            if not k.startswith("_")
-        }
+        return {k: v for k, v in json.load(f)["drugs"].items() if not k.startswith("_")}
 
 
 def _key(printed: str) -> str:

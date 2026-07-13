@@ -36,8 +36,7 @@ def resolve_person(who: str) -> str:
     person = resolve(who)
     if person is None:
         raise SystemExit(
-            f"unknown person: {who!r} "
-            "(use a name, a folder, or an alias from data/people.json)"
+            f"unknown person: {who!r} " "(use a name, a folder, or an alias from data/people.json)"
         )
     return person.correspondent
 
@@ -74,12 +73,10 @@ def show_reconcile(con, person: str | None) -> None:
     """Reconciliation cards, grouped by person, then by document."""
     want = resolve_person(person) if person else None
 
-    rows = con.execute(
-        """SELECT DISTINCT m.subject, m.document_id, d.doc_date, d.source_path
+    rows = con.execute("""SELECT DISTINCT m.subject, m.document_id, d.doc_date, d.source_path
            FROM medication_events m JOIN documents d ON d.id = m.document_id
            WHERE m.entered_by = 'extractor'
-           ORDER BY m.subject, d.doc_date"""
-    ).fetchall()
+           ORDER BY m.subject, d.doc_date""").fetchall()
 
     # Children are skipped: their prescriptions are short courses that expire on
     # their own, and they have no chronic regimen to reconcile. Asking about them
@@ -152,6 +149,7 @@ def show_history(con, person: str | None, drug: str | None) -> None:
         why = ""
         if r["diagnoses"]:
             import json as _json
+
             dx = _json.loads(r["diagnoses"] or "[]")
             why = "; ".join(dx)[:26]
         elif r["reason"]:
@@ -193,15 +191,19 @@ def show_for_condition(con, condition: str, person: str | None) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--list", action="store_true", help="Show the believed-current list")
-    p.add_argument(
-        "--reconcile", action="store_true", help="Show diffs needing a decision"
-    )
+    p.add_argument("--reconcile", action="store_true", help="Show diffs needing a decision")
     p.add_argument("--person", help="Name, folder, or alias from data/people.json")
-    p.add_argument("--history", action="store_true",
-                   help="Every prescription ever, unfiltered (short courses, children, all)")
+    p.add_argument(
+        "--history",
+        action="store_true",
+        help="Every prescription ever, unfiltered (short courses, children, all)",
+    )
     p.add_argument("--drug", help="Filter history by drug -- brand OR molecule")
-    p.add_argument("--for", dest="condition",
-                   help="What was prescribed for a diagnosis, e.g. --for 'hand foot mouth'")
+    p.add_argument(
+        "--for",
+        dest="condition",
+        help="What was prescribed for a diagnosis, e.g. --for 'hand foot mouth'",
+    )
     p.add_argument(
         "--decide",
         nargs=4,

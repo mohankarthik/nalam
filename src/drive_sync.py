@@ -294,7 +294,8 @@ def sync(dry_run: bool = False, limit: int = 0) -> None:
         try:
             task = api.upload(
                 content=content,
-                filename=os.path.basename(d.rel) + ("" if d.rel.lower().endswith(d.suffix) else d.suffix),
+                filename=os.path.basename(d.rel)
+                + ("" if d.rel.lower().endswith(d.suffix) else d.suffix),
                 title=d.title,
                 correspondent=corr_ids[d.correspondent],
                 document_type=doc_type,

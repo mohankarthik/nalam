@@ -12,7 +12,9 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dry-run", action="store_true", help="Show the plan, upload nothing")
     p.add_argument("--limit", type=int, default=0, help="Upload at most N documents")
-    p.add_argument("--report", action="store_true", help="List documents Paperless refused to consume")
+    p.add_argument(
+        "--report", action="store_true", help="List documents Paperless refused to consume"
+    )
     args = p.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")

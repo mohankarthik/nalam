@@ -34,9 +34,7 @@ def _load_settings() -> dict[str, Any]:
 SETTINGS = _load_settings()
 
 # The Drive folder holding the scanned documents, one sub-folder per person.
-MEDICAL_ROOT = os.path.expanduser(
-    os.environ.get("NALAM_MEDICAL_ROOT", SETTINGS["medical_root"])
-)
+MEDICAL_ROOT = os.path.expanduser(os.environ.get("NALAM_MEDICAL_ROOT", SETTINGS["medical_root"]))
 
 PAPERLESS_URL = os.environ.get(
     "NALAM_PAPERLESS_URL", SETTINGS.get("paperless_url", "http://localhost:8100")

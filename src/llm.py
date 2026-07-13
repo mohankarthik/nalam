@@ -83,9 +83,7 @@ def _throttle(model: str) -> None:
     NALAM_GEMINI_MIN_INTERVAL=0 to turn it off.
     """
     global _last_primary_call
-    interval = float(
-        os.environ.get("NALAM_GEMINI_MIN_INTERVAL", _PRIMARY_MIN_INTERVAL)
-    )
+    interval = float(os.environ.get("NALAM_GEMINI_MIN_INTERVAL", _PRIMARY_MIN_INTERVAL))
     if not _is_primary(model) or interval <= 0:
         return
     wait = interval - (time.monotonic() - _last_primary_call)

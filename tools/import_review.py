@@ -40,7 +40,8 @@ def main() -> None:
         if not m:
             continue
         med_id = int(m.group(1))
-        as_read = m.group(2).strip()
+        # group(2) is the name AS READ. It is already on the row in the database,
+        # so it is matched but not re-read here.
         correction = m.group(6).strip()
 
         if correction in {"?", "??"}:
@@ -83,15 +84,13 @@ def main() -> None:
     print(f"  {deleted:>4} deleted (not a drug)")
     print(f"  {left:>4} left in review (unreadable)")
 
-    still = con.execute(
-        "SELECT count(*) FROM medication_events WHERE status='review'"
-    ).fetchone()[0]
+    still = con.execute("SELECT count(*) FROM medication_events WHERE status='review'").fetchone()[
+        0
+    ]
     print(f"\n  {still} drugs still awaiting review")
 
-    unmapped = con.execute(
-        """SELECT count(DISTINCT drug) FROM medication_events
-           WHERE generic IS NULL AND status='ok'"""
-    ).fetchone()[0]
+    unmapped = con.execute("""SELECT count(DISTINCT drug) FROM medication_events
+           WHERE generic IS NULL AND status='ok'""").fetchone()[0]
     if unmapped:
         print(
             f"  {unmapped} confirmed drug names have no molecule in data/drugs.json "

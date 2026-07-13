@@ -110,8 +110,13 @@ class TestValueParsing:
 
     @pytest.mark.parametrize(
         "raw, expected",
-        [("Not Reactive", "negative"), ("Negative", "negative"), ("Nil", "negative"),
-         ("Reactive", "positive"), ("Positive", "positive")],
+        [
+            ("Not Reactive", "negative"),
+            ("Negative", "negative"),
+            ("Nil", "negative"),
+            ("Reactive", "positive"),
+            ("Positive", "positive"),
+        ],
     )
     def test_qualitative_synonyms(self, raw: str, expected: str) -> None:
         assert parse_value(raw)[1] == expected
@@ -151,7 +156,7 @@ class TestSubSectionHeadings:
             ("RBC", "MICROSCOPIC EXAMINATION", "Urine RBC"),
             ("RBC", "Microscopy", "Urine RBC"),
             ("Glucose", "Complete Urine Analysis", "Urine Glucose"),
-            ("RBC", "COMPLETE BLOOD COUNT", "RBC"),    # the blood one still lands
+            ("RBC", "COMPLETE BLOOD COUNT", "RBC"),  # the blood one still lands
         ],
     )
     def test_subsection_headings_resolve_to_the_right_domain(

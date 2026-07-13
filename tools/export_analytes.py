@@ -169,11 +169,9 @@ def main() -> None:
     con = db.connect()
 
     have: dict[str, list[tuple[str, int, str, str]]] = defaultdict(list)
-    for r in con.execute(
-        """SELECT analyte, subject, count(*) n, min(effective) a, max(effective) b
+    for r in con.execute("""SELECT analyte, subject, count(*) n, min(effective) a, max(effective) b
            FROM observations WHERE analyte IS NOT NULL
-           GROUP BY analyte, subject"""
-    ):
+           GROUP BY analyte, subject"""):
         rel = people[r["subject"]].relation if r["subject"] in people else r["subject"]
         have[r["analyte"]].append((rel, r["n"], r["a"] or "?", r["b"] or "?"))
 
@@ -196,22 +194,31 @@ def main() -> None:
         "",
     ]
     for segment in sorted(by_segment):
-        lines += [f"## {segment}", "", "| Analyte | Meaning | Range (M / F) | People with data |", "|---|---|---|---|"]
+        lines += [
+            f"## {segment}",
+            "",
+            "| Analyte | Meaning | Range (M / F) | People with data |",
+            "|---|---|---|---|",
+        ]
         for name in sorted(by_segment[segment]):
             e = codebook[name]
             r = e.get("ranges") or {}
+
             def band(sex: str) -> str:
                 b = r.get(sex)
                 if not b:
                     return "—"
                 lo, hi = b.get("low"), b.get("high")
                 return f"{'' if lo is None else lo}–{'' if hi is None else hi}"
+
             who = have.get(name, [])
-            who_s = "<br>".join(
-                f"{rel} ({n}, {a[:4]}–{b[:4]})" for rel, n, a, b in sorted(who)
-            ) or "—"
+            who_s = (
+                "<br>".join(f"{rel} ({n}, {a[:4]}–{b[:4]})" for rel, n, a, b in sorted(who)) or "—"
+            )
             meaning = MEANING.get(name, "**?? no description — please check**")
-            lines.append(f"| **{name}** | {meaning} | {band('male')} / {band('female')} | {who_s} |")
+            lines.append(
+                f"| **{name}** | {meaning} | {band('male')} / {band('female')} | {who_s} |"
+            )
         lines.append("")
 
     missing = [n for n in codebook if n not in MEANING]

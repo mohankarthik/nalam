@@ -37,9 +37,23 @@ ALIASES = "data/aliases.json"
 # then matched Total Bilirubin and Indirect Bilirubin -- writing the wrong
 # number into a medical record. The golden test caught it; the next one might not.
 NOISE = {
-    "test", "level", "levels", "value", "method", "by", "in", "the", "of",
-    "hexokinase", "westergren", "hplc", "calculated", "auto", "estimated",
-    "s", "b",
+    "test",
+    "level",
+    "levels",
+    "value",
+    "method",
+    "by",
+    "in",
+    "the",
+    "of",
+    "hexokinase",
+    "westergren",
+    "hplc",
+    "calculated",
+    "auto",
+    "estimated",
+    "s",
+    "b",
 }
 
 # A Master Health Checkup is not a lab report -- it is five report types stapled
@@ -61,13 +75,29 @@ NOISE = {
 # from being recorded as a blood cell count.
 DOMAIN_KEYWORDS = {
     "urine": (
-        "urine", "urinary", "urinalysis", "microscop", "deposit",
-        "leucocyte esterase", "leukocyte esterase",
+        "urine",
+        "urinary",
+        "urinalysis",
+        "microscop",
+        "deposit",
+        "leucocyte esterase",
+        "leukocyte esterase",
     ),
     "echo": (
-        "echo", "echocardiog", "m-mode", "mmode", "doppler", "great vessel",
-        "valve", "sept", "chamber", "wall motion", "pericardium", "ventricle",
-        "atrium", "vegetation",
+        "echo",
+        "echocardiog",
+        "m-mode",
+        "mmode",
+        "doppler",
+        "great vessel",
+        "valve",
+        "sept",
+        "chamber",
+        "wall motion",
+        "pericardium",
+        "ventricle",
+        "atrium",
+        "vegetation",
     ),
     "opt": ("ophthal", "optometry", "eye", "vision", "refraction", "fundus"),
     "usg": ("ultrasound", "usg", "sonograph", "sonolog", "ultrasonograph"),
@@ -75,9 +105,20 @@ DOMAIN_KEYWORDS = {
     "tmt": ("tmt", "treadmill", "stress test", "exercise test"),
     "ecg": ("electrocardiog", "ecg", "ekg"),
     "sleep": (
-        "sleep therapy", "bi-level", "bilevel", "cpap", "bipap", "apap",
-        "compliance summary", "ahi", "apnea", "apnoea", "hypopnea",
-        "periodic breathing", "large leak", "flow limitation",
+        "sleep therapy",
+        "bi-level",
+        "bilevel",
+        "cpap",
+        "bipap",
+        "apap",
+        "compliance summary",
+        "ahi",
+        "apnea",
+        "apnoea",
+        "hypopnea",
+        "periodic breathing",
+        "large leak",
+        "flow limitation",
     ),
     "phys": ("vitals", "physical exam", "anthropom", "general exam"),
 }
@@ -109,7 +150,14 @@ BLOOD = "blood"
 # Left unblocked, each of these also claims the real analyte, and the duplicate
 # guard then refuses BOTH -- so the genuine value never lands.
 DISQUALIFIERS = {
-    "absolute", "abs", "ratio", "non", "index", "pus", "eag", "percentage",
+    "absolute",
+    "abs",
+    "ratio",
+    "non",
+    "index",
+    "pus",
+    "eag",
+    "percentage",
 }
 
 
@@ -153,9 +201,7 @@ def domain_of(section: str, printed: str = "") -> str:
 
 def _domain_compatible(printed: str, section: str, entry: dict) -> bool:
     """A result may only match an analyte from its own kind of report."""
-    return domain_of(section, printed) == SEGMENT_DOMAIN.get(
-        entry.get("segment", ""), BLOOD
-    )
+    return domain_of(section, printed) == SEGMENT_DOMAIN.get(entry.get("segment", ""), BLOOD)
 
 
 def load_codebook() -> dict[str, dict]:
@@ -332,7 +378,8 @@ def resolve(
 
     If two results in ONE report both claim the same analyte, neither is
     trusted: one is silently overwriting the other, and we cannot know which is
-    real. Both are unresolved and go to review. (This is how a urine RBC came to sit where a blood RBC belonged.)
+    real. Both are unresolved and go to review. (This is how a urine RBC came to
+    sit where a blood RBC belonged.)
     """
     codebook = codebook if codebook is not None else load_codebook()
     resolved, unmatched = [], []

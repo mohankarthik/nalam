@@ -22,7 +22,7 @@ class TestConversion:
     @pytest.mark.parametrize(
         "analyte, value, unit, expected",
         [
-            ("Vitamin D", 31.29, "nmol/L", 12.53),      # the one that started this
+            ("Vitamin D", 31.29, "nmol/L", 12.53),  # the one that started this
             ("Platelet Count", 215.0, "10^3/uL", 215000.0),
             ("WBC", 6.8, "10^3/uL", 6800.0),
             ("T4", 8.08, "micg/dl", 103.99),
@@ -36,9 +36,7 @@ class TestConversion:
         assert reason is None
         assert got == pytest.approx(expected, rel=0.001)
 
-    @pytest.mark.parametrize(
-        "unit", ["mg/dL", "mg/dl", "MG/DL", "mg / dL"]
-    )
+    @pytest.mark.parametrize("unit", ["mg/dL", "mg/dl", "MG/DL", "mg / dL"])
     def test_unit_spelling_is_irrelevant(self, units: dict, unit: str) -> None:
         got, _canonical, reason = convert("Cholesterol", 170.0, unit, units)
         assert reason is None and got == 170.0

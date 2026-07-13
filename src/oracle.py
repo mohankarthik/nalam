@@ -86,9 +86,7 @@ class Oracle:
 NO_ORACLE = Oracle(text="", source="none")
 
 
-def build(
-    text_layer: str, ocr_text: Optional[str] = None, min_chars: int = 40
-) -> Oracle:
+def build(text_layer: str, ocr_text: Optional[str] = None, min_chars: int = 40) -> Oracle:
     """Pick the best available independent reading.
 
     The embedded text layer wins when there is one: it is the document's own

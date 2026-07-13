@@ -28,7 +28,8 @@ from src.drugs import load_drugs, lookup
 # strength in `strength` -- and the strength as READ is often wrong ("50g" for
 # 50mg), so a correction that supplies one must replace it.
 _STRENGTH = re.compile(
-    r"\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)(?:\s*/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml))?)\s*$",
+    r"\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)"
+    r"(?:\s*/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml))?)\s*$",
     re.IGNORECASE,
 )
 
@@ -42,9 +43,7 @@ def split_strength(text: str) -> tuple[str, str | None]:
 
 def _split(con, table, med_id: int, row, parts: list[str]) -> None:
     """One extracted entry is really several drugs. Make it several rows."""
-    source = con.execute(
-        "SELECT * FROM medication_events WHERE id = ?", (med_id,)
-    ).fetchone()
+    source = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
 
     for i, part in enumerate(parts):
         name, strength = split_strength(part)
@@ -69,10 +68,18 @@ def _split(con, table, med_id: int, row, parts: list[str]) -> None:
                       status)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'human','ok')""",
                 (
-                    source["document_id"], source["subject"], name, generic,
-                    strength or source["strength"], source["form"], source["dose"],
-                    source["frequency"], source["duration"], source["event"],
-                    source["effective"], source["raw_text"],
+                    source["document_id"],
+                    source["subject"],
+                    name,
+                    generic,
+                    strength or source["strength"],
+                    source["form"],
+                    source["dose"],
+                    source["frequency"],
+                    source["duration"],
+                    source["event"],
+                    source["effective"],
+                    source["raw_text"],
                 ),
             )
             print(f"      + {shown:<42} (new row, split from the same line)")
@@ -134,9 +141,7 @@ def main() -> None:
         print(f"  {med_id}: {shown:<44} {how}")
 
     con.commit()
-    left = con.execute(
-        "SELECT count(*) FROM medication_events WHERE status='review'"
-    ).fetchone()[0]
+    left = con.execute("SELECT count(*) FROM medication_events WHERE status='review'").fetchone()[0]
     print(f"\n  {left} drugs still in review")
 
 

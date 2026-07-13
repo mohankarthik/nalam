@@ -1,0 +1,46 @@
+# Every hook is `repo: local` and runs from ./venv. Nothing is fetched from the
+# network, so the checks work offline and cannot change under you between runs.
+#
+#   ./venv/bin/pip install -r requirements.txt
+#   ./venv/bin/pre-commit install
+#
+# The two guards come FIRST on purpose. If a commit is going to be refused for
+# publishing a patient's name or an API key, that should happen before anything
+# spends time reformatting it.
+repos:
+  - repo: local
+    hooks:
+      - id: guard-pii
+        name: refuse to commit personal data
+        entry: ./venv/bin/python -m tools.guard_pii
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: guard-secrets
+        name: refuse to commit credentials
+        entry: ./venv/bin/python -m tools.guard_secrets
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: black
+        name: black
+        entry: ./venv/bin/black
+        language: system
+        types: [python]
+
+      - id: flake8
+        name: flake8
+        entry: ./venv/bin/flake8
+        language: system
+        types: [python]
+
+      # The suite is offline and reads cached LLM output, so it costs nothing and
+      # takes under two seconds. There is no reason not to run it on every commit.
+      - id: pytest
+        name: pytest
+        entry: ./venv/bin/python -m pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true

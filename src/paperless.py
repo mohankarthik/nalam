@@ -57,9 +57,7 @@ def load_credentials() -> tuple[str, str]:
 
 
 class Paperless:
-    def __init__(
-        self, url: str = PAPERLESS_URL, auth: Optional[tuple[str, str]] = None
-    ) -> None:
+    def __init__(self, url: str = PAPERLESS_URL, auth: Optional[tuple[str, str]] = None) -> None:
         self.url = url.rstrip("/")
         self.session = requests.Session()
         self.session.auth = auth or load_credentials()
@@ -138,7 +136,6 @@ class Paperless:
             raise PaperlessError(f"Upload of {filename!r} failed: {resp.text[:300]}")
         return str(resp.json())
 
-
     def ocr_index(self) -> dict[tuple[str, str], str]:
         """{(correspondent, filename) -> OCR text} for every document Paperless holds.
 
@@ -189,8 +186,6 @@ def fold_filename(name: str) -> str:
     return re.sub(r"\s+", " ", stem).strip().lower()
 
 
-def ocr_for(
-    index: dict[tuple[str, str], str], correspondent: str, rel_path: str
-) -> Optional[str]:
+def ocr_for(index: dict[tuple[str, str], str], correspondent: str, rel_path: str) -> Optional[str]:
     """The OCR text for one source document, or None if there is no independent reading."""
     return index.get((correspondent, fold_filename(os.path.basename(rel_path))))

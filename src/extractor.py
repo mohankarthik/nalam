@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 
 from src import validator
 from src.llm import call_with_pdf
@@ -133,11 +133,12 @@ def extract_discharge(
 ) -> Discharge:
     """Extract a discharge summary.
 
-    The patient check matters more here than anywhere else in the system. Some documents are filed under the wrong person: a mother's surgical and
-    delivery summaries can sit in the CHILD's folder, because that folder is
-    organised around the pregnancy rather than around the patient. A discharge summary carries the
-    medication list, so filing it against the wrong person puts one person's
-    drugs in another person's record.
+    The patient check matters more here than anywhere else in the system. Some
+    documents are filed under the wrong person: a mother's surgical and delivery
+    summaries can sit in the CHILD's folder, because that folder is organised
+    around the pregnancy rather than around the patient. A discharge summary
+    carries the medication list, so filing it against the wrong person puts one
+    person's drugs in another person's record.
     """
     with open(DISCHARGE_CONFIG, encoding="utf-8") as f:
         config = json.load(f)
@@ -215,8 +216,11 @@ def classify(
         prompt = json.load(f)["prompt"]
 
     data, model = call_with_pdf(
-        prompt, first_page(pdf_bytes), models=models,
-        source=source or None, doc_type="classify",
+        prompt,
+        first_page(pdf_bytes),
+        models=models,
+        source=source or None,
+        doc_type="classify",
     )
     return {
         "doc_type": (data.get("doc_type") or "other").strip().lower(),
