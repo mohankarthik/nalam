@@ -156,14 +156,57 @@ def ingest_lab(
     return committed, queued
 
 
-def _collection_date(patient: dict, fallback: Optional[datetime.date]) -> Optional[str]:
-    """Prefer the collection date printed on the report over the filename's."""
+MAX_DATE_DRIFT_DAYS = 15
+
+
+def trusted_date(
+    printed_text: str,
+    filename_date: Optional[datetime.date],
+    what: str = "",
+    max_drift: int = MAX_DATE_DRIFT_DAYS,
+) -> Optional[str]:
+    """The date to record, when the document and the filename disagree.
+
+    The date printed on the page is normally the better one -- a lab report knows
+    when the sample was collected, and the file may have been scanned weeks later.
+    So it won.
+
+    It won even when it was nonsense. A prescription filed 2024-06-14, whose drugs
+    are marked "till delivery", was recorded as effective 2024-08-24 -- a month AFTER
+    the delivery it was written for -- because the model misread the date off the
+    page and nothing checked. An arterial Doppler moved two months when 04/02 was
+    read as 02/04: the day/month swap, which is not an exotic failure, it is the
+    single commonest way a date goes wrong.
+
+    Filenames here begin with YYYY-MM-DD and are reliable. So: the printed date
+    wins, UNLESS it disagrees with the filename by more than `max_drift` days -- at
+    which point we do not know which is right, and this codebase does not guess. Take
+    the filename, which is the one that cannot be misread, and say so out loud.
+    """
     from src.validator import _parse_date
 
-    printed = _parse_date(patient.get("collected_at", "") or "")
-    if printed:
+    printed = _parse_date(printed_text or "")
+    if not printed:
+        return filename_date.isoformat() if filename_date else None
+    if not filename_date:
         return printed.isoformat()
-    return fallback.isoformat() if fallback else None
+
+    drift = abs((printed - filename_date).days)
+    if drift > max_drift:
+        logger.warning(
+            f"{what}: the date read off the page ({printed}) is {drift} days from the "
+            f"filename's ({filename_date}). Too far to be a scanning delay -- most "
+            f"likely a misread, and a day/month swap is the usual one. Using the "
+            f"filename."
+        )
+        return filename_date.isoformat()
+
+    return printed.isoformat()
+
+
+def _collection_date(patient: dict, fallback: Optional[datetime.date]) -> Optional[str]:
+    """The collection date printed on the report -- unless it cannot be true."""
+    return trusted_date(patient.get("collected_at", "") or "", fallback)
 
 
 def _reference_range(text: str) -> tuple[Optional[float], Optional[float]]:
@@ -554,7 +597,10 @@ def ingest_prescription(
         logger.error(f"{rel_path}: names {printed!r}, filed under {subject!r} -- not committed")
         return 0, 0, None
 
-    effective = _iso(cons.get("date")) or (doc_date.isoformat() if doc_date else None)
+    # NOT just `_iso(cons.get("date")) or doc_date`. The consultation date read off
+    # the page was taken on trust, and a misread put a prescription's drugs two
+    # months into the future -- past the delivery their duration said they ran until.
+    effective = trusted_date(cons.get("date") or "", doc_date, what=rel_path)
 
     # The consultation itself: diagnosis, and the follow-up that becomes a reminder.
     if cons.get("diagnosis") or cons.get("follow_up") or cons.get("doctor"):

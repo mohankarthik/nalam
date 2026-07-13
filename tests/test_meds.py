@@ -737,3 +737,57 @@ class TestADrugCanBeTakenTwice:
         rows = meds.history(con, subject="Alice Doe", drug="Ecosprin")
         stops = [r for r in rows if r["event"] == "stopped" and r["entered_by"] == "human"]
         assert len(stops) == 2, "a stop recorded by a human vanished from the history"
+
+
+class TestADateReadOffThePageCanBeWrong:
+    """And when it is, it is wrong by MONTHS, silently.
+
+    The printed date normally beats the filename -- a lab knows when the sample was
+    taken, and the scan may be weeks later. So it won unconditionally, and it won
+    even when it could not possibly be true:
+
+      * a prescription filed 2024-06-14, whose drugs are marked "till delivery", was
+        recorded effective 2024-08-24 -- a month AFTER the delivery they were written
+        for.
+      * an arterial Doppler moved two months because 04/02 was read as 02/04. The
+        day/month swap is not an exotic failure. It is the commonest way a date goes
+        wrong, and nothing was watching for it.
+
+    Filenames here begin with YYYY-MM-DD and cannot be misread. So the printed date
+    wins UNLESS it disagrees with the filename by more than the tolerance -- at which
+    point we do not know which is right, and this codebase does not guess.
+    """
+
+    import datetime as _dt
+
+    FILENAME = _dt.date(2024, 6, 14)
+
+    def test_a_plausible_printed_date_still_wins(self) -> None:
+        """A scanning delay is normal and must not be second-guessed."""
+        from src.ingest import trusted_date
+
+        assert trusted_date("20/06/2024", self.FILENAME) == "2024-06-20"
+
+    def test_a_date_after_the_delivery_it_precedes_is_refused(self) -> None:
+        from src.ingest import trusted_date
+
+        assert trusted_date("24/8/2024", self.FILENAME) == "2024-06-14"
+
+    def test_the_day_month_swap_is_refused(self) -> None:
+        """04/02 read as 02/04. Two months, on a vascular study."""
+        import datetime
+
+        from src.ingest import trusted_date
+
+        assert trusted_date("2026-02-04", datetime.date(2026, 4, 2)) == "2026-04-02"
+
+    def test_no_printed_date_falls_back_to_the_filename(self) -> None:
+        from src.ingest import trusted_date
+
+        assert trusted_date("", self.FILENAME) == "2024-06-14"
+
+    def test_no_filename_date_leaves_the_printed_one_alone(self) -> None:
+        """Nothing to cross-check against. The page is all we have."""
+        from src.ingest import trusted_date
+
+        assert trusted_date("24/8/2024", None) == "2024-08-24"
