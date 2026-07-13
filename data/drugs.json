@@ -1371,6 +1371,20 @@
       "class": "DENTAL FLOSS, not a drug (brand name as printed; spelling not verified)",
       "confirmed": true,
       "device": true
+    },
+    "AMLONG": {
+      "generic": [
+        "Amlodipine"
+      ],
+      "class": "calcium channel blocker (Micro Labs). Same molecule as AMLODAC -- a brand switch, not a new drug.",
+      "confirmed": true
+    },
+    "VELTAM": {
+      "generic": [
+        "Tamsulosin"
+      ],
+      "class": "alpha-blocker for BPH (Intas). NOT the same as RAPILIF, which is silodosin -- a different molecule.",
+      "confirmed": true
     }
   }
 }

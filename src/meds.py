@@ -375,8 +375,27 @@ def record_decision(
     event: str,
     effective: Optional[str],
     document_id: Optional[int] = None,
+    strength: Optional[str] = None,
+    frequency: Optional[str] = None,
+    raw_text: Optional[str] = None,
 ) -> None:
-    """Write a human's decision into the log. This is what makes it state."""
+    """Write a human's decision into the log. This is what makes it state.
+
+    `strength` and `frequency` are optional, and the difference matters. Confirming
+    that a drug is still being taken says nothing about the dose, so a bare
+    confirmation leaves both None and current() keeps whatever the last prescription
+    stated -- which is right: the prescription is the evidence, and the confirmation
+    is only about status.
+
+    But when a person reads their own strip and says "Arbitel 40mg, 1-0-1", that IS
+    the dose, and it is better evidence than a three-year-old script. Given here, it
+    is recorded, and current() shows it.
+
+    `raw_text` keeps whatever they actually said, verbatim -- "0-1-0, 6 days a week",
+    "3 days a week, evening 5PM". The schema has no column for a regimen that
+    complex, and inventing one to hold "6 days a week" would lose the sentence. The
+    log keeps the sentence.
+    """
     if event not in ("prescribed", "continued", "changed", "stopped"):
         raise ValueError(f"not a medication event: {event!r}")
 
@@ -385,10 +404,20 @@ def record_decision(
 
     con.execute(
         """INSERT INTO medication_events
-             (document_id, subject, drug, generic, event, effective, raw_text,
-              entered_by, status)
-           VALUES (?,?,?,?,?,?,?,'human','ok')""",
-        (document_id, subject, drug, generic, event, effective, drug),
+             (document_id, subject, drug, generic, strength, frequency, event,
+              effective, raw_text, entered_by, status)
+           VALUES (?,?,?,?,?,?,?,?,?,'human','ok')""",
+        (
+            document_id,
+            subject,
+            drug,
+            generic,
+            strength,
+            frequency,
+            event,
+            effective,
+            raw_text or drug,
+        ),
     )
     con.commit()
 
