@@ -197,3 +197,35 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
 - **`health.db` is the source of truth; the Sheet is a generated view.** Opposite of gajana, where
   Sheets is primary. Consequence: the Sheet is read-only to humans; corrections go through the
   Telegram review cards.
+
+## Where the work stands (2026-07-13)
+
+`health.db`: 3,793 observations · 461 medication events · 103 encounters, 8 people, 2013–2026.
+All 470 PDFs classified **by content**: 168 prescription · 157 lab · 61 radiology · 36 insurance ·
+15 discharge · 12 vaccination. Labs, discharges and prescriptions are extracted.
+**Radiology (61 documents) is not.**
+
+### Medication review — resume here
+
+Uncorroborated drug names are reviewed with the user, **one person at a time, batched**: propose
+a reading for each, flag confidence, they correct what's wrong.
+
+```bash
+./venv/bin/python -m tools.export_review          # worksheet, links to each scan
+./venv/bin/python -m tools.apply_review 47=Cilostazol 151='Telekast-F||Allegra' 461=-
+#   id=Name  correct it     id=  accept as read     id=-  not a drug     id=A||B  split
+```
+
+| person | state |
+|---|---|
+| father, mother | done |
+| wife | 6 left, honestly unknown |
+| self | ~10 uncertain left |
+| **mother-in-law** | **deceased — leave as-is, do not clean up** |
+| son (b. 2024-07-23), daughter (b. 2025-11-13), father-in-law | 39 to do |
+
+### Not started
+
+MCP agent · Todoist reminders · Telegram bot · **deployment** (shared `cron-base` image, not a
+shared container with gajana) · radiology extractor · reconciling the live medicine list (people
+still show 2023 antibiotics as "current" because nothing ever said stop).
