@@ -34,12 +34,12 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 ./venv/bin/python run_extract.py --reclassify  # re-resolve unnamed analytes (FREE, no LLM)
 
 # --- Medicines ---
-./venv/bin/python run_meds.py --list --person a family member
+./venv/bin/python run_meds.py --list --person dad
 ./venv/bin/python run_meds.py --reconcile
-./venv/bin/python run_meds.py --decide a family member "FARONEM" stopped 2023-03-04
+./venv/bin/python run_meds.py --decide dad "FARONEM" stopped 2023-03-04
 
 # --- Tests ---
-./venv/bin/python -m pytest              # 117 regressions, offline and free
+./venv/bin/python -m pytest              # ~167 regressions, offline and free
 ./venv/bin/python -m tools.extract_golden      # regenerate golden cache (slow, costs money)
 ./venv/bin/python -m tools.import_master_sheet # re-import the codebook from the Sheet
 ./venv/bin/python -m tools.export_analytes     # codebook -> ~/nalam-analytes-review.md
