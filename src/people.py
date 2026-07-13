@@ -155,3 +155,20 @@ def flag(value: Optional[float], low: Optional[float], high: Optional[float]) ->
     if low is not None and value < low:
         return "low"
     return "normal"
+
+
+def shared_name_tokens() -> set[str]:
+    """Name tokens that more than one family member has: the surnames.
+
+    A family is precisely the setting where everyone is called the same thing.
+    Matching a document to a person on a surname alone would let one relative's
+    records be filed against another -- so `validator.patient_matches` requires a
+    match on a token that DISTINGUISHES the person.
+    """
+    from src.validator import _name_tokens
+
+    counts: dict[str, int] = {}
+    for person in load_people().values():
+        for token in _name_tokens(person.correspondent):
+            counts[token] = counts.get(token, 0) + 1
+    return {token for token, n in counts.items() if n > 1}

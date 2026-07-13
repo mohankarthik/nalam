@@ -169,14 +169,40 @@ def from_document(con: sqlite3.Connection, document_id: int) -> list[Med]:
     )
 
 
+def is_long_term(med: Med) -> bool:
+    """Is this a drug someone stays on, rather than a course that ends itself?
+
+    A five-day antibiotic needs no decision from anyone: the prescription says
+    how long, and `course_ends` retires it on that date. Asking about it is
+    asking a question whose answer is already written down.
+
+    Only open-ended drugs -- the statin, the metformin, the antiplatelet -- are
+    genuinely ambiguous, and those are the ones worth a human's attention.
+    """
+    return course_ends(med) is None
+
+
 def reconcile(
-    con: sqlite3.Connection, subject: str, document_id: int
+    con: sqlite3.Connection,
+    subject: str,
+    document_id: int,
+    long_term_only: bool = True,
 ) -> Reconciliation:
     """Diff a new medication list against what we believe is current.
 
+    Surfaces CHANGES only: a new drug, a changed dose, a drug that has vanished.
+    A consultation that re-prescribes the same list produces no cards at all,
+    because there is nothing to decide.
+
+    That restraint is the point. Hundreds of prescriptions x half a dozen drugs
+    is thousands of events; if every one became a card you would rubber-stamp
+    them, and a rubber-stamped review is worse than no review -- it launders a
+    guess into a decision. So: only changes, only open-ended drugs, and
+    `long_term_only` skips the self-expiring courses entirely.
+
     `stopped` is a PROPOSAL, never a conclusion. A drug missing from one
-    discharge summary does not mean it was stopped -- the summary may simply not
-    have listed the patient's long-term drugs. Only a human can say.
+    prescription does not mean it was stopped -- a consultation routinely omits a
+    patient's other long-term medication. Only a human can say.
     """
     incoming = from_document(con, document_id)
     as_of = incoming[0].effective if incoming else None
@@ -187,6 +213,10 @@ def reconcile(
         for m in current(con, subject)
         if m.effective is None or as_of is None or m.effective < as_of
     ]
+
+    if long_term_only:
+        incoming = [m for m in incoming if is_long_term(m)]
+        previous = [m for m in previous if is_long_term(m)]
 
     before = {m.key: m for m in previous}
     after = {m.key: m for m in incoming}
@@ -234,3 +264,78 @@ def record_decision(
         (document_id, subject, drug, generic, event, effective, drug),
     )
     con.commit()
+
+
+def history(
+    con: sqlite3.Connection,
+    subject: Optional[str] = None,
+    drug: Optional[str] = None,
+) -> list[dict]:
+    """Every time a drug was prescribed. Nothing is filtered out.
+
+    The live-list and reconciliation views deliberately hide things -- an expired
+    antibiotic is not a current medication, and a five-day course needs no
+    decision. But HIDDEN IS NOT DELETED. "When did we last give cetirizine?" and
+    "what did she get for hand-foot-and-mouth?" are exactly the questions a family
+    health record exists to answer, and they need the whole log: short courses,
+    children, one-off prescriptions and all.
+
+    `drug` matches the brand OR the molecule, so searching "cetirizine" finds it
+    under whatever brand it was written as.
+    """
+    sql = """
+        SELECT m.subject, m.drug, m.generic, m.strength, m.frequency, m.duration,
+               m.effective, m.status, d.doc_type, d.source_path,
+               e.diagnoses, e.reason
+        FROM medication_events m
+        JOIN documents d ON d.id = m.document_id
+        LEFT JOIN encounters e ON e.document_id = m.document_id
+        WHERE 1=1
+    """
+    params: list[str] = []
+    if subject:
+        sql += " AND m.subject = ?"
+        params.append(subject)
+    if drug:
+        sql += " AND (m.drug LIKE ? OR IFNULL(m.generic,'') LIKE ?)"
+        params += [f"%{drug}%", f"%{drug}%"]
+    sql += " ORDER BY m.effective DESC, m.id"
+
+    return [dict(r) for r in con.execute(sql, params).fetchall()]
+
+
+def for_condition(
+    con: sqlite3.Connection, condition: str, subject: Optional[str] = None
+) -> list[dict]:
+    """What was prescribed for a given diagnosis or complaint.
+
+    "What did we give her the last time she had hand-foot-and-mouth?" -- the
+    medicines are joined to the encounter that recorded WHY they were given.
+    """
+    sql = """
+        SELECT e.subject, e.admitted AS date, e.diagnoses, e.reason,
+               e.follow_up, d.source_path, d.id AS document_id
+        FROM encounters e
+        JOIN documents d ON d.id = e.document_id
+        WHERE (LOWER(IFNULL(e.diagnoses,'')) LIKE LOWER(?)
+            OR LOWER(IFNULL(e.reason,''))    LIKE LOWER(?))
+    """
+    params = [f"%{condition}%", f"%{condition}%"]
+    if subject:
+        sql += " AND e.subject = ?"
+        params.append(subject)
+    sql += " ORDER BY e.admitted DESC"
+
+    episodes = []
+    for r in con.execute(sql, params).fetchall():
+        row = dict(r)
+        row["medications"] = [
+            dict(m)
+            for m in con.execute(
+                """SELECT drug, generic, strength, frequency, duration, status
+                   FROM medication_events WHERE document_id = ? ORDER BY id""",
+                (row["document_id"],),
+            ).fetchall()
+        ]
+        episodes.append(row)
+    return episodes

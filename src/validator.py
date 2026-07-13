@@ -82,18 +82,66 @@ def _name_tokens(name: str) -> set[str]:
     return {t for t in normalise(name).split() if t and t not in drop and len(t) > 1}
 
 
-def patient_matches(printed: str, expected: str) -> bool:
+# A neonatal record is labelled by the MOTHER's name: "B/O Alice Doe",
+# "BABY OF ...", "Baby of ...". OCR mangles the slash, so "B/O" arrives as "Blo",
+# "BIO", "B10".
+#
+# This nearly caused the worst error the system can make. The rule "the document
+# wins over the folder" -- which correctly re-files a mother's surgery from a
+# child's folder -- read "B/O ALICE DOE" on a premature baby's retinopathy
+# report and moved the BABY's records into the MOTHER's. The folder was right;
+# the document names the parent only to identify the child.
+_NEONATAL = re.compile(
+    r"^\s*(b\s*[/\\|1l]\s*o|b[il1]o|baby\s+of|baby|newborn|nb)\b",
+    re.IGNORECASE,
+)
+
+# "1 Month 14 Days", "3 Days", "6 Weeks" -- nobody's mother is six weeks old.
+_INFANT_AGE = re.compile(
+    r"^\s*\d+\s*(day|days|week|weeks|month|months)\b", re.IGNORECASE
+)
+
+
+def names_a_baby(printed_name: str, printed_age: str = "") -> bool:
+    """Is this a NEONATAL record, labelled with the parent's name?
+
+    True means: the patient is this person's baby, NOT this person. The folder
+    knows which child it is; the document does not.
+    """
+    if _NEONATAL.match((printed_name or "").strip()):
+        return True
+    return bool(_INFANT_AGE.match((printed_age or "").strip()))
+
+
+def patient_matches(
+    printed: str, expected: str, shared: Optional[set[str]] = None
+) -> bool:
     """Does the name printed on the report plausibly refer to the expected patient?
 
-    Deliberately lenient on FORM (initials, honorifics, reordered names, a lab
-    that abbreviates a given name) and strict on IDENTITY (at least one name token
-    must be shared). An empty printed name is not a match -- it is an unknown,
-    and the caller decides.
+    Lenient on FORM (initials, honorifics, reordered names, an abbreviated given
+    name). Strict on IDENTITY -- and in a FAMILY, identity is not the surname.
+
+    `shared` names the tokens that more than one family member has: the surnames.
+    A match on those alone is not a match at all. Without this, a document for one
+    child matched a parent because they share a surname, and the "re-file to the
+    person the document names" rule could move records to the wrong relative --
+    the worst error the system can make, in the one setting where it is most
+    likely: everybody is called the same thing.
+
+    An empty printed name is not a match; it is an unknown, and the caller decides.
     """
     printed_t, expected_t = _name_tokens(printed), _name_tokens(expected)
     if not printed_t or not expected_t:
         return False
-    return bool(printed_t & expected_t)
+
+    common = printed_t & expected_t
+    if not common:
+        return False
+    if shared:
+        # At least one token they share must be one that DISTINGUISHES this person
+        # from the rest of the family.
+        return bool(common - shared)
+    return True
 
 
 def check_result(

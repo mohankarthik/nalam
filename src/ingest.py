@@ -218,8 +218,8 @@ def ingest_discharge(
     a wrong cholesterol reading is not. A human confirms each one.
     """
     from src.extractor import extract_discharge
-    from src.people import load_people
-    from src.validator import patient_matches
+    from src.people import load_people, shared_name_tokens
+    from src.validator import names_a_baby, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -233,12 +233,24 @@ def ingest_discharge(
 
     d = extract_discharge(pdf, subject, rel_path, doc_date)
 
-    # Whose document is this, really?
+    # Whose document is this, really? The document usually wins over the folder --
+    # but NOT when it names a baby by its parent ("B/O <mother>"), which is how
+    # neonatal records are labelled.
     misfiled_to: Optional[str] = None
     printed = (d.patient.get("name") or "").strip()
-    if printed and not patient_matches(printed, subject):
-        for candidate in load_people().values():
-            if patient_matches(printed, candidate.correspondent):
+    printed_age = (d.patient.get("age") or "").strip()
+    people = load_people()
+    shared = shared_name_tokens()
+
+    if names_a_baby(printed, printed_age):
+        if not people.get(subject, None) or not people[subject].child:
+            logger.warning(
+                f"{rel_path}: names a baby ({printed!r}) but the folder is not a "
+                f"child's ({subject!r}). Filing per the folder; please check."
+            )
+    elif printed and not patient_matches(printed, subject, shared):
+        for candidate in people.values():
+            if patient_matches(printed, candidate.correspondent, shared):
                 misfiled_to = candidate.correspondent
                 break
 
@@ -355,8 +367,8 @@ def ingest_prescription(
     most dangerous thing this system can emit.
     """
     from src.extractor import extract_prescription
-    from src.people import load_people
-    from src.validator import patient_matches
+    from src.people import load_people, shared_name_tokens
+    from src.validator import names_a_baby, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -372,12 +384,28 @@ def ingest_prescription(
         pdf, subject, rel_path, ocr_text=ocr_text, expected_date=doc_date
     )
 
-    # Whose document is this, really? The document wins over the folder.
+    # Whose document is this, really? The document usually wins over the folder --
+    # but NOT when it names a baby by its parent.
     misfiled_to: Optional[str] = None
     printed = (p.patient.get("name") or "").strip()
-    if printed and not patient_matches(printed, subject):
-        for candidate in load_people().values():
-            if patient_matches(printed, candidate.correspondent):
+    printed_age = (p.patient.get("age") or "").strip()
+    people = load_people()
+    shared = shared_name_tokens()
+
+    if names_a_baby(printed, printed_age):
+        # "B/O Alice Doe", age "1 Month 14 Days": the patient is that person's
+        # BABY, not that person. The folder knows which child; the document does
+        # not. Re-filing here would move a premature infant's retinopathy notes
+        # into his mother's record -- which is exactly what happened before this
+        # check existed.
+        if not people.get(subject, None) or not people[subject].child:
+            logger.warning(
+                f"{rel_path}: names a baby ({printed!r}) but the folder is not a "
+                f"child's ({subject!r}). Filing per the folder; please check."
+            )
+    elif printed and not patient_matches(printed, subject, shared):
+        for candidate in people.values():
+            if patient_matches(printed, candidate.correspondent, shared):
                 misfiled_to = candidate.correspondent
                 break
     actual = misfiled_to or subject

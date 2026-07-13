@@ -172,6 +172,20 @@ CLASSIFY_CONFIG = "data/configs/classify.json"
 PRESCRIPTION_CONFIG = "data/configs/prescription.json"
 
 
+def is_encrypted(pdf_bytes: bytes) -> bool:
+    """Is this PDF password-protected?
+
+    Some insurance policies are. Sending one to a model wastes two API calls and
+    returns an error, so check first. gajana keeps statement passwords in
+    secrets/passwords.json and decrypts; nothing here needs that yet -- these are
+    policy documents, not medical records.
+    """
+    try:
+        return bool(PdfReader(io.BytesIO(pdf_bytes)).is_encrypted)
+    except Exception:
+        return False
+
+
 def first_page(pdf_bytes: bytes) -> bytes:
     """Just page 1. Classification does not need the whole document, and a 6 MB
     scan costs real money and real seconds to send."""

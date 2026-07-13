@@ -5,6 +5,15 @@
     python run_meds.py --reconcile            diffs needing a human decision
     python run_meds.py --decide dad "ATORVA" stopped 2024-01-15
 
+    python run_meds.py --history --drug cetirizine     when did we last give it?
+    python run_meds.py --history --person alice       everything she's had
+    python run_meds.py --for "hand foot mouth"         what was given for it
+
+--list and --reconcile deliberately HIDE things: an expired antibiotic is not a
+current medication, and a finished course needs no decision. --history hides
+nothing. Short courses, children, one-offs -- all of it is there, because "when
+did we last give her cetirizine" is exactly what a family health record is for.
+
 A prescription says what STARTED. Nothing says what STOPPED. So the list is only
 as true as the last decision a human made -- see src/meds.py.
 
@@ -72,9 +81,17 @@ def show_reconcile(con, person: str | None) -> None:
            ORDER BY m.subject, d.doc_date"""
     ).fetchall()
 
+    # Children are skipped: their prescriptions are short courses that expire on
+    # their own, and they have no chronic regimen to reconcile. Asking about them
+    # is asking a question whose answer is already written on the prescription.
+    people = load_people()
+
     by_person: dict[str, list] = {}
     for r in rows:
         if want and r["subject"] != want:
+            continue
+        person = people.get(r["subject"])
+        if person and person.child:
             continue
         by_person.setdefault(r["subject"], []).append(r)
 
@@ -117,6 +134,62 @@ def show_reconcile(con, person: str | None) -> None:
                 )
 
 
+def show_history(con, person: str | None, drug: str | None) -> None:
+    """Every prescription, unfiltered. Short courses and children included."""
+    subject = resolve_person(person) if person else None
+    rows = meds.history(con, subject=subject, drug=drug)
+
+    what = f"{drug!r}" if drug else "all medicines"
+    who = subject or "everyone"
+    if not rows:
+        print(f"\nNo record of {what} for {who}.")
+        return
+
+    print(f"\n{what} — {who} — {len(rows)} prescriptions, most recent first\n")
+    print(f"  {'DATE':<12} {'PERSON':<17} {'MEDICINE':<34} {'DOSE':<9} FOR")
+    for r in rows:
+        name = f"{r['generic']} ({r['drug']})" if r["generic"] else r["drug"]
+        why = ""
+        if r["diagnoses"]:
+            import json as _json
+            dx = _json.loads(r["diagnoses"] or "[]")
+            why = "; ".join(dx)[:26]
+        elif r["reason"]:
+            why = str(r["reason"])[:26]
+        mark = "" if r["status"] == "ok" else " [unconfirmed]"
+        print(
+            f"  {(r['effective'] or '?'):<12} {r['subject'][:17]:<17} "
+            f"{name[:34]:<34} {(r['strength'] or '-'):<9} {why}{mark}"
+        )
+
+
+def show_for_condition(con, condition: str, person: str | None) -> None:
+    """What was prescribed for a diagnosis. 'What did she get for HFM last time?'"""
+    import json as _json
+
+    subject = resolve_person(person) if person else None
+    episodes = meds.for_condition(con, condition, subject=subject)
+    if not episodes:
+        print(f"\nNothing recorded for {condition!r}.")
+        return
+
+    print(f"\n{condition!r} — {len(episodes)} episode(s), most recent first")
+    for e in episodes:
+        dx = "; ".join(_json.loads(e["diagnoses"] or "[]")) or (e["reason"] or "?")
+        print(f"\n  {e['date'] or '?'}  {e['subject']}  —  {dx[:56]}")
+        if e["follow_up"]:
+            print(f"     follow-up: {e['follow_up'][:56]}")
+        if not e["medications"]:
+            print("     (no medicines recorded)")
+        for m in e["medications"]:
+            name = f"{m['generic']} ({m['drug']})" if m["generic"] else m["drug"]
+            mark = "" if m["status"] == "ok" else "  [unconfirmed]"
+            print(
+                f"     - {name[:38]:<38} {(m['strength'] or '-'):<9} "
+                f"{(m['frequency'] or '-'):<10} {m['duration'] or ''}{mark}"
+            )
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--list", action="store_true", help="Show the believed-current list")
@@ -124,6 +197,11 @@ def main() -> None:
         "--reconcile", action="store_true", help="Show diffs needing a decision"
     )
     p.add_argument("--person", help="Name, folder, or alias from data/people.json")
+    p.add_argument("--history", action="store_true",
+                   help="Every prescription ever, unfiltered (short courses, children, all)")
+    p.add_argument("--drug", help="Filter history by drug -- brand OR molecule")
+    p.add_argument("--for", dest="condition",
+                   help="What was prescribed for a diagnosis, e.g. --for 'hand foot mouth'")
     p.add_argument(
         "--decide",
         nargs=4,
@@ -138,6 +216,12 @@ def main() -> None:
         who, drug, event, date = args.decide
         meds.record_decision(con, resolve_person(who), drug, event, date)
         print(f"recorded: {who} {drug} -> {event} on {date}")
+        return
+    if args.condition:
+        show_for_condition(con, args.condition, args.person)
+        return
+    if args.history or args.drug:
+        show_history(con, args.person, args.drug)
         return
     if args.reconcile:
         show_reconcile(con, args.person)
