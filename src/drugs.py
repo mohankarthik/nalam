@@ -53,6 +53,11 @@ class Drug:
     drug_class: str
     confirmed: bool
     device: bool
+    # GIVEN once, on a date -- a vaccine, or a monoclonal antibody injection. Not a
+    # medicine anybody is "on". It stays in the log and in --history, because it
+    # happened and when it happened matters; it never belongs in a list of what
+    # someone is currently taking. A child was listed as currently on five vaccines.
+    single_dose: bool = False
 
     @property
     def display(self) -> str:
@@ -114,6 +119,7 @@ def lookup(printed: str, table: Optional[dict[str, dict]] = None) -> Optional[Dr
         drug_class=str(entry.get("class") or ""),
         confirmed=bool(entry.get("confirmed")),
         device=bool(entry.get("device")),
+        single_dose=bool(entry.get("single_dose")),
     )
 
 

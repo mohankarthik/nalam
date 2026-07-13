@@ -791,3 +791,62 @@ class TestADateReadOffThePageCanBeWrong:
         from src.ingest import trusted_date
 
         assert trusted_date("24/8/2024", None) == "2024-08-24"
+
+
+class TestAVaccineIsNotSomethingYouAreOn:
+    """An infant was listed as CURRENTLY TAKING five vaccines.
+
+    Nobody had written a stop date for her rotavirus drops, so nothing stopped them.
+    But you do not stop a vaccine. It was given, on a day, and that is the whole of
+    it. Same for a monoclonal antibody injection like nirsevimab.
+
+    data/drugs.json can say so (`single_dose: true`). The medicine list never asked --
+    exactly as it never asked about `device: true`, and answered "what is he taking?"
+    with dental floss.
+
+    They stay in the log and in --history: they happened, and WHEN they happened is
+    the entire clinical point of a vaccination record.
+    """
+
+    def build(self, tmp_path):
+        import sqlite3
+
+        from src import db
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('Alice Doe','p.pdf','vaccination')"
+        )
+        doc = con.execute("SELECT id FROM documents").fetchone()["id"]
+        for drug in ("Rotateq", "Prevenar", "Hexaxim", "Beyfortus", "Crocin"):
+            con.execute(
+                "INSERT INTO medication_events (document_id,subject,drug,event,effective,raw_text)"
+                " VALUES (?,?,?,'prescribed','2026-03-05',?)",
+                (doc, "Alice Doe", drug, drug),
+            )
+        con.commit()
+        return con
+
+    def test_a_vaccine_is_not_a_current_medicine(self, tmp_path) -> None:
+        from src import meds
+
+        names = [m.drug for m in meds.current(self.build(tmp_path), "Alice Doe")]
+        assert names == ["Crocin"], f"a vaccine is being taken, apparently: {names}"
+
+    def test_a_monoclonal_antibody_injection_is_not_either(self, tmp_path) -> None:
+        from src import meds
+
+        names = [m.drug for m in meds.current(self.build(tmp_path), "Alice Doe")]
+        assert "Beyfortus" not in names
+
+    def test_but_the_vaccination_record_still_exists(self, tmp_path) -> None:
+        """WHEN a vaccine was given is the entire point of a vaccination record.
+        Hiding it from the medicine list must not hide it from the history."""
+        from src import meds
+
+        rows = meds.history(self.build(tmp_path), subject="Alice Doe")
+        given = {r["drug"] for r in rows}
+        assert {"Rotateq", "Prevenar", "Hexaxim", "Beyfortus"} <= given

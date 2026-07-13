@@ -1232,7 +1232,8 @@
         "Nirsevimab"
       ],
       "class": "RSV monoclonal antibody (passive immunisation, NOT a vaccine)",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "HEXAXIM": {
       "generic": [
@@ -1244,35 +1245,40 @@
         "Haemophilus influenzae type b conjugate"
       ],
       "class": "hexavalent paediatric vaccine (Sanofi)",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "PREVENAR": {
       "generic": [
         "Pneumococcal conjugate (13-valent)"
       ],
       "class": "pneumococcal conjugate vaccine (Pfizer); India markets Prevenar 13",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "ROTATEQ": {
       "generic": [
         "Rotavirus vaccine, live, oral, pentavalent"
       ],
       "class": "rotavirus vaccine (Merck)",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "FLUARIX TETRA": {
       "generic": [
         "Influenza vaccine, quadrivalent, split-virion"
       ],
       "class": "seasonal influenza vaccine (GSK)",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "VAXIGRIP": {
       "generic": [
         "Influenza vaccine, quadrivalent, split-virion"
       ],
       "class": "seasonal influenza vaccine (Sanofi)",
-      "confirmed": true
+      "confirmed": true,
+      "single_dose": true
     },
     "NORMAL SALINE": {
       "generic": [
@@ -1440,6 +1446,7 @@
       ],
       "class": "PPI + prokinetic (Alkem). 40mg + 30mg.",
       "confirmed": true
-    }
+    },
+    "_single_dose": "single_dose=true means it is GIVEN, once, on a date -- a vaccine, or a monoclonal antibody injection. It is not a medicine anybody is 'on'. It stays in the log and in --history (it happened, and when it happened matters), but it never appears in the believed-current list. A child was listed as currently taking five vaccines."
   }
 }

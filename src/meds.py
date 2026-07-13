@@ -300,16 +300,19 @@ def current(
         if m.event == "stopped":
             continue
 
-        # A device is not a medication. data/drugs.json already knows this --
-        # `device: true`, and Drug.display renders it "[device, not a drug]" -- but
-        # the medicine list never asked. So "what is he taking?" answered with
-        # DENTAL FLOSS, and a BiPAP machine, straight-faced, in a list of drugs.
+        # Neither a DEVICE nor a SINGLE DOSE is a medicine somebody is on.
         #
-        # It stays in medication_events: it WAS prescribed, and --history must still
-        # find it. It simply is not a medicine, and the medicine list is a list of
-        # medicines.
+        # data/drugs.json knew both -- `device: true`, `single_dose: true` -- and the
+        # medicine list never asked. So "what is he taking?" answered with DENTAL
+        # FLOSS and a BiPAP machine; and an infant was listed as CURRENTLY TAKING
+        # five vaccines, because nobody had written a stop date for her rotavirus
+        # drops. You do not stop a vaccine. It was given, on a day, and that is the
+        # whole of it.
+        #
+        # Both stay in medication_events: they happened, and --history must find
+        # them. They are simply not medicines, and this is a list of medicines.
         d = lookup(m.drug, table)
-        if d and d.device:
+        if d and (d.device or d.single_dose):
             continue
 
         ends = course_ends(m)
