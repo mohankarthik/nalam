@@ -869,7 +869,7 @@
       "generic": [
         "Coenzyme Q10"
       ],
-      "class": "fertility supplement",
+      "class": "coenzyme Q10 supplement. Some Q Gold SKUs add lycopene/EPA/DHA/antioxidants; the molecule kept here is the one the user confirmed",
       "confirmed": true
     },
     "EVION": {
@@ -1026,6 +1026,351 @@
       ],
       "class": "muscle relaxant + NSAID",
       "confirmed": true
+    },
+    "D3": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D3 supplement (Cholecalciferol IP 800 IU)",
+      "confirmed": true
+    },
+    "CPINK": {
+      "generic": [
+        "Ferrous ascorbate",
+        "Folic acid"
+      ],
+      "class": "iron + folic acid supplement (Cipla)",
+      "confirmed": true
+    },
+    "CROCIN": {
+      "generic": [
+        "Paracetamol"
+      ],
+      "class": "analgesic/antipyretic",
+      "confirmed": true
+    },
+    "CALPOL": {
+      "generic": [
+        "Paracetamol"
+      ],
+      "class": "analgesic/antipyretic",
+      "confirmed": true
+    },
+    "ATARAX": {
+      "generic": [
+        "Hydroxyzine"
+      ],
+      "class": "antihistamine (H1), paediatric drops 6mg/ml",
+      "confirmed": true
+    },
+    "BUDECORT": {
+      "generic": [
+        "Budesonide"
+      ],
+      "class": "inhaled corticosteroid (respule)",
+      "confirmed": true
+    },
+    "MONTAIR-LC": {
+      "generic": [
+        "Montelukast",
+        "Levocetirizine"
+      ],
+      "class": "leukotriene antagonist + antihistamine",
+      "confirmed": true
+    },
+    "DUOLIN LD": {
+      "generic": [
+        "Levosalbutamol",
+        "Ipratropium bromide"
+      ],
+      "class": "bronchodilator + anticholinergic (respule, 0.63mg/500mcg)",
+      "confirmed": true
+    },
+    "NASOCLEAR": {
+      "generic": [
+        "Sodium chloride"
+      ],
+      "class": "isotonic saline nasal drops 0.65%",
+      "confirmed": true
+    },
+    "NASIVION BABY": {
+      "generic": [
+        "Oxymetazoline"
+      ],
+      "class": "nasal decongestant drops 0.01% (under 1 year)",
+      "confirmed": true
+    },
+    "NASIVION CHILD": {
+      "generic": [
+        "Oxymetazoline"
+      ],
+      "class": "nasal decongestant drops 0.025% (1-6 years)",
+      "confirmed": true
+    },
+    "SINAREST AF": {
+      "generic": [
+        "Chlorpheniramine",
+        "Phenylephrine"
+      ],
+      "class": "antihistamine + decongestant, paediatric drops",
+      "confirmed": true
+    },
+    "MEFTAL P": {
+      "generic": [
+        "Mefenamic acid"
+      ],
+      "class": "NSAID, paediatric suspension",
+      "confirmed": true
+    },
+    "MUCOLITE": {
+      "generic": [
+        "Ambroxol"
+      ],
+      "class": "mucolytic",
+      "confirmed": true
+    },
+    "TOBA": {
+      "generic": [
+        "Tobramycin"
+      ],
+      "class": "aminoglycoside antibiotic eye drops 0.3% (NB: TOBA F adds fluorometholone)",
+      "confirmed": true
+    },
+    "HYPER NEB": {
+      "generic": [
+        "Sodium chloride"
+      ],
+      "class": "hypertonic saline 3% for nebulisation (brand: Hyperneb)",
+      "confirmed": true
+    },
+    "SALINE N/D": {
+      "generic": [],
+      "class": "saline nasal drops, not a branded drug",
+      "confirmed": false
+    },
+    "VICKS BABYRUB": {
+      "generic": [],
+      "class": "OTC topical rub, not a prescription drug",
+      "confirmed": false
+    },
+    "NEO PF": {
+      "generic": [],
+      "class": "mono-component protein fortifier (Analeptik Biologicals) -- a nutrition supplement, not a drug",
+      "confirmed": false
+    },
+    "CALCIOMAX": {
+      "generic": [],
+      "class": "calcium supplement? (only ever seen in a STOP instruction)",
+      "confirmed": false
+    },
+    "BECOS": {
+      "generic": [],
+      "class": "B-complex supplement? (only ever seen in a STOP instruction)",
+      "confirmed": false
+    },
+    "DAVTAC": {
+      "generic": [],
+      "class": "? (only ever seen in a STOP instruction)",
+      "confirmed": false
+    },
+    "HYPERNEB": {
+      "generic": [
+        "Sodium chloride"
+      ],
+      "class": "hypertonic saline 3% for nebulisation",
+      "confirmed": true
+    },
+    "ASCORIL LS": {
+      "generic": [
+        "Levosalbutamol",
+        "Ambroxol",
+        "Guaifenesin"
+      ],
+      "class": "bronchodilator + mucolytic + expectorant syrup",
+      "confirmed": true
+    },
+    "RELENT PLUS": {
+      "generic": [
+        "Ambroxol",
+        "Cetirizine"
+      ],
+      "class": "mucolytic + antihistamine syrup",
+      "confirmed": true
+    },
+    "COLICAID": {
+      "generic": [
+        "Simethicone",
+        "Dill oil",
+        "Fennel oil"
+      ],
+      "class": "infant colic / antiflatulent drops",
+      "confirmed": true
+    },
+    "AZEE": {
+      "generic": [
+        "Azithromycin"
+      ],
+      "class": "macrolide antibiotic",
+      "confirmed": true
+    },
+    "NEXPRO JUNIOR": {
+      "generic": [
+        "Esomeprazole"
+      ],
+      "class": "proton pump inhibitor, paediatric sachet 10mg",
+      "confirmed": true
+    },
+    "UNICFLORA RT": {
+      "generic": [
+        "Lactobacillus reuteri"
+      ],
+      "class": "probiotic drops",
+      "confirmed": true
+    },
+    "BEYFORTUS": {
+      "generic": [
+        "Nirsevimab"
+      ],
+      "class": "RSV monoclonal antibody (passive immunisation, NOT a vaccine)",
+      "confirmed": true
+    },
+    "HEXAXIM": {
+      "generic": [
+        "Diphtheria toxoid",
+        "Tetanus toxoid",
+        "Acellular pertussis",
+        "Inactivated poliovirus",
+        "Hepatitis B surface antigen",
+        "Haemophilus influenzae type b conjugate"
+      ],
+      "class": "hexavalent paediatric vaccine (Sanofi)",
+      "confirmed": true
+    },
+    "PREVENAR": {
+      "generic": [
+        "Pneumococcal conjugate (13-valent)"
+      ],
+      "class": "pneumococcal conjugate vaccine (Pfizer); India markets Prevenar 13",
+      "confirmed": true
+    },
+    "ROTATEQ": {
+      "generic": [
+        "Rotavirus vaccine, live, oral, pentavalent"
+      ],
+      "class": "rotavirus vaccine (Merck)",
+      "confirmed": true
+    },
+    "FLUARIX TETRA": {
+      "generic": [
+        "Influenza vaccine, quadrivalent, split-virion"
+      ],
+      "class": "seasonal influenza vaccine (GSK)",
+      "confirmed": true
+    },
+    "VAXIGRIP": {
+      "generic": [
+        "Influenza vaccine, quadrivalent, split-virion"
+      ],
+      "class": "seasonal influenza vaccine (Sanofi)",
+      "confirmed": true
+    },
+    "NORMAL SALINE": {
+      "generic": [
+        "Sodium chloride"
+      ],
+      "class": "isotonic saline 0.9% for nebulisation",
+      "confirmed": true
+    },
+    "C-PINK": {
+      "generic": [
+        "Ferrous ascorbate",
+        "Folic acid"
+      ],
+      "class": "iron + folic acid supplement (Cipla); hyphenated spelling of CPINK",
+      "confirmed": true
+    },
+    "DUOLIN": {
+      "generic": [
+        "Levosalbutamol",
+        "Ipratropium bromide"
+      ],
+      "class": "bronchodilator + anticholinergic (standard strength; DUOLIN LD is the low-dose respule)",
+      "confirmed": true
+    },
+    "KIDRICH": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D3 supplement, 800 IU/ml paediatric nano drops (Dr Reddy's)",
+      "confirmed": true
+    },
+    "KIDRICH-D3": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D3 supplement, 800 IU/ml paediatric nano drops (Dr Reddy's)",
+      "confirmed": true
+    },
+    "TASIRON": {
+      "generic": [
+        "Ferric diphosphate",
+        "Folic acid"
+      ],
+      "class": "iron + folic acid supplement (Inzpera). Same indication as C-PINK, DIFFERENT iron salt -- the doctor offered them as alternatives",
+      "confirmed": true
+    },
+    "NEBZMART FB": {
+      "generic": [
+        "Budesonide",
+        "Formoterol"
+      ],
+      "class": "inhaled corticosteroid + LABA (COPD/asthma respule, Glenmark)",
+      "confirmed": true
+    },
+    "NEBZMART G": {
+      "generic": [
+        "Glycopyrronium bromide"
+      ],
+      "class": "long-acting anticholinergic (COPD respule, Glenmark)",
+      "confirmed": true
+    },
+    "EXIZOL": {
+      "generic": [
+        "Ketoconazole"
+      ],
+      "class": "topical antifungal shampoo 2% (Sun Pharma)",
+      "confirmed": true
+    },
+    "ARGIHOPE": {
+      "generic": [
+        "L-Arginine",
+        "Proanthocyanidins"
+      ],
+      "class": "L-arginine supplement, 3g sachet (Corona Remedies)",
+      "confirmed": true
+    },
+    "SEPTRAN": {
+      "generic": [
+        "Sulfamethoxazole",
+        "Trimethoprim"
+      ],
+      "class": "co-trimoxazole antibiotic (GSK)",
+      "confirmed": true
+    },
+    "TRIACTIN": {
+      "generic": [
+        "Thiocolchicoside",
+        "Aceclofenac",
+        "Paracetamol"
+      ],
+      "class": "muscle relaxant + NSAID (Pharmed, INDIA). WARNING: the same brand name outside India is CYPROHEPTADINE, a different drug entirely -- confirmed as the Indian product by the user",
+      "confirmed": true
+    },
+    "YOUMIFLOSS": {
+      "generic": [],
+      "class": "DENTAL FLOSS, not a drug (brand name as printed; spelling not verified)",
+      "confirmed": true,
+      "device": true
     }
   }
 }
