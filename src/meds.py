@@ -50,6 +50,7 @@ class Med:
     # answers "when did we last hear about this?" (and drives the stale flag, which
     # a confirmation must clear). `started` answers "since when has he been on it?".
     started: Optional[str] = None
+    entered_by: str = "extractor"
 
     @property
     def key(self) -> str:
@@ -107,6 +108,7 @@ def _rows_to_meds(rows) -> list[Med]:
             effective=r["effective"],
             event=r["event"],
             status=r["status"],
+            entered_by=r["entered_by"],
         )
         for r in rows
     ]
@@ -212,6 +214,23 @@ def current(
 
     all_meds = _rows_to_meds(rows)  # newest first
 
+    # Med.key is the MOLECULE when we know it and the brand when we do not. So two
+    # rows for one drug get two different keys the moment one of them learns its
+    # molecule and the other has not -- and then "stop Brevoxyl wash" does not stop
+    # Brevoxyl wash, it invents a second one beside it.
+    #
+    # A molecule known about a brand is known about every row of that brand. Share
+    # it, so the key is stable whatever order the rows were written in.
+    from src.drugs import _key as brand_key
+
+    molecule: dict[str, str] = {}
+    for m in all_meds:
+        if m.generic:
+            molecule.setdefault(brand_key(m.drug).lower(), m.generic)
+    for m in all_meds:
+        if not m.generic:
+            m.generic = molecule.get(brand_key(m.drug).lower())
+
     latest: dict[str, Med] = {}
     for med in all_meds:
         latest.setdefault(med.key, med)
@@ -227,7 +246,13 @@ def current(
     # actually carried a dose is the dose.
     for key, m in latest.items():
         same = [x for x in all_meds if x.key == key]
-        dated = [x.effective for x in same if x.effective]
+
+        # A start date is a fact from a DOCUMENT. It is never the day someone
+        # confirmed the drug is still being taken -- a prescription with no date at
+        # all would then appear to have started the moment it was reconciled, which
+        # is how a wash somebody has used for years came to say "started today".
+        # No dated prescription, no start date: '?' is the honest answer.
+        dated = [x.effective for x in same if x.effective and x.entered_by != "human"]
         m.started = min(dated) if dated else None
         if m.strength is None:
             m.strength = next((x.strength for x in same if x.strength), None)

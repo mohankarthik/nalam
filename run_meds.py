@@ -60,8 +60,12 @@ def show_list(con, person: str | None) -> None:
             # human confirming "still on it" writes a `continued` event dated today;
             # printing that as the start date would say a five-year-old statin began
             # this morning.
+            # NOT `or m.effective` -- effective is the most recent event, which for a
+            # reconciled drug is the day a human confirmed it. Falling back to it puts
+            # the confirmation date straight back into the STARTED column, which is
+            # the bug this is here to avoid. If no document dated it, say so.
             print(
-                f"  {m.display[:44]:<44} {(m.started or m.effective or '?'):<12} "
+                f"  {m.display[:44]:<44} {(m.started or '?'):<12} "
                 f"{(m.strength or '-'):<9} {m.frequency or '-'}{mark}"
             )
 

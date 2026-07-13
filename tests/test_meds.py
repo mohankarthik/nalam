@@ -536,3 +536,89 @@ class TestDoctorsDoNotWriteForSevenDays:
         from src.meds import course_ends
 
         assert course_ends(self.med(duration)) is None
+
+
+class TestAStartDateComesFromADocument:
+    """Never from the day a human confirmed the drug.
+
+    A prescription with no date at all -- a wash on a dermatology note, say --
+    would otherwise appear to have STARTED the moment it was reconciled. Someone
+    who has used it for years gets a record saying they began this morning.
+
+    No dated prescription, no start date. '?' is the honest answer.
+    """
+
+    def build(self, tmp_path, effective):
+        import sqlite3
+
+        from src import db
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('Alice Doe', 'p.pdf', 'prescription')"
+        )
+        doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+        con.execute(
+            "INSERT INTO medication_events (document_id, subject, drug, event, effective, "
+            "raw_text, entered_by) VALUES (?,?,'Brevoxyl wash','prescribed',?,'x','extractor')",
+            (doc_id, "Alice Doe", effective),
+        )
+        con.commit()
+        return con
+
+    def test_an_undated_prescription_has_no_start_date(self, tmp_path) -> None:
+        from src import meds
+
+        con = self.build(tmp_path, None)
+        meds.record_decision(con, "Alice Doe", "Brevoxyl wash", "continued", "2026-07-13")
+
+        (m,) = meds.current(con, "Alice Doe")
+        assert m.started is None, "a human's confirmation date became the start date"
+
+    def test_a_dated_prescription_keeps_its_date(self, tmp_path) -> None:
+        from src import meds
+
+        con = self.build(tmp_path, "2019-06-01")
+        meds.record_decision(con, "Alice Doe", "Brevoxyl wash", "continued", "2026-07-13")
+
+        (m,) = meds.current(con, "Alice Doe")
+        assert m.started == "2019-06-01"
+
+
+def test_stopping_a_drug_stops_it_even_if_only_one_row_knows_the_molecule(tmp_path) -> None:
+    """Med.key is the MOLECULE when known and the brand when not. So an extractor
+    row that never resolved its molecule, and a human decision that did, get two
+    different keys -- and "stop Brevoxyl wash" does not stop Brevoxyl wash, it
+    invents a second one next to it, still current.
+
+    A molecule known about a brand is known about every row of that brand.
+    """
+    import sqlite3
+
+    from src import db, meds
+
+    con = sqlite3.connect(tmp_path / "t.db")
+    con.row_factory = sqlite3.Row
+    con.executescript(db.SCHEMA)
+    con.execute(
+        "INSERT INTO documents (subject, source_path, doc_type) "
+        "VALUES ('Alice Doe', 'p.pdf', 'prescription')"
+    )
+    doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+
+    # The extractor never resolved the molecule for this row (generic IS NULL) --
+    # which was true of 86 rows in the real database.
+    con.execute(
+        "INSERT INTO medication_events (document_id, subject, drug, generic, event, "
+        "effective, raw_text) VALUES (?,?,'Brevoxyl wash',NULL,'prescribed','2019-06-01','x')",
+        (doc_id, "Alice Doe"),
+    )
+    con.commit()
+
+    # record_decision() looks the brand up and DOES resolve it.
+    meds.record_decision(con, "Alice Doe", "Brevoxyl wash", "stopped", "2026-07-13")
+
+    assert meds.current(con, "Alice Doe") == [], "the stop created a second drug instead"
