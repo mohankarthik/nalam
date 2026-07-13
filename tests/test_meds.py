@@ -330,3 +330,131 @@ class TestKeyIsOrderIndependent:
             "Y", "Pregabalin + Nortriptyline", None, None, None, "2024-01-01", "prescribed", "ok"
         )
         assert a.key != b.key
+
+
+class TestADeviceIsNotAMedicine:
+    """`what is he taking?` answered with DENTAL FLOSS.
+
+    data/drugs.json already knew: `device: true`, and Drug.display renders it
+    "[device, not a drug]". The medicine list simply never asked, so a floss brand
+    and a BiPAP machine sat in the believed-current list alongside the antibiotics.
+
+    They stay in medication_events -- they WERE prescribed, and --history must find
+    them. They are just not medicines.
+    """
+
+    def test_a_device_is_not_believed_current(self, tmp_path) -> None:
+        import sqlite3
+
+        from src import db, meds
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('Alice Doe', 'p.pdf', 'prescription')"
+        )
+        doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+
+        # BIPAP AT NIGHT is device:true in data/drugs.json. Ecosprin is a real drug.
+        for drug in ("BIPAP AT NIGHT", "Ecosprin"):
+            con.execute(
+                "INSERT INTO medication_events "
+                "(document_id, subject, drug, event, effective, raw_text) "
+                "VALUES (?,?,?,'prescribed','2025-01-01',?)",
+                (doc_id, "Alice Doe", drug, drug),
+            )
+        con.commit()
+
+        names = [m.drug for m in meds.current(con, "Alice Doe")]
+        assert "Ecosprin" in names
+        assert "BIPAP AT NIGHT" not in names, "a device is not a medicine"
+
+    def test_but_history_still_finds_it(self, tmp_path) -> None:
+        """Hidden is not deleted. It was prescribed, and the record must say so."""
+        import sqlite3
+
+        from src import db, meds
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('Alice Doe', 'p.pdf', 'prescription')"
+        )
+        doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+        con.execute(
+            "INSERT INTO medication_events "
+            "(document_id, subject, drug, event, effective, raw_text) "
+            "VALUES (?,?,'BIPAP AT NIGHT','prescribed','2025-01-01','BIPAP AT NIGHT')",
+            (doc_id, "Alice Doe"),
+        )
+        con.commit()
+
+        assert any(r["drug"] == "BIPAP AT NIGHT" for r in meds.history(con, subject="Alice Doe"))
+
+
+class TestConfirmingADrugMustNotEraseIt:
+    """Saying "yes, he is still on it" writes a `continued` event with no strength
+    and no frequency -- it confirms a fact, it does not restate a prescription.
+
+    Taken literally, that BLANKS the dose and resets the start date to today. The
+    medicine list then says a five-year-old statin began this morning, at an unknown
+    dose -- which is worse than the stale flag the reconciliation was meant to clear.
+
+    The confirmation decides the STATUS. The prescriptions still supply the facts.
+    """
+
+    def build(self, tmp_path):
+        import sqlite3
+
+        from src import db
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('Alice Doe', 'p.pdf', 'prescription')"
+        )
+        doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+
+        # Prescribed in 2020, at a dose, and never mentioned again.
+        con.execute(
+            "INSERT INTO medication_events (document_id, subject, drug, generic, strength, "
+            "frequency, event, effective, raw_text) "
+            "VALUES (?,?,'Ecosprin AV','Aspirin + Atorvastatin','150/20','0-0-1',"
+            "'prescribed','2020-12-11','x')",
+            (doc_id, "Alice Doe"),
+        )
+        con.commit()
+        return con
+
+    def test_a_confirmation_keeps_the_original_start_date(self, tmp_path) -> None:
+        from src import meds
+
+        con = self.build(tmp_path)
+        meds.record_decision(con, "Alice Doe", "Ecosprin AV", "continued", "2026-07-13")
+
+        (m,) = meds.current(con, "Alice Doe")
+        assert m.started == "2020-12-11", "confirming the drug erased when it began"
+        assert m.effective == "2026-07-13", "but we DID last hear about it today"
+
+    def test_a_confirmation_keeps_the_dose(self, tmp_path) -> None:
+        from src import meds
+
+        con = self.build(tmp_path)
+        meds.record_decision(con, "Alice Doe", "Ecosprin AV", "continued", "2026-07-13")
+
+        (m,) = meds.current(con, "Alice Doe")
+        assert m.strength == "150/20", "a medicine list with no dose is not a medicine list"
+        assert m.frequency == "0-0-1"
+
+    def test_a_stop_still_stops_it(self, tmp_path) -> None:
+        from src import meds
+
+        con = self.build(tmp_path)
+        meds.record_decision(con, "Alice Doe", "Ecosprin AV", "stopped", "2026-07-13")
+        assert meds.current(con, "Alice Doe") == []

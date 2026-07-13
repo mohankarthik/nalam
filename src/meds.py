@@ -41,6 +41,15 @@ class Med:
     effective: Optional[str]
     event: str
     status: str
+    # When this drug was FIRST prescribed, as opposed to `effective`, which is the
+    # most recent event about it. They are different facts and the list needs both.
+    #
+    # Confirming "yes, he is still on it" writes a `continued` event dated today. If
+    # that were the only date, the medicine list would say the drug STARTED today --
+    # so reconciling a five-year-old statin would erase the five years. `effective`
+    # answers "when did we last hear about this?" (and drives the stale flag, which
+    # a confirmation must clear). `started` answers "since when has he been on it?".
+    started: Optional[str] = None
 
     @property
     def key(self) -> str:
@@ -160,14 +169,51 @@ def current(
         (subject,),
     ).fetchall()
 
+    all_meds = _rows_to_meds(rows)  # newest first
+
     latest: dict[str, Med] = {}
-    for med in _rows_to_meds(rows):
+    for med in all_meds:
         latest.setdefault(med.key, med)
+
+    # A human's "yes, still on it" is a `continued` event with no strength and no
+    # frequency -- it confirms a fact, it does not restate the prescription. Taken
+    # literally, reconciling a drug therefore BLANKS its dose and resets its start
+    # date to today: the medicine list would say a five-year-old statin began this
+    # morning, at an unknown dose. That is worse than the stale flag it replaced.
+    #
+    # So the confirmation decides the STATUS, and the prescriptions still supply the
+    # facts: the earliest event is when it started, and the most recent event that
+    # actually carried a dose is the dose.
+    for key, m in latest.items():
+        same = [x for x in all_meds if x.key == key]
+        dated = [x.effective for x in same if x.effective]
+        m.started = min(dated) if dated else None
+        if m.strength is None:
+            m.strength = next((x.strength for x in same if x.strength), None)
+        if m.frequency is None:
+            m.frequency = next((x.frequency for x in same if x.frequency), None)
+
+    from src.drugs import load_drugs, lookup
+
+    table = load_drugs()
 
     active = []
     for m in latest.values():
         if m.event == "stopped":
             continue
+
+        # A device is not a medication. data/drugs.json already knows this --
+        # `device: true`, and Drug.display renders it "[device, not a drug]" -- but
+        # the medicine list never asked. So "what is he taking?" answered with
+        # DENTAL FLOSS, and a BiPAP machine, straight-faced, in a list of drugs.
+        #
+        # It stays in medication_events: it WAS prescribed, and --history must still
+        # find it. It simply is not a medicine, and the medicine list is a list of
+        # medicines.
+        d = lookup(m.drug, table)
+        if d and d.device:
+            continue
+
         ends = course_ends(m)
         if ends and ends < as_of:
             continue  # the prescription said how long, and that time has passed

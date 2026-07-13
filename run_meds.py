@@ -56,16 +56,23 @@ def show_list(con, person: str | None) -> None:
         print(f"  {'MEDICINE':<44} {'STARTED':<12} {'DOSE':<9} FREQ")
         for m in sorted(active, key=lambda x: x.display.lower()):
             mark = "" if m.status == "ok" else "  [unconfirmed]"
+            # STARTED is when the drug BEGAN, not when we last heard about it. A
+            # human confirming "still on it" writes a `continued` event dated today;
+            # printing that as the start date would say a five-year-old statin began
+            # this morning.
             print(
-                f"  {m.display[:44]:<44} {(m.effective or '?'):<12} "
+                f"  {m.display[:44]:<44} {(m.started or m.effective or '?'):<12} "
                 f"{(m.strength or '-'):<9} {m.frequency or '-'}{mark}"
             )
 
+        # Stale means "nobody has said anything about this for years" -- which is a
+        # question about the LAST event, not the first. A drug started in 2020 and
+        # confirmed today is not stale; that is exactly what reconciling it did.
         stale = [m for m in active if m.effective and m.effective < "2024-01-01"]
         if stale:
             print(
-                f"\n  ! {len(stale)} of these were last seen before 2024 and have never been"
-                "\n    reconciled. Nothing says they stopped -- but nothing says they didn't."
+                f"\n  ! {len(stale)} of these were last confirmed before 2024 and have never"
+                "\n    been reconciled. Nothing says they stopped -- but nothing says they didn't."
             )
 
 
