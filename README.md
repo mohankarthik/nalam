@@ -54,7 +54,8 @@ cp data/people.example.json  data/people.json      # your family
 ./venv/bin/python run_extract.py --reclassify # re-resolve analytes (free, offline)
 ./venv/bin/python run_meds.py --list --person dad
 ./venv/bin/python run_meds.py --reconcile
-./venv/bin/python -m pytest                   # 117 regressions, offline
+./venv/bin/python -m tools.reresolve_drugs    # backfill molecules (free, offline)
+./venv/bin/python -m pytest                   # 167 regressions, offline
 ```
 
 Nothing personal is committed. Real names, paths, values and records live in
