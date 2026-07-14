@@ -72,7 +72,7 @@ def show_list(con, person: str | None) -> None:
         # Stale means "nobody has said anything about this for years" -- which is a
         # question about the LAST event, not the first. A drug started in 2020 and
         # confirmed today is not stale; that is exactly what reconciling it did.
-        stale = [m for m in active if m.effective and m.effective < "2024-01-01"]
+        stale = [m for m in active if m.effective and m.effective < meds.STALE_BEFORE]
         if stale:
             print(
                 f"\n  ! {len(stale)} of these were last confirmed before 2024 and have never"

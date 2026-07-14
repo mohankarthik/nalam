@@ -51,6 +51,10 @@ class Med:
     # a confirmation must clear). `started` answers "since when has he been on it?".
     started: Optional[str] = None
     entered_by: str = "extractor"
+    # The document behind the LATEST event about this drug -- None for a human
+    # decision recorded with no source (record_decision's document_id is optional:
+    # nobody wrote down "yes, still on it", which is why a human had to say so).
+    document_id: Optional[int] = None
 
     @property
     def key(self) -> str:
@@ -109,6 +113,7 @@ def _rows_to_meds(rows) -> list[Med]:
             event=r["event"],
             status=r["status"],
             entered_by=r["entered_by"],
+            document_id=r["document_id"],
         )
         for r in rows
     ]
@@ -189,6 +194,13 @@ def course_ends(med: Med) -> Optional[datetime.date]:
     except ValueError:
         return None
     return start + datetime.timedelta(days=days)
+
+
+# "Stale" means nobody has said anything about a drug for years -- a question
+# about the LAST event, not the first. Shared by run_meds.py's --list display
+# and src/qa.py's Telegram answers so the two surfaces can't drift apart on
+# what "stale" means.
+STALE_BEFORE = "2024-01-01"
 
 
 def current(

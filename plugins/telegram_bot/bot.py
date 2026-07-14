@@ -45,6 +45,7 @@ from typing import Any, Optional
 
 import requests
 
+from src import qa
 from src.constants import CONSUMABLE_EXT, DOCUMENT_TYPE, MAGIC, MEDICAL_ROOT, SPECIALTIES_CONFIG
 from src.drive_sync import _key, load_state, save_state
 from src.paperless import Paperless
@@ -56,6 +57,16 @@ API_URL = "https://api.telegram.org/bot{token}/{method}"
 FILE_URL = "https://api.telegram.org/file/bot{token}/{file_path}"
 HTTP_TIMEOUT = 30
 DOWNLOAD_TIMEOUT = 120
+
+# Long polling: Telegram holds the getUpdates connection open server-side for
+# up to this many seconds, returning the instant a message arrives instead of
+# an empty result -- so a message sent mid-tick gets answered in ~seconds, not
+# up to a minute later on the NEXT cron tick. Kept comfortably under the
+# 1-minute cron interval (see crontab) so a tick reliably finishes before the
+# next one fires; the client-side HTTP timeout adds a buffer on top for
+# network/serialization time, per Telegram's own recommendation.
+LONG_POLL_SECONDS = 45
+LONG_POLL_HTTP_TIMEOUT = LONG_POLL_SECONDS + 10
 
 
 def _load_specialties() -> tuple[dict[str, str], str]:
@@ -171,10 +182,13 @@ class TelegramDocBot:
         return API_URL.format(token=self.token, method=method)
 
     def get_updates(self) -> list[dict[str, Any]]:
-        params: dict[str, Any] = {"timeout": 0, "allowed_updates": json.dumps(["message"])}
+        params: dict[str, Any] = {
+            "timeout": LONG_POLL_SECONDS,
+            "allowed_updates": json.dumps(["message"]),
+        }
         if self.state.get("offset"):
             params["offset"] = self.state["offset"]
-        resp = requests.get(self._api("getUpdates"), params=params, timeout=HTTP_TIMEOUT)
+        resp = requests.get(self._api("getUpdates"), params=params, timeout=LONG_POLL_HTTP_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("result", [])
 
@@ -246,7 +260,9 @@ class TelegramDocBot:
             "out automatically, you don't type it.\n"
             "Example: Dad | Reports | 2026-07-10\n\n"
             f"Names: {', '.join(names)}\n"
-            f"Types: {', '.join(types)} (omit to file directly under the person)"
+            f"Types: {', '.join(types)} (omit to file directly under the person)\n\n"
+            'Or just ask a question, e.g. "What\'s Dad on for BP?" or '
+            '"Mom\'s latest HbA1c" -- name the person, it answers from health.db.'
         )
 
     # --- Message handling ------------------------------------------------------
@@ -263,15 +279,26 @@ class TelegramDocBot:
     def process_message(self, message: dict[str, Any]) -> bool:
         """Handle one message. Returns True if a document was filed."""
         chat_id = message["chat"]["id"]
-        text = str(message.get("text", "")).strip().lower().split("@")[0]
-        if text in ("/start", "/help"):
+        raw_text = str(message.get("text", "")).strip()
+        cmd = raw_text.lower().split("@")[0]
+        if cmd in ("/start", "/help"):
             tag_map, _ = _load_specialties()
             self.send_message(chat_id, self._help_text(tag_map))
             return False
 
         file_ref = self._file_ref(message)
         if file_ref is None:
-            return False  # chatter, not an attachment -> stay silent
+            # No attachment -> not an ingest. Plain text that isn't a slash
+            # command is a question, e.g. "Dad's latest HbA1c" -- answer it
+            # over health.db instead of staying silent.
+            if raw_text and not raw_text.startswith("/"):
+                try:
+                    answer = qa.answer_question(raw_text)
+                except Exception as e:
+                    logger.error(f"Q&A failed: {e}", exc_info=True)
+                    answer = f"✗ Could not answer that: {e}"
+                self.send_message(chat_id, answer)
+            return False
 
         caption = message.get("caption", "")
         tag_map, default_tag = _load_specialties()
