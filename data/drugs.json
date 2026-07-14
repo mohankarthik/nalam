@@ -562,9 +562,11 @@
       "confirmed": true
     },
     "PLATIFY": {
-      "generic": [],
-      "class": "?",
-      "confirmed": false
+      "generic": [
+        "Eltrombopag"
+      ],
+      "class": "thrombopoietin receptor agonist",
+      "confirmed": true
     },
     "DIAFOOT": {
       "generic": [],
@@ -1447,6 +1449,320 @@
       "class": "PPI + prokinetic (Alkem). 40mg + 30mg.",
       "confirmed": true
     },
-    "_single_dose": "single_dose=true means it is GIVEN, once, on a date -- a vaccine, or a monoclonal antibody injection. It is not a medicine anybody is 'on'. It stays in the log and in --history (it happened, and when it happened matters), but it never appears in the believed-current list. A child was listed as currently taking five vaccines."
+    "_single_dose": "single_dose=true means it is GIVEN, once, on a date -- a vaccine, or a monoclonal antibody injection. It is not a medicine anybody is 'on'. It stays in the log and in --history (it happened, and when it happened matters), but it never appears in the believed-current list. A child was listed as currently taking five vaccines.",
+    "SOMPRAZ D": {
+      "generic": [
+        "Esomeprazole",
+        "Domperidone"
+      ],
+      "class": "PPI + prokinetic",
+      "confirmed": true
+    },
+    "CIPLOX": {
+      "generic": [
+        "Ciprofloxacin"
+      ],
+      "class": "antibiotic (fluoroquinolone)",
+      "confirmed": true
+    },
+    "CIPRO": {
+      "generic": [
+        "Ciprofloxacin"
+      ],
+      "class": "antibiotic (fluoroquinolone)",
+      "confirmed": true
+    },
+    "OTRIVIN NASAL DROPS": {
+      "generic": [
+        "Xylometazoline"
+      ],
+      "class": "nasal decongestant",
+      "confirmed": true
+    },
+    "ROZAVEL": {
+      "generic": [
+        "Rosuvastatin"
+      ],
+      "class": "statin",
+      "confirmed": true
+    },
+    "SOLIWAX EAR DROPS": {
+      "generic": [
+        "Paradichlorobenzene",
+        "Benzocaine",
+        "Chlorbutol",
+        "Turpentine Oil"
+      ],
+      "class": "earwax softener/analgesic",
+      "confirmed": true
+    },
+    "AGMENTIN": {
+      "generic": [
+        "Amoxicillin",
+        "Clavulanic acid"
+      ],
+      "class": "antibiotic (penicillin)",
+      "confirmed": true
+    },
+    "GABANTIN": {
+      "generic": [
+        "Gabapentin"
+      ],
+      "class": "anticonvulsant/neuropathic pain",
+      "confirmed": true
+    },
+    "MIRAGO S": {
+      "generic": [
+        "Mirabegron",
+        "Solifenacin"
+      ],
+      "class": "overactive bladder combo",
+      "confirmed": true
+    },
+    "MONTEK FX": {
+      "generic": [
+        "Montelukast",
+        "Fexofenadine"
+      ],
+      "class": "antihistamine/leukotriene antagonist combo",
+      "confirmed": true
+    },
+    "SIGNOFLAM": {
+      "generic": [
+        "Aceclofenac",
+        "Paracetamol",
+        "Serratiopeptidase"
+      ],
+      "class": "NSAID combo",
+      "confirmed": true
+    },
+    "ZOCEF": {
+      "generic": [
+        "Cefuroxime"
+      ],
+      "class": "antibiotic (cephalosporin)",
+      "confirmed": true
+    },
+    "CAP SR PEVESCA PLUS": {
+      "generic": [
+        "Pregabalin",
+        "Methylcobalamin",
+        "Alpha Lipoic Acid",
+        "Pyridoxine",
+        "Folic Acid"
+      ],
+      "class": "neuropathic pain combo",
+      "confirmed": true
+    },
+    "UPRISE D3": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D3 supplement",
+      "confirmed": true
+    },
+    "LUMIA": {
+      "generic": [
+        "Cholecalciferol"
+      ],
+      "class": "vitamin D3 supplement",
+      "confirmed": true
+    },
+    "GABAGESIC NT": {
+      "generic": [
+        "Gabapentin",
+        "Nortriptyline"
+      ],
+      "class": "neuropathic pain combo",
+      "confirmed": true
+    },
+    "NUCOXIA MR": {
+      "generic": [
+        "Etoricoxib",
+        "Thiocolchicoside"
+      ],
+      "class": "NSAID + muscle relaxant combo",
+      "confirmed": true
+    },
+    "RABLET": {
+      "generic": [
+        "Rabeprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "RAZO": {
+      "generic": [
+        "Rabeprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "ETOSHINE P": {
+      "generic": [
+        "Etoricoxib",
+        "Paracetamol"
+      ],
+      "class": "NSAID combo",
+      "confirmed": true
+    },
+    "EZORB FORTE": {
+      "generic": [
+        "Calcitriol",
+        "Calcium Aspartate",
+        "Calcium Orotate",
+        "Magnesium",
+        "Zinc",
+        "Folic Acid",
+        "Hydroxycobalamin"
+      ],
+      "class": "bone health supplement",
+      "confirmed": true
+    },
+    "TRAZER M FORTE": {
+      "generic": [
+        "Carnitine",
+        "Coenzyme Q10",
+        "Astaxanthin",
+        "Zinc",
+        "Lycopene"
+      ],
+      "class": "male fertility supplement",
+      "confirmed": true
+    },
+    "AQUASURGE MAX EYE DROP": {
+      "generic": [
+        "Carboxymethylcellulose"
+      ],
+      "class": "artificial tears",
+      "confirmed": true
+    },
+    "CINTODAC": {
+      "generic": [
+        "Cinitapride",
+        "Pantoprazole"
+      ],
+      "class": "PPI + prokinetic combo",
+      "confirmed": true
+    },
+    "COLOSPA RETARD": {
+      "generic": [
+        "Mebeverine"
+      ],
+      "class": "antispasmodic",
+      "confirmed": true
+    },
+    "COLOWIPE G": {
+      "generic": [
+        "Magnesium Sulphate",
+        "Potassium Sulphate",
+        "Sodium Sulphate"
+      ],
+      "class": "bowel prep laxative",
+      "confirmed": true,
+      "single_dose": true
+    },
+    "CREMADIET DUO GRANULES": {
+      "generic": [
+        "Lactitol",
+        "Ispaghula Husk"
+      ],
+      "class": "osmotic laxative combo",
+      "confirmed": true
+    },
+    "CYCLOPAM": {
+      "generic": [
+        "Dicyclomine",
+        "Paracetamol"
+      ],
+      "class": "antispasmodic combo",
+      "confirmed": true
+    },
+    "FLAGYL": {
+      "generic": [
+        "Metronidazole"
+      ],
+      "class": "antibiotic/antiprotozoal",
+      "confirmed": true
+    },
+    "MELOSET": {
+      "generic": [
+        "Melatonin"
+      ],
+      "class": "sleep aid",
+      "confirmed": true
+    },
+    "JALRA": {
+      "generic": [
+        "Vildagliptin"
+      ],
+      "class": "DPP-4 inhibitor",
+      "confirmed": true
+    },
+    "VILDAPRIDE": {
+      "generic": [
+        "Vildagliptin"
+      ],
+      "class": "DPP-4 inhibitor",
+      "confirmed": true
+    },
+    "EYESURGE": {
+      "generic": [
+        "Astaxanthin",
+        "Lutein",
+        "Zeaxanthin",
+        "Bilberry Extract",
+        "Tocotrienol",
+        "Resveratrol",
+        "Zinc",
+        "Copper"
+      ],
+      "class": "eye antioxidant supplement",
+      "confirmed": true
+    },
+    "CHAMPIX": {
+      "generic": [
+        "Varenicline"
+      ],
+      "class": "smoking cessation",
+      "confirmed": true
+    },
+    "CHAMPIX STARTER": {
+      "generic": [
+        "Varenicline"
+      ],
+      "class": "smoking cessation",
+      "confirmed": true
+    },
+    "LUBREX EYE DROPS": {
+      "generic": [
+        "Carboxymethylcellulose"
+      ],
+      "class": "artificial tears",
+      "confirmed": true
+    },
+    "NEXITO PLUS": {
+      "generic": [
+        "Escitalopram",
+        "Clonazepam"
+      ],
+      "class": "SSRI + benzodiazepine combo",
+      "confirmed": true
+    },
+    "STUGERON": {
+      "generic": [
+        "Cinnarizine"
+      ],
+      "class": "antihistamine/antivertigo",
+      "confirmed": true
+    },
+    "SPIROMONT B": {
+      "generic": [
+        "Bilastine",
+        "Montelukast"
+      ],
+      "class": "antihistamine + leukotriene antagonist combo",
+      "confirmed": true
+    }
   }
 }

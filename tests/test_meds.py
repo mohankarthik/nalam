@@ -49,12 +49,12 @@ class TestBrandToMolecule:
 
     def test_unconfirmed_brand_yields_no_molecule(self, table) -> None:
         """An unconfirmed brand keeps its own name rather than acquiring a
-        plausible-looking generic. (GB 29 SR used to live here; a human has since
-        confirmed it as methylcobalamin + pregabalin, which is the system working.)"""
-        d = lookup("PLATIFY", table)
+        plausible-looking generic. (GB 29 SR and PLATIFY used to live here; a
+        human has since confirmed them, which is the system working.)"""
+        d = lookup("GLUCONORM AV", table)
         assert d is not None and not d.confirmed
-        assert molecules("PLATIFY", table) == []
-        assert d.display == "PLATIFY", "must not acquire a plausible-looking generic"
+        assert molecules("GLUCONORM AV", table) == []
+        assert d.display == "GLUCONORM AV", "must not acquire a plausible-looking generic"
 
     def test_unknown_brand_is_not_invented(self, table) -> None:
         assert lookup("SOMETHING NOBODY HAS HEARD OF", table) is None
