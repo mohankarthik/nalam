@@ -45,7 +45,7 @@ from typing import Any, Optional
 
 import requests
 
-from src import qa
+from src import extract_queue, qa
 from src.constants import CONSUMABLE_EXT, DOCUMENT_TYPE, MAGIC, MEDICAL_ROOT, SPECIALTIES_CONFIG
 from src.drive_sync import _key, load_state, save_state
 from src.paperless import Paperless
@@ -157,6 +157,28 @@ def _suffix(filename: str, content: bytes) -> Optional[str]:
     return None
 
 
+def send_message(token: str, chat_id: int, text: str) -> None:
+    """Plain text, no parse_mode -- error text often carries a file path or
+    exception message with underscores/parens/etc that break Telegram's
+    Markdown parser. A malformed-entity 400 doesn't raise (requests only
+    raises on connection errors), so an unchecked send silently vanishes.
+
+    A free function, not a method, so run_extract_queue.py's follow-up
+    messages (sent from a separate cron tick, with no TelegramDocBot instance
+    around) can reuse it too.
+    """
+    try:
+        resp = requests.post(
+            API_URL.format(token=token, method="sendMessage"),
+            json={"chat_id": chat_id, "text": text},
+            timeout=HTTP_TIMEOUT,
+        )
+        if not resp.ok:
+            logger.warning(f"Telegram reply rejected ({resp.status_code}): {resp.text[:200]}")
+    except requests.RequestException as e:
+        logger.warning(f"Failed to send Telegram reply: {e}")
+
+
 def _load_token() -> str:
     from src.constants import SECRETS_DIR
 
@@ -193,20 +215,7 @@ class TelegramDocBot:
         return resp.json().get("result", [])
 
     def send_message(self, chat_id: int, text: str) -> None:
-        """Plain text, no parse_mode -- error text often carries a file path or
-        exception message with underscores/parens/etc that break Telegram's
-        Markdown parser. A malformed-entity 400 doesn't raise (requests only
-        raises on connection errors), so an unchecked send silently vanishes."""
-        try:
-            resp = requests.post(
-                self._api("sendMessage"),
-                json={"chat_id": chat_id, "text": text},
-                timeout=HTTP_TIMEOUT,
-            )
-            if not resp.ok:
-                logger.warning(f"Telegram reply rejected ({resp.status_code}): {resp.text[:200]}")
-        except requests.RequestException as e:
-            logger.warning(f"Failed to send Telegram reply: {e}")
+        send_message(self.token, chat_id, text)
 
     def _download(self, file_id: str) -> tuple[bytes, str]:
         resp = requests.get(self._api("getFile"), params={"file_id": file_id}, timeout=HTTP_TIMEOUT)
@@ -368,10 +377,22 @@ class TelegramDocBot:
         sync_state[_key(path, rel)] = rel
         save_state(sync_state)
 
+        # Extraction is an LLM call (10-30s+) and would blow this tick's
+        # ~60s budget -- queue it instead, drained by run_extract_queue.py on
+        # its own cron tick. See docs/telegram_ingest_queue.md.
+        extract_queue.enqueue(
+            rel=rel,
+            correspondent=parsed.correspondent,
+            tag=parsed.tag,
+            title=parsed.title,
+            date=parsed.date,
+            chat_id=chat_id,
+        )
+
         self.send_message(
             chat_id,
             f"✓ Filed: {parsed.correspondent} · {parsed.tag} · {parsed.date} ({task}). "
-            "Extraction runs on the next daily pass.",
+            "Extraction queued -- I'll follow up shortly.",
         )
         return True
 

@@ -30,6 +30,86 @@ from src.units import convert, load_units
 logger = logging.getLogger(__name__)
 
 
+def ingest_document(
+    con,
+    doc,
+    ocr_text: Optional[str] = None,
+    paperless_id: Optional[int] = None,
+) -> dict:
+    """Route one document to its extractor and ingest it. Returns a result dict.
+
+    Same precedence run_extract.py's nightly batch passes use (is_lab ->
+    ingest_lab, is_discharge -> ingest_discharge, else classify() ->
+    prescription -> ingest_prescription), now shared with the on-demand queue
+    (run_extract_queue.py) so nightly and on-demand routing can never drift
+    apart. Radiology is deliberately excluded: it has no trusted extractor yet
+    (see CLAUDE.md), so it stays a manual, explicit `--radiology` pass.
+
+    ``ocr_text`` is only useful to the prescription branch (labs and discharge
+    summaries corroborate off the PDF's own text layer; see src/extractor.py).
+    """
+    from src.extractor import classify, is_discharge, is_encrypted, is_lab
+
+    if doc.suffix != ".pdf":
+        return {"doc_type": "unsupported", "note": "not a PDF"}
+
+    doc_date: Optional[datetime.date] = None
+    if doc.created:
+        try:
+            doc_date = datetime.date.fromisoformat(doc.created)
+        except ValueError:
+            doc_date = None
+
+    if is_lab(doc):
+        committed, queued = ingest_lab(
+            con,
+            rel_path=doc.rel,
+            subject=doc.correspondent,
+            doc_date=doc_date,
+            paperless_id=paperless_id,
+        )
+        return {"doc_type": "lab", "committed": committed, "review": queued}
+
+    if is_discharge(doc):
+        meds, encs, misfiled = ingest_discharge(
+            con,
+            rel_path=doc.rel,
+            subject=doc.correspondent,
+            doc_date=doc_date,
+            paperless_id=paperless_id,
+        )
+        return {
+            "doc_type": "discharge",
+            "medications": meds,
+            "encounters": encs,
+            "misfiled": misfiled,
+        }
+
+    path = os.path.join(MEDICAL_ROOT, doc.rel)
+    pdf = open(path, "rb").read()
+    if is_encrypted(pdf):
+        return {"doc_type": "encrypted", "note": "password-protected, cannot extract"}
+
+    kind = classify(pdf, source=doc.rel)["doc_type"]
+    if kind == "prescription":
+        meds, bad, misfiled = ingest_prescription(
+            con,
+            doc.rel,
+            doc.correspondent,
+            ocr_text=ocr_text,
+            doc_date=doc_date,
+            paperless_id=paperless_id,
+        )
+        return {
+            "doc_type": "prescription",
+            "medications": meds,
+            "uncorroborated": bad,
+            "misfiled": misfiled,
+        }
+
+    return {"doc_type": kind, "note": "no extractor for this document type yet"}
+
+
 def ingest_lab(
     con,
     rel_path: str,

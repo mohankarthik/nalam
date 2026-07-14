@@ -24,3 +24,8 @@ SHELL=/bin/sh
 # Every minute: poll Telegram for incoming scans, file straight into
 # Paperless. Cheap no-op when unconfigured (see run_telegram_bot.py).
 * * * * * cd /app && python run_telegram_bot.py
+
+# Every minute: drain the on-demand extraction queue a Telegram filing just
+# added to (see run_extract_queue.py). Cheap no-op tick when the queue is
+# empty -- still pushes a Paperless health heartbeat every tick regardless.
+* * * * * cd /app && python run_extract_queue.py

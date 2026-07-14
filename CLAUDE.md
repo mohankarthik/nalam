@@ -33,6 +33,9 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 ./venv/bin/python run_extract.py --review   # what is not trusted, and why
 ./venv/bin/python run_extract.py --reclassify  # re-resolve unnamed analytes (FREE, no LLM)
 
+# --- Telegram on-demand extraction (docs/telegram_ingest_queue.md) ---
+./venv/bin/python run_extract_queue.py  # drain the queue Telegram filing adds to; cron, 1 min
+
 # --- Medicines ---
 ./venv/bin/python run_meds.py --list --person dad
 ./venv/bin/python run_meds.py --reconcile
@@ -204,6 +207,12 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
 All 470 PDFs classified **by content**: 168 prescription · 157 lab · 61 radiology · 36 insurance ·
 15 discharge · 12 vaccination. Labs, discharges and prescriptions are extracted.
 **Radiology (61 documents) is not.**
+
+A Telegram-filed document now extracts on-demand instead of waiting for the nightly pass — see
+`docs/telegram_ingest_queue.md`. Filing enqueues (`src/extract_queue.py`); `run_extract_queue.py`
+(new 1-min cron tick) drains it, watching Paperless's own health (`src/monitor.py` → Uptime-Kuma)
+so an outage skips the tick entirely rather than extracting without a chance at independent
+corroboration. Needs `NALAM_PAPERLESS_PUSH_URL` wired at deploy time.
 
 ### Medication review — resume here
 

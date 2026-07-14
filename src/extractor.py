@@ -31,6 +31,41 @@ LAB_CONFIG = "data/configs/lab.json"
 DISCHARGE_CONFIG = "data/configs/discharge.json"
 
 
+def is_lab(doc: Any) -> bool:
+    """Is this a lab report?
+
+    The folder says WHO the patient is (authoritative). It does not say what
+    KIND of document this is: many lab reports sit outside a folder named
+    'Reports' -- they land under a specialty or admission folder instead. Routing
+    on the folder skipped every one of them.
+
+    So: the Reports folder, OR a title that names a test. Keyword matching, not
+    classification -- see the limits noted in data/configs/lab.json.
+    """
+    import re
+
+    with open(LAB_CONFIG, encoding="utf-8") as f:
+        routing = json.load(f)["routing"]
+
+    if doc.tag in routing["tags"]:
+        return True
+    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
+
+
+def is_discharge(doc: Any) -> bool:
+    """Is this a discharge summary?
+
+    Routed on the TITLE, not the folder: an Admissions folder groups an EPISODE, not a
+    document type. Most of what is in it are the labs and scans from the stay;
+    only a handful are actual summaries.
+    """
+    import re
+
+    with open(DISCHARGE_CONFIG, encoding="utf-8") as f:
+        routing = json.load(f)["routing"]
+    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
+
+
 @dataclass
 class Extraction:
     person: str

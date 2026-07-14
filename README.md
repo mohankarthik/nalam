@@ -52,6 +52,7 @@ cp data/people.example.json  data/people.json      # your family
 ./venv/bin/python run_extract.py              # PDFs  -> health.db
 ./venv/bin/python run_extract.py --review     # what is not trusted, and why
 ./venv/bin/python run_extract.py --reclassify # re-resolve analytes (free, offline)
+./venv/bin/python run_extract_queue.py        # drain the Telegram on-demand queue (cron, 1 min)
 ./venv/bin/python run_meds.py --list --person dad
 ./venv/bin/python run_meds.py --reconcile
 ./venv/bin/python -m tools.reresolve_drugs    # backfill molecules (free, offline)

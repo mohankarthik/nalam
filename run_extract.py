@@ -12,55 +12,22 @@ review queue with a reason. Nothing is dropped.
 from __future__ import annotations
 
 import argparse
-import datetime
 import json
 import logging
-import re
 
 from src import cache, db
 from src.drive_sync import collect
 from src.extractor import (
     CLASSIFY_CONFIG,
-    DISCHARGE_CONFIG,
-    LAB_CONFIG,
     classify,
+    is_discharge,
     is_encrypted,
+    is_lab,
 )
-from src.ingest import ingest_discharge, ingest_lab, ingest_prescription, ingest_radiology
+from src.ingest import ingest_document, ingest_radiology
 from src.paperless import Paperless, id_for, ocr_for
 
 logger = logging.getLogger(__name__)
-
-
-def is_lab(doc) -> bool:
-    """Is this a lab report?
-
-    The folder says WHO the patient is (authoritative). It does not say what
-    KIND of document this is: many lab reports sit outside a folder named
-    'Reports' -- they land under a specialty or admission folder instead. Routing
-    on the folder skipped every one of them.
-
-    So: the Reports folder, OR a title that names a test. Keyword matching, not
-    classification -- see the limits noted in data/configs/lab.json.
-    """
-    with open(LAB_CONFIG, encoding="utf-8") as f:
-        routing = json.load(f)["routing"]
-
-    if doc.tag in routing["tags"]:
-        return True
-    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
-
-
-def is_discharge(doc) -> bool:
-    """Is this a discharge summary?
-
-    Routed on the TITLE, not the folder: an Admissions folder groups an EPISODE, not a
-    document type. Most of what is in it are the labs and scans from the stay;
-    only a handful are actual summaries.
-    """
-    with open(DISCHARGE_CONFIG, encoding="utf-8") as f:
-        routing = json.load(f)["routing"]
-    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
 
 
 def run_discharge(con, limit: int = 0) -> None:
@@ -79,27 +46,23 @@ def run_discharge(con, limit: int = 0) -> None:
     logger.info(f"{len(todo)} discharge summaries to extract")
     paperless_ids = Paperless().document_id_index()
     for i, d in enumerate(todo, 1):
-        doc_date = datetime.date.fromisoformat(d.created) if d.created else None
         try:
-            meds, encs, misfiled = ingest_discharge(
-                con,
-                rel_path=d.rel,
-                subject=d.correspondent,
-                doc_date=doc_date,
-                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
+            result = ingest_document(
+                con, d, paperless_id=id_for(paperless_ids, d.correspondent, d.rel)
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
             continue
         note = ""
-        if misfiled:
+        if result.get("misfiled"):
             note = (
                 f"  ** MISFILED: folder says {d.correspondent}, "
-                f"document says {misfiled} -> filed under {misfiled}"
+                f"document says {result['misfiled']} -> filed under {result['misfiled']}"
             )
         logger.info(
             f"[{i}/{len(todo)}] {d.correspondent} | {d.title} -> "
-            f"{encs} encounter, {meds} medications{note}"
+            f"{result.get('encounters', 0)} encounter, "
+            f"{result.get('medications', 0)} medications{note}"
         )
 
 
@@ -194,24 +157,27 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
 
     for i, d in enumerate(todo, 1):
         try:
-            n, bad, moved = ingest_prescription(
+            result = ingest_document(
                 con,
-                d.rel,
-                d.correspondent,
+                d,
                 ocr_text=ocr_for(ocr, d.correspondent, d.rel),
                 paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
             continue
-        uncorroborated += bad
-        if moved:
+        uncorroborated += result.get("uncorroborated", 0)
+        if result.get("misfiled"):
             misfiled += 1
             logger.warning(
-                f"[{i}/{len(todo)}] MISFILED: {d.rel} names {moved}, not {d.correspondent}"
+                f"[{i}/{len(todo)}] MISFILED: {d.rel} names {result['misfiled']}, "
+                f"not {d.correspondent}"
             )
         if i % 20 == 0 or i == len(todo):
-            logger.info(f"  [{i}/{len(todo)}] {d.correspondent} | {d.title[:30]} -> {n} meds")
+            logger.info(
+                f"  [{i}/{len(todo)}] {d.correspondent} | {d.title[:30]} -> "
+                f"{result.get('medications', 0)} meds"
+            )
 
     logger.info(
         f"\ndone. {uncorroborated} drugs not corroborated by an independent reading "
@@ -374,18 +340,13 @@ def main() -> None:
     logger.info(f"{len(labs)} lab PDFs, {len(todo)} to extract")
     paperless_ids = Paperless().document_id_index()
     for i, d in enumerate(todo, 1):
-        doc_date = datetime.date.fromisoformat(d.created) if d.created else None
         try:
-            committed, queued = ingest_lab(
-                con,
-                rel_path=d.rel,
-                subject=d.correspondent,
-                doc_date=doc_date,
-                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
+            result = ingest_document(
+                con, d, paperless_id=id_for(paperless_ids, d.correspondent, d.rel)
             )
             logger.info(
                 f"[{i}/{len(todo)}] {d.correspondent} | {d.title} -> "
-                f"{committed} observations, {queued} to review"
+                f"{result.get('committed', 0)} observations, {result.get('review', 0)} to review"
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")

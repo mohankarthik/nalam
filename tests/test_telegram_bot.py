@@ -113,3 +113,67 @@ class TestTitle:
     def test_omitted_title_and_type_falls_back_to_general(self) -> None:
         parsed = bot.parse_caption("Wife", TAG_MAP, DEFAULT_TAG)
         assert parsed.title == "General"
+
+
+class TestProcessMessageEnqueuesExtraction:
+    """A filed document is queued for extraction, not extracted inline.
+
+    Extraction is an LLM call (10-30s+) and would blow the bot's ~60s tick
+    budget if run inline -- see docs/telegram_ingest_queue.md. process_message()
+    must enqueue and reply immediately, never block on ingest_document().
+    """
+
+    def _bot(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> bot.TelegramDocBot:
+        monkeypatch.setattr(bot, "MEDICAL_ROOT", str(tmp_path))
+        monkeypatch.setattr(bot, "Paperless", lambda: _FakePaperless())
+        monkeypatch.setattr(bot, "load_state", lambda: {})
+        monkeypatch.setattr(bot, "save_state", lambda state: None)
+
+        instance = bot.TelegramDocBot.__new__(bot.TelegramDocBot)
+        instance.token = "test-token"
+        instance.state_path = str(tmp_path / "state.json")
+        instance.allowed_chat_id = 1
+        instance.allowed_users = {1: "Someone"}
+        instance.state = {}
+        instance.paperless = _FakePaperless()
+        return instance
+
+    def test_success_enqueues_and_does_not_extract_inline(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        instance = self._bot(tmp_path, monkeypatch)
+
+        enqueued = {}
+        monkeypatch.setattr(bot.extract_queue, "enqueue", lambda **kw: enqueued.update(kw))
+        sent = []
+        monkeypatch.setattr(instance, "send_message", lambda chat_id, text: sent.append(text))
+        monkeypatch.setattr(instance, "_download", lambda file_id: (b"%PDF-1.4 fake", "scan.pdf"))
+
+        message = {
+            "chat": {"id": 1},
+            "from": {"id": 1},
+            "caption": "Wife | | 2026-01-01 | Thyroid",
+            "document": {"file_id": "abc", "file_name": "scan.pdf"},
+        }
+        result = instance.process_message(message)
+
+        assert result is True
+        assert enqueued["correspondent"] == "Alice Example"
+        assert enqueued["chat_id"] == 1
+        assert enqueued["title"] == "Thyroid"
+        assert any("queued" in t.lower() for t in sent)
+        assert not any("daily pass" in t.lower() for t in sent)
+
+
+class _FakePaperless:
+    def correspondent_id(self, name: str, create: bool = False) -> int:
+        return 1
+
+    def tag_id(self, name: str) -> int:
+        return 2
+
+    def document_type_id(self, name: str) -> int:
+        return 3
+
+    def upload(self, **kwargs) -> str:
+        return "task-id"
