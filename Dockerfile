@@ -16,10 +16,12 @@ RUN pip install -r requirements.txt
 # App code + medical-knowledge configs baked in (no identities -- see
 # CLAUDE.md's committed/gitignored table); personal data (secrets/,
 # data/settings.json, data/people.json, data/analytes.json, data/health.db,
-# data/state/, data/llm/) is bind-mounted at runtime.
-COPY run_sync.py run_extract.py run_meds.py ./
+# data/state/, data/llm/, plugins/telegram_bot/settings.json) is bind-mounted
+# at runtime (see .dockerignore).
+COPY run_sync.py run_extract.py run_meds.py run_telegram_bot.py ./
 COPY src/ ./src/
 COPY tools/ ./tools/
+COPY plugins/ ./plugins/
 COPY data/aliases.json data/units.json data/drugs.json data/analytes_extra.json data/specialties.json ./data/
 COPY data/configs/ ./data/configs/
 COPY crontab ./crontab

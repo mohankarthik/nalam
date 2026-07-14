@@ -8,6 +8,7 @@ data/health.db
 data/health.db.*
 data/state/
 data/llm/
+plugins/telegram_bot/settings.json
 
 # Dev / VCS / caches
 .git/

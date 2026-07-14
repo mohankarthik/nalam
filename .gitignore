@@ -5,6 +5,7 @@ secrets/
 # The *.example.json files in data/ are the committed schema.
 data/settings.json
 data/people.json
+plugins/telegram_bot/settings.json
 
 # The codebook is generated from the user's own spreadsheet and encodes which
 # tests they track and the ranges they chose. Personal.

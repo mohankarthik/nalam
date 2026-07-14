@@ -20,3 +20,7 @@ SHELL=/bin/sh
 # for review. Read-only -- it never writes a decision on its own; that's
 # always `run_meds.py --decide`, by a human.
 0 5 * * 0 cd /app && python run_meds.py --reconcile
+
+# Every minute: poll Telegram for incoming scans, file straight into
+# Paperless. Cheap no-op when unconfigured (see run_telegram_bot.py).
+* * * * * cd /app && python run_telegram_bot.py
