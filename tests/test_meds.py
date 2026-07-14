@@ -850,3 +850,49 @@ class TestAVaccineIsNotSomethingYouAreOn:
         rows = meds.history(self.build(tmp_path), subject="Alice Doe")
         given = {r["drug"] for r in rows}
         assert {"Rotateq", "Prevenar", "Hexaxim", "Beyfortus"} <= given
+
+
+class TestForConditionMatchesColloquialAndClinicalWording:
+    """A person asks "what did she get for a cold"; the discharge summary says
+    "AURTI". Neither wording is wrong -- they're the same fact -- so
+    for_condition() must find it under either. See src/conditions.py."""
+
+    def build(self, tmp_path):
+        import sqlite3
+
+        from src import db
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) "
+            "VALUES ('A Child', 'p.pdf', 'prescription')"
+        )
+        doc_id = con.execute("SELECT id FROM documents").fetchone()["id"]
+        con.execute(
+            "INSERT INTO encounters (document_id, subject, admitted, diagnoses, reason) "
+            "VALUES (?, 'A Child', '2024-03-01', '[\"AURTI\"]', '')",
+            (doc_id,),
+        )
+        con.execute(
+            "INSERT INTO medication_events "
+            "(document_id, subject, drug, event, effective, raw_text) "
+            "VALUES (?, 'A Child', 'Cetzine', 'prescribed', '2024-03-01', 'Cetzine')",
+            (doc_id,),
+        )
+        con.commit()
+        return con
+
+    def test_colloquial_query_finds_the_clinical_diagnosis(self, tmp_path) -> None:
+        from src import meds
+
+        episodes = meds.for_condition(self.build(tmp_path), "cold", subject="A Child")
+        assert len(episodes) == 1
+        assert episodes[0]["medications"][0]["drug"] == "Cetzine"
+
+    def test_the_clinical_wording_still_matches_directly(self, tmp_path) -> None:
+        from src import meds
+
+        episodes = meds.for_condition(self.build(tmp_path), "AURTI", subject="A Child")
+        assert len(episodes) == 1

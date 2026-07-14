@@ -65,10 +65,12 @@ class TestExtractPerson:
     def test_resolves_by_alias(self) -> None:
         person, msg = qa.extract_person("what's dad on for BP?")
         assert msg == ""
+        assert person is not None
         assert person.correspondent == "Bob Example"
 
     def test_resolves_by_correspondent_name(self) -> None:
         person, msg = qa.extract_person("Alice Example's latest HbA1c")
+        assert person is not None
         assert person.correspondent == "Alice Example"
 
     def test_no_name_asks_rather_than_guesses(self) -> None:
@@ -180,3 +182,74 @@ class TestGetEncounters:
         assert len(rows) == 1
         assert rows[0]["diagnoses"] == ["dengue"]
         assert rows[0]["document_id"] == doc_id
+
+
+class TestGetMedicationHistory:
+    """list_medications hides an expired 5-day course; history must not --
+    this is exactly the gap that made the bot say 'no record' for a course
+    that had already ended (see the docstring on get_medication_history)."""
+
+    def test_finds_an_expired_course_hidden_from_list_medications(self, con) -> None:
+        doc_id = _doc(con, subject="A Child", doc_type="prescription", paperless_id=11)
+        con.execute(
+            """INSERT INTO medication_events
+                 (document_id, subject, drug, strength, frequency, duration,
+                  event, effective, raw_text)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (
+                doc_id,
+                "A Child",
+                "CETZINE",
+                "5mg",
+                "0-0-1",
+                "5 days",
+                "prescribed",
+                "2024-03-01",
+                "Cetzine 5mg x 5 days",
+            ),
+        )
+        con.commit()
+
+        assert qa.list_medications(con, "A Child") == [], "expired course, correctly hidden"
+
+        rows = qa.get_medication_history(con, "A Child")
+        assert len(rows) == 1
+        assert rows[0]["medicine"] == "CETZINE"
+        assert rows[0]["document_id"] == doc_id
+
+    def test_filters_by_drug(self, con) -> None:
+        doc_id = _doc(con, subject="A Child", doc_type="prescription", paperless_id=12)
+        meds.record_decision(
+            con,
+            subject="A Child",
+            drug="CETZINE",
+            event="prescribed",
+            effective="2024-03-01",
+            document_id=doc_id,
+        )
+        assert (
+            len(qa.get_medication_history(con, "A Child", drug="cetirizine")) == 0
+        ), "record_decision doesn't map a molecule -- brand search still works"
+        assert len(qa.get_medication_history(con, "A Child", drug="CETZINE")) == 1
+
+
+class TestGetMedicationsForCondition:
+    def test_finds_medicines_by_free_text_reason(self, con) -> None:
+        doc_id = _doc(con, subject="A Child", doc_type="prescription", paperless_id=13)
+        con.execute(
+            """INSERT INTO encounters (document_id, subject, admitted, reason, diagnoses)
+               VALUES (?,?,?,?,?)""",
+            (doc_id, "A Child", "2024-03-01", "cold and cough", "[]"),
+        )
+        con.execute(
+            """INSERT INTO medication_events
+                 (document_id, subject, drug, event, effective, raw_text)
+               VALUES (?,?,?,?,?,?)""",
+            (doc_id, "A Child", "Cetzine", "prescribed", "2024-03-01", "Cetzine"),
+        )
+        con.commit()
+
+        episodes = qa.get_medications_for_condition(con, "A Child", "cold")
+        assert len(episodes) == 1
+        assert episodes[0]["medications"][0]["medicine"] == "Cetzine"
+        assert episodes[0]["document_id"] == doc_id

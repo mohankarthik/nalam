@@ -18,6 +18,7 @@ SECRETS_DIR = "secrets"
 SETTINGS_CONFIG = os.path.join(DATA_DIR, "settings.json")
 PEOPLE_CONFIG = os.path.join(DATA_DIR, "people.json")
 SPECIALTIES_CONFIG = os.path.join(DATA_DIR, "specialties.json")
+CONDITIONS_CONFIG = os.path.join(DATA_DIR, "conditions.json")
 SYNC_STATE = os.path.join(STATE_DIR, "synced.json")
 
 

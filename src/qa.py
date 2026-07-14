@@ -180,6 +180,74 @@ def get_encounters(
     ]
 
 
+def get_medication_history(
+    con: sqlite3.Connection, subject: str, drug: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Every medication EVENT ever recorded, unfiltered -- unlike
+    list_medications, this does not hide expired courses, children's
+    prescriptions, or one-offs. This is the tool for "when did we last give
+    her cetirizine" or "what was she on for her hand-foot-and-mouth" -- and,
+    critically, for anything list_medications hid because it already ended
+    (a short antibiotic course, a child's prescription): a "no current
+    medication" answer from list_medications does NOT mean nothing was ever
+    given, and this tool is how that distinction gets checked before saying
+    "no record"."""
+    rows = meds.history(con, subject=subject, drug=drug)
+    return [
+        {
+            "medicine": meds.display_name(r["drug"], r["generic"]),
+            "event": r["event"],
+            "date": r["effective"],
+            "confirmed": r["status"] == "ok",
+            "diagnoses": r["diagnoses"],
+            "reason": r["reason"],
+            "document_id": r["document_id"],
+        }
+        for r in rows
+    ]
+
+
+def get_medications_for_condition(
+    con: sqlite3.Connection, subject: str, condition: str
+) -> list[dict[str, Any]]:
+    """What was prescribed for a given diagnosis or complaint, e.g. "hand foot
+    and mouth" or "cold" -- matches against the encounter's recorded diagnoses
+    AND its free-text reason. The colloquial term you were asked is expanded
+    against clinical shorthand too (data/conditions.json: "cold" also matches
+    "URTI"/"AURTI").
+
+    That mapping is not exhaustive. Rather than trust the model to remember a
+    prompt rule and call get_medication_history itself when this comes back
+    empty, this tool does it FOR the model: an empty condition match falls
+    back to the full, unfiltered history here, so one tool call always has
+    enough to reason over instead of depending on prompt compliance for the
+    one thing this feature exists to fix ("no record" for a drug that was, in
+    fact, given)."""
+    episodes = meds.for_condition(con, condition, subject=subject)
+    if not episodes:
+        return get_medication_history(con, subject)
+    return [
+        {
+            "date": e["date"],
+            "diagnoses": json.loads(e["diagnoses"] or "[]"),
+            "reason": e["reason"],
+            "follow_up": e["follow_up"],
+            "medications": [
+                {
+                    "medicine": meds.display_name(m["drug"], m["generic"]),
+                    "strength": m["strength"],
+                    "frequency": m["frequency"],
+                    "duration": m["duration"],
+                    "confirmed": m["status"] == "ok",
+                }
+                for m in e["medications"]
+            ],
+            "document_id": e["document_id"],
+        }
+        for e in episodes
+    ]
+
+
 # --- LLM orchestration -------------------------------------------------------
 
 TOOLS = [
@@ -230,6 +298,49 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_medication_history",
+            "description": "Every medication event ever recorded for this person, including "
+            "expired courses, children's prescriptions and one-offs that "
+            "list_medications hides because they already ended. ALWAYS call this "
+            "before saying there is no record of a medicine, an antibiotic course, "
+            "or anything similar -- 'not currently on it' and 'never had it' are "
+            "different facts, and only this tool can tell them apart.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "drug": {
+                        "type": "string",
+                        "description": "Brand or molecule name to filter by, e.g. "
+                        "'cetirizine'. Omit for the whole history.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_medications_for_condition",
+            "description": "What was prescribed for a diagnosis or complaint, e.g. 'cold', "
+            "'fever', 'hand foot and mouth'. Use this for any 'what did they get "
+            "for X' question -- it searches the encounter's diagnoses AND its "
+            "free-text reason, so an informal complaint that never got a named "
+            "diagnosis (most colds) is still found.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "condition": {
+                        "type": "string",
+                        "description": "The diagnosis or complaint to search for.",
+                    },
+                },
+                "required": ["condition"],
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """You answer questions about {person}'s medical history, using \
@@ -237,8 +348,22 @@ ONLY the tools given to you -- never your own medical knowledge, and never a \
 number or date you were not handed by a tool.
 
 Rules:
-- If a tool returns nothing relevant, say plainly that there is no trustworthy \
-record of it. Do not fill the gap with medical knowledge or a guess.
+- list_medications only shows what's believed CURRENT. Before telling anyone \
+there is no record of a medicine, a course, or "what was given for X", you \
+MUST also check get_medication_history -- an expired course or a child's \
+prescription won't show up in list_medications, but it is still there.
+- get_medications_for_condition expands common colloquial/clinical pairs \
+(e.g. "cold" also matches "URTI"/"AURTI") and, if nothing matches even after \
+that, falls back to the full history itself -- so an empty-looking result \
+from it can still hand you real events. Read each one's own \
+diagnoses/reason yourself: you ARE allowed to recognize that a coded \
+diagnosis you were HANDED BY A TOOL (e.g. "AURTI") matches the \
+plain-language condition asked about (e.g. "cold") -- that is reading \
+what's on record, not guessing a value that isn't there.
+- Only after checking get_medication_history (directly, or via \
+get_medications_for_condition's fallback) and finding nothing relevant \
+should you say there is no trustworthy record of it. Never fill a real gap \
+with medical knowledge or a guess.
 - Repeat every date and caveat a tool gives you VERBATIM. If a medicine is \
 `"confirmed": false`, say it is unconfirmed. If `"stale": true`, say nobody has \
 confirmed it recently and it may have stopped -- do not silently drop this.
@@ -255,6 +380,10 @@ def _dispatch(con: sqlite3.Connection, subject: str) -> dict[str, Callable[..., 
             con, subject, analyte, since
         ),
         "get_encounters": lambda since=None: get_encounters(con, subject, since),
+        "get_medication_history": lambda drug=None: get_medication_history(con, subject, drug),
+        "get_medications_for_condition": lambda condition: get_medications_for_condition(
+            con, subject, condition
+        ),
     }
 
 

@@ -32,24 +32,10 @@ OUT = os.path.expanduser("~/nalam-drug-review.md")
 VIEWER = str(SETTINGS.get("paperless_viewer_url") or PAPERLESS_URL).rstrip("/")
 
 
-def paperless_ids() -> dict[tuple[str, str], int]:
-    """{(correspondent, filename) -> paperless document id}, for deep links."""
-    api = Paperless()
-    correspondents = {c["id"]: c["name"] for c in api._get_all("correspondents")}
-    index: dict[tuple[str, str], int] = {}
-    for doc in api._get_all("documents"):
-        key = (
-            correspondents.get(doc["correspondent"], ""),
-            fold_filename(doc.get("original_file_name") or ""),
-        )
-        index[key] = doc["id"]
-    return index
-
-
 def main() -> None:
     con = db.connect()
     table = load_drugs()
-    links = paperless_ids()
+    links = Paperless().document_id_index()
 
     rows = con.execute("""SELECT m.id, m.subject, m.drug, m.strength, m.frequency, m.duration,
                   m.review_reason, d.doc_date, d.source_path, d.doc_type

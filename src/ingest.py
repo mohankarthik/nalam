@@ -241,6 +241,7 @@ def ingest_discharge(
     rel_path: str,
     subject: str,
     doc_date: Optional[datetime.date] = None,
+    paperless_id: Optional[int] = None,
 ) -> tuple[int, int, Optional[str]]:
     """Ingest a discharge summary. Returns (medications, encounters, misfiled_to).
 
@@ -328,6 +329,7 @@ def ingest_discharge(
 
     document_id = db.upsert_document(
         con,
+        paperless_id=paperless_id,
         subject=actual,
         source_path=rel_path,
         doc_type="discharge",
@@ -535,6 +537,7 @@ def ingest_prescription(
     subject: str,
     ocr_text: Optional[str] = None,
     doc_date: Optional[datetime.date] = None,
+    paperless_id: Optional[int] = None,
 ) -> tuple[int, int, Optional[str]]:
     """Ingest a consultation / prescription. Returns (meds, uncorroborated, misfiled_to).
 
@@ -566,6 +569,7 @@ def ingest_prescription(
     cons = p.consultation
     document_id = db.upsert_document(
         con,
+        paperless_id=paperless_id,
         subject=actual,
         source_path=rel_path,
         doc_type="prescription",
@@ -697,6 +701,7 @@ def ingest_radiology(
     subject: str,
     ocr_text: Optional[str] = None,
     doc_date: Optional[datetime.date] = None,
+    paperless_id: Optional[int] = None,
 ) -> tuple[int, int, int, Optional[str]]:
     """Ingest an imaging report. Returns (measurements, findings, untrusted, misfiled_to).
 
@@ -767,6 +772,7 @@ def ingest_radiology(
     study = r.study
     document_id = db.upsert_document(
         con,
+        paperless_id=paperless_id,
         subject=actual,
         source_path=rel_path,
         doc_type="radiology",

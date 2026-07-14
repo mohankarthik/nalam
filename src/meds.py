@@ -31,6 +31,13 @@ from typing import Optional
 from src.drugs import lookup
 
 
+def display_name(drug: str, generic: Optional[str]) -> str:
+    """ "Molecule (Brand)" when the molecule is known, else just the brand as
+    printed. Shared by Med.display and src/qa.py's Q&A tools, which read the
+    same drug/generic pair from a raw db row rather than a Med instance."""
+    return f"{generic} ({drug})" if generic else drug
+
+
 @dataclass
 class Med:
     drug: str
@@ -82,9 +89,7 @@ class Med:
 
     @property
     def display(self) -> str:
-        if self.generic:
-            return f"{self.generic} ({self.drug})"
-        return self.drug
+        return display_name(self.drug, self.generic)
 
 
 @dataclass
@@ -497,7 +502,7 @@ def history(
     # again -- which is a thing that happens.
     sql = """
         SELECT m.subject, m.drug, m.generic, m.strength, m.frequency, m.duration,
-               m.effective, m.status, m.event, m.entered_by,
+               m.effective, m.status, m.event, m.entered_by, m.document_id,
                d.doc_type, d.source_path,
                e.diagnoses, e.reason
         FROM medication_events m
@@ -524,23 +529,36 @@ def for_condition(
 
     "What did we give her the last time she had hand-foot-and-mouth?" -- the
     medicines are joined to the encounter that recorded WHY they were given.
+
+    `condition` is expanded through data/conditions.json before searching, so
+    the colloquial term a person actually asks with ("a cold") also matches
+    the clinical shorthand a document actually says ("AURTI") -- see
+    src/conditions.py. An unmapped term is still searched literally.
     """
+    from src.conditions import expand
+
+    # Every ROW for the subject (or everyone) is fetched -- a family's worth of
+    # encounters is at most a few hundred -- and the expanded terms are matched
+    # in Python. That trades a dynamic SQL string, sized and ordered in exact
+    # lockstep with a parallel params list, for a plain `any(term in text)`.
+    terms = [t.lower() for t in expand(condition)]
     sql = """
         SELECT e.subject, e.admitted AS date, e.diagnoses, e.reason,
                e.follow_up, d.source_path, d.id AS document_id
         FROM encounters e
         JOIN documents d ON d.id = e.document_id
-        WHERE (LOWER(IFNULL(e.diagnoses,'')) LIKE LOWER(?)
-            OR LOWER(IFNULL(e.reason,''))    LIKE LOWER(?))
     """
-    params = [f"%{condition}%", f"%{condition}%"]
+    params: list[str] = []
     if subject:
-        sql += " AND e.subject = ?"
+        sql += " WHERE e.subject = ?"
         params.append(subject)
     sql += " ORDER BY e.admitted DESC"
 
     episodes = []
     for r in con.execute(sql, params).fetchall():
+        haystack = f"{r['diagnoses'] or ''} {r['reason'] or ''}".lower()
+        if not any(t in haystack for t in terms):
+            continue
         row = dict(r)
         row["medications"] = [
             dict(m)

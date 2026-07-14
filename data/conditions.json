@@ -1,0 +1,130 @@
+{
+  "_comment": "Colloquial <-> clinical condition names, for meds.for_condition(). A layperson asks 'what did she get for a cold' but a discharge summary says 'AURTI' or 'URTI' -- a literal substring search matches neither to the other. Hand-curated, generic medical terminology only: no names, no dates, no real diagnoses from anyone's record belong here (see CLAUDE.md, 'nothing personal in this repository'). Matching is token-containment against BOTH diagnoses and the free-text reason, same as the rest of the codebook aliasing (data/aliases.json).",
+  "cold": [
+    "URTI",
+    "AURTI",
+    "upper respiratory tract infection",
+    "upper respiratory infection",
+    "common cold",
+    "coryza",
+    "rhinitis",
+    "runny nose",
+    "cough and cold"
+  ],
+  "flu": [
+    "influenza",
+    "ILI",
+    "influenza like illness"
+  ],
+  "fever": [
+    "pyrexia",
+    "febrile",
+    "PUO",
+    "pyrexia of unknown origin"
+  ],
+  "cough": [
+    "bronchitis",
+    "productive cough",
+    "dry cough"
+  ],
+  "stomach bug": [
+    "gastroenteritis",
+    "loose stools",
+    "diarrhea",
+    "diarrhoea",
+    "vomiting",
+    "AGE",
+    "acute gastroenteritis"
+  ],
+  "diabetes": [
+    "T2DM",
+    "T1DM",
+    "DM",
+    "diabetes mellitus",
+    "type 2 diabetes",
+    "type 1 diabetes"
+  ],
+  "high blood pressure": [
+    "HTN",
+    "hypertension",
+    "K/C/O HTN"
+  ],
+  "high cholesterol": [
+    "dyslipidemia",
+    "dyslipidaemia",
+    "hyperlipidemia",
+    "hyperlipidaemia"
+  ],
+  "heart disease": [
+    "CAD",
+    "coronary artery disease",
+    "ACS",
+    "acute coronary syndrome",
+    "angina",
+    "MI",
+    "myocardial infarction"
+  ],
+  "kidney problem": [
+    "AKI",
+    "CKD",
+    "acute kidney injury",
+    "chronic kidney disease",
+    "renal failure"
+  ],
+  "asthma": [
+    "reactive airway disease",
+    "RAD",
+    "wheeze",
+    "bronchial asthma"
+  ],
+  "copd": [
+    "chronic obstructive pulmonary disease",
+    "emphysema"
+  ],
+  "back pain": [
+    "lumbago",
+    "spondyloarthritis",
+    "spondylosis",
+    "inflammatory back pain",
+    "sciatica"
+  ],
+  "joint pain": [
+    "arthralgia",
+    "rheumatoid arthritis",
+    "RA",
+    "osteoarthritis",
+    "OA"
+  ],
+  "allergy": [
+    "allergic rhinitis",
+    "atopy",
+    "hay fever"
+  ],
+  "skin rash": [
+    "dermatitis",
+    "eczema",
+    "folliculitis",
+    "urticaria"
+  ],
+  "ear infection": [
+    "otitis media",
+    "AOM",
+    "acute otitis media"
+  ],
+  "hand foot and mouth": [
+    "HFMD",
+    "hand-foot-and-mouth disease",
+    "hand foot mouth disease"
+  ],
+  "stroke": [
+    "CVA",
+    "cerebrovascular accident",
+    "infarct",
+    "MCA stroke"
+  ],
+  "anemia": [
+    "anaemia",
+    "low hemoglobin",
+    "low haemoglobin"
+  ]
+}

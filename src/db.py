@@ -199,6 +199,29 @@ def upsert_document(con: sqlite3.Connection, **fields: Any) -> int:
             f"Two extractors claim this document; a human has to say which owns it."
         )
 
+    # paperless_id is UNIQUE, and it is possible for TWO source_paths to resolve
+    # to the same one -- the same physical document filed under two different
+    # Drive paths (see tools/backfill_paperless_ids.py, which hit this for real
+    # on 3 pairs). Left unchecked, the INSERT below raises a raw
+    # IntegrityError that the caller's per-document try/except swallows,
+    # dropping that document's extraction entirely over a citation-link
+    # collision. Refuse the id instead -- same rule as CLAUDE.md trap #4, two
+    # claims on one identity are both untrusted -- and let the document commit
+    # without one; a human decides which row (if either) really owns it.
+    paperless_id = fields.get("paperless_id")
+    if paperless_id is not None:
+        owner = con.execute(
+            "SELECT source_path FROM documents WHERE paperless_id = ? AND source_path != ?",
+            (paperless_id, fields["source_path"]),
+        ).fetchone()
+        if owner:
+            logger.warning(
+                f"paperless_id={paperless_id} already belongs to {owner['source_path']!r}; "
+                f"{fields['source_path']!r} resolved to the same id. Leaving it unlinked "
+                "rather than guessing which one actually owns it."
+            )
+            paperless_id = None
+
     cur = con.execute(
         """INSERT INTO documents (paperless_id, subject, source_path, doc_type,
                                   doc_date, lab, model, text_layer)
@@ -206,10 +229,15 @@ def upsert_document(con: sqlite3.Connection, **fields: Any) -> int:
                    :doc_date, :lab, :model, :text_layer)
            ON CONFLICT(source_path) DO UPDATE SET
                model = excluded.model,
+               -- COALESCE, not a bare overwrite: a re-run before Paperless has
+               -- linked this document yet passes paperless_id=NULL, and a bare
+               -- assignment would erase an id a PREVIOUS run already resolved.
+               -- Never erase a real answer with "don't know yet".
+               paperless_id = COALESCE(excluded.paperless_id, documents.paperless_id),
                extracted_at = datetime('now')
            RETURNING id""",
         {
-            "paperless_id": fields.get("paperless_id"),
+            "paperless_id": paperless_id,
             "subject": fields["subject"],
             "source_path": fields["source_path"],
             "doc_type": fields["doc_type"],

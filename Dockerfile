@@ -22,7 +22,7 @@ COPY run_sync.py run_extract.py run_meds.py run_telegram_bot.py ./
 COPY src/ ./src/
 COPY tools/ ./tools/
 COPY plugins/ ./plugins/
-COPY data/aliases.json data/units.json data/drugs.json data/analytes_extra.json data/specialties.json ./data/
+COPY data/aliases.json data/units.json data/drugs.json data/analytes_extra.json data/specialties.json data/conditions.json ./data/
 COPY data/configs/ ./data/configs/
 COPY crontab ./crontab
 

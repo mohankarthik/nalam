@@ -62,6 +62,13 @@ class Paperless:
         self.session = requests.Session()
         self.session.auth = auth or load_credentials()
         self.session.headers["Accept"] = "application/json"
+        # ocr_index() and document_id_index() both walk every correspondent and
+        # every document Paperless holds -- a run that calls both (run_extract.py's
+        # prescription/radiology passes do) would otherwise page through the same
+        # few hundred documents twice. Cached per-instance, not across instances:
+        # a long-lived Paperless() would go stale against new uploads.
+        self._correspondents: Optional[dict[int, str]] = None
+        self._documents: Optional[list[dict[str, Any]]] = None
 
     def _get_all(self, endpoint: str) -> list[dict[str, Any]]:
         """GET every page of a list endpoint."""
@@ -136,6 +143,65 @@ class Paperless:
             raise PaperlessError(f"Upload of {filename!r} failed: {resp.text[:300]}")
         return str(resp.json())
 
+    def _document_rows(self) -> tuple[dict[int, str], list[dict[str, Any]]]:
+        """(correspondent names by id, every document), fetched once and cached.
+
+        Both ocr_index() and document_id_index() need the exact same walk --
+        every correspondent, every document -- differing only in which field of
+        `doc` they keep. Caching means calling both in one run (as
+        run_extract.py's prescription/radiology passes do) pages through
+        Paperless once, not twice.
+        """
+        if self._correspondents is None:
+            self._correspondents = {c["id"]: c["name"] for c in self._get_all("correspondents")}
+        if self._documents is None:
+            self._documents = self._get_all("documents")
+        return self._correspondents, self._documents
+
+    def _keyed_index(self, value_of, kind: str) -> dict[tuple[str, str], Any]:
+        """{(correspondent, folded filename) -> value_of(doc)} for every document
+        where that key is unique.
+
+        Keyed on (correspondent, original filename), NOT on (title, date):
+        Paperless rewrites `created` from its own date detection, and a title
+        like "Prescription" occurs seven times across different dates. Joining
+        on an ambiguous key could link to (or corroborate against) SOMEBODY
+        ELSE's page -- a safety bug, not a coverage one -- so a key that is not
+        unique is DROPPED rather than guessed at.
+        """
+        correspondents, documents = self._document_rows()
+
+        seen: dict[tuple[str, str], int] = {}
+        index: dict[tuple[str, str], Any] = {}
+        for doc in documents:
+            key = (
+                correspondents.get(doc["correspondent"], ""),
+                fold_filename(doc.get("original_file_name") or ""),
+            )
+            seen[key] = seen.get(key, 0) + 1
+            value = value_of(doc)
+            if value:
+                index[key] = value
+
+        ambiguous = {k for k, n in seen.items() if n > 1}
+        for key in ambiguous:
+            index.pop(key, None)
+        if ambiguous:
+            logger.info(
+                f"{len(ambiguous)} documents share a (person, filename) key; dropped "
+                f"from the {kind} index rather than risk linking to the wrong page."
+            )
+        return index
+
+    def document_id_index(self) -> dict[tuple[str, str], int]:
+        """{(correspondent, filename) -> Paperless document id} for every document.
+
+        This is how `documents.paperless_id` gets filled in: extraction reads
+        PDFs from the Drive mount, never from Paperless, so it has no id of its
+        own until it looks one up here.
+        """
+        return self._keyed_index(lambda doc: doc["id"], kind="id")
+
     def ocr_index(self) -> dict[tuple[str, str], str]:
         """{(correspondent, filename) -> OCR text} for every document Paperless holds.
 
@@ -143,37 +209,8 @@ class Paperless:
         scanned PDF -- which has no text layer of its own -- that is the only
         independent reading of the page we have, and without an independent
         reading a vision model's output cannot be checked at all. See src/oracle.
-
-        Keyed on (correspondent, original filename), NOT on (title, date):
-        Paperless rewrites `created` from its own date detection, and a title
-        like "Prescription" occurs seven times across different dates. Joining on
-        an ambiguous key could corroborate a drug against SOMEBODY ELSE'S page --
-        a safety bug, not a coverage one. A key that is not unique is DROPPED, so
-        those documents get no oracle and go to review.
         """
-        correspondents = {c["id"]: c["name"] for c in self._get_all("correspondents")}
-
-        seen: dict[tuple[str, str], int] = {}
-        content: dict[tuple[str, str], str] = {}
-        for doc in self._get_all("documents"):
-            key = (
-                correspondents.get(doc["correspondent"], ""),
-                fold_filename(doc.get("original_file_name") or ""),
-            )
-            seen[key] = seen.get(key, 0) + 1
-            text = (doc.get("content") or "").strip()
-            if text:
-                content[key] = text
-
-        ambiguous = {k for k, n in seen.items() if n > 1}
-        for key in ambiguous:
-            content.pop(key, None)
-        if ambiguous:
-            logger.info(
-                f"{len(ambiguous)} documents share a (person, filename) key; dropped "
-                "from the OCR index rather than risk corroborating against the wrong page."
-            )
-        return content
+        return self._keyed_index(lambda doc: (doc.get("content") or "").strip(), kind="OCR")
 
 
 def fold_filename(name: str) -> str:
@@ -186,6 +223,18 @@ def fold_filename(name: str) -> str:
     return re.sub(r"\s+", " ", stem).strip().lower()
 
 
+def _index_lookup(index: dict[tuple[str, str], Any], correspondent: str, rel_path: str) -> Any:
+    """One source document's value from an (correspondent, filename)-keyed index,
+    or None if unresolved (not uploaded yet, or an ambiguous filename dropped
+    from the index). Shared by ocr_for() and id_for() -- same key, same join."""
+    return index.get((correspondent, fold_filename(os.path.basename(rel_path))))
+
+
 def ocr_for(index: dict[tuple[str, str], str], correspondent: str, rel_path: str) -> Optional[str]:
     """The OCR text for one source document, or None if there is no independent reading."""
-    return index.get((correspondent, fold_filename(os.path.basename(rel_path))))
+    return _index_lookup(index, correspondent, rel_path)
+
+
+def id_for(index: dict[tuple[str, str], int], correspondent: str, rel_path: str) -> Optional[int]:
+    """The Paperless document id for one source document, or None if unresolved."""
+    return _index_lookup(index, correspondent, rel_path)

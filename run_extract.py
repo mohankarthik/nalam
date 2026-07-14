@@ -27,7 +27,7 @@ from src.extractor import (
     is_encrypted,
 )
 from src.ingest import ingest_discharge, ingest_lab, ingest_prescription, ingest_radiology
-from src.paperless import Paperless, ocr_for
+from src.paperless import Paperless, id_for, ocr_for
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +77,16 @@ def run_discharge(con, limit: int = 0) -> None:
         todo = todo[:limit]
 
     logger.info(f"{len(todo)} discharge summaries to extract")
+    paperless_ids = Paperless().document_id_index()
     for i, d in enumerate(todo, 1):
         doc_date = datetime.date.fromisoformat(d.created) if d.created else None
         try:
             meds, encs, misfiled = ingest_discharge(
-                con, rel_path=d.rel, subject=d.correspondent, doc_date=doc_date
+                con,
+                rel_path=d.rel,
+                subject=d.correspondent,
+                doc_date=doc_date,
+                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
@@ -182,7 +187,9 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
         todo = todo[:limit]
 
     logger.info(f"{len(todo)} prescriptions to extract")
-    ocr = Paperless().ocr_index()
+    paperless = Paperless()
+    ocr = paperless.ocr_index()
+    paperless_ids = paperless.document_id_index()
     misfiled = uncorroborated = 0
 
     for i, d in enumerate(todo, 1):
@@ -192,6 +199,7 @@ def run_prescriptions(con, limit: int = 0, person: str | None = None) -> None:
                 d.rel,
                 d.correspondent,
                 ocr_text=ocr_for(ocr, d.correspondent, d.rel),
+                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
@@ -234,7 +242,9 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
         todo = todo[:limit]
 
     logger.info(f"{len(todo)} imaging reports to extract")
-    ocr = Paperless().ocr_index()
+    paperless = Paperless()
+    ocr = paperless.ocr_index()
+    paperless_ids = paperless.document_id_index()
     misfiled = untrusted = meas = find = 0
 
     for i, d in enumerate(todo, 1):
@@ -244,6 +254,7 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
                 d.rel,
                 d.correspondent,
                 ocr_text=ocr_for(ocr, d.correspondent, d.rel),
+                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
@@ -361,11 +372,16 @@ def main() -> None:
         todo = todo[: args.limit]
 
     logger.info(f"{len(labs)} lab PDFs, {len(todo)} to extract")
+    paperless_ids = Paperless().document_id_index()
     for i, d in enumerate(todo, 1):
         doc_date = datetime.date.fromisoformat(d.created) if d.created else None
         try:
             committed, queued = ingest_lab(
-                con, rel_path=d.rel, subject=d.correspondent, doc_date=doc_date
+                con,
+                rel_path=d.rel,
+                subject=d.correspondent,
+                doc_date=doc_date,
+                paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
             )
             logger.info(
                 f"[{i}/{len(todo)}] {d.correspondent} | {d.title} -> "
