@@ -1,0 +1,23 @@
+# Personal data -- bind-mounted at runtime, never baked into the image.
+secrets/
+data/settings.json
+data/people.json
+data/analytes.json
+data/pii_denylist.txt
+data/health.db
+data/health.db.*
+data/state/
+data/llm/
+
+# Dev / VCS / caches
+.git/
+venv/
+tests/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+.coverage
+logs/
+NOTES.local.md
+.vscode/

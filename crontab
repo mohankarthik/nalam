@@ -1,0 +1,22 @@
+# Nalam schedule (times are container-local, TZ=Asia/Kolkata).
+# Output goes to supercronic's stdout -> Docker logs -> Dozzle.
+#
+# Gemini key is shared with gajana (see CLAUDE.md); gajana's daily statement
+# run fires at 06:00. Extraction runs earlier, at default (free-tier) pacing,
+# so it never overlaps or starves gajana's run.
+
+SHELL=/bin/sh
+
+# Every 6 hours: Drive -> Paperless sync. No LLM calls, idempotent, cheap
+# enough to run often so new scans get filed same-day.
+0 */6 * * * cd /app && python run_sync.py
+
+# Daily 04:30 IST: extract labs, discharge summaries and prescriptions from
+# whatever's new since the last run (cached, idempotent). Radiology has no
+# trusted extractor yet (see CLAUDE.md) so it stays manual.
+30 4 * * * cd /app && python run_extract.py && python run_extract.py --discharge && python run_extract.py --prescriptions
+
+# Weekly Sunday 05:00 IST: print medication-reconciliation diffs to the log
+# for review. Read-only -- it never writes a decision on its own; that's
+# always `run_meds.py --decide`, by a human.
+0 5 * * 0 cd /app && python run_meds.py --reconcile
