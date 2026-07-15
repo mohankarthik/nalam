@@ -53,6 +53,31 @@ def stub_common(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     return calls
 
 
+class TestResultText:
+    """_result_text() must never crash on an unrecognized doc_type/shape --
+    that's exactly what stranded a queue item in production (2026-07-15): a
+    'discharge' result missing the 'medications' key raised KeyError inside
+    send_message(), so the item was never popped and every subsequent tick
+    re-raised on the same document."""
+
+    def test_missing_keys_on_a_doc_type_that_normally_has_them_does_not_raise(self) -> None:
+        text = rq._result_text({"doc_type": "discharge", "note": "no extractor for this type"})
+        assert "no extractor" in text
+
+    def test_unknown_doc_type_does_not_raise(self) -> None:
+        text = rq._result_text({"doc_type": "insurance"})
+        assert "insurance" in text
+
+    def test_lab_result_formats(self) -> None:
+        assert rq._result_text({"doc_type": "lab", "committed": 2, "review": 1}) == (
+            "Extracted: 2 observations, 1 to review."
+        )
+
+    def test_discharge_result_formats(self) -> None:
+        result = {"doc_type": "discharge", "medications": 3, "encounters": 1, "misfiled": None}
+        assert rq._result_text(result) == "Extracted: 3 medications, 1 encounter."
+
+
 class TestPaperlessDown:
     def test_skips_whole_tick_queue_untouched(
         self, monkeypatch: pytest.MonkeyPatch, stub_common: dict[str, Any]

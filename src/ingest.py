@@ -90,6 +90,16 @@ def ingest_document(
     if is_encrypted(pdf):
         return {"doc_type": "encrypted", "note": "password-protected, cannot extract"}
 
+    # classify() is the fallback source of truth for whatever is_lab()/
+    # is_discharge() -- both free, title/tag-only heuristics -- miss. A
+    # discharge summary titled by its admission ("Hyponatremia.pdf" under an
+    # Admissions folder) doesn't match either heuristic but IS a document
+    # classify() correctly reads from content, and it must route through the
+    # SAME ingest_* the heuristic path would have used -- not a bare
+    # "doc_type": kind with none of that extractor's keys. Returning a
+    # doc_type string this module doesn't actually populate crashed every
+    # on-demand tick that touched one (KeyError in the caller's result
+    # formatting), popped nothing, and the item never advanced.
     kind = classify(pdf, source=doc.rel)["doc_type"]
     if kind == "prescription":
         meds, bad, misfiled = ingest_prescription(
@@ -106,6 +116,31 @@ def ingest_document(
             "uncorroborated": bad,
             "misfiled": misfiled,
         }
+
+    if kind == "discharge":
+        meds, encs, misfiled = ingest_discharge(
+            con,
+            rel_path=doc.rel,
+            subject=doc.correspondent,
+            doc_date=doc_date,
+            paperless_id=paperless_id,
+        )
+        return {
+            "doc_type": "discharge",
+            "medications": meds,
+            "encounters": encs,
+            "misfiled": misfiled,
+        }
+
+    if kind == "lab":
+        committed, queued = ingest_lab(
+            con,
+            rel_path=doc.rel,
+            subject=doc.correspondent,
+            doc_date=doc_date,
+            paperless_id=paperless_id,
+        )
+        return {"doc_type": "lab", "committed": committed, "review": queued}
 
     return {"doc_type": kind, "note": "no extractor for this document type yet"}
 

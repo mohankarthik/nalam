@@ -124,6 +124,33 @@ class TestRouting:
             "misfiled": None,
         }
 
+    def test_falls_through_to_classify_then_discharge(
+        self, stub_extractors: dict[str, Any]
+    ) -> None:
+        """A discharge summary titled by its admission, not the word 'discharge'
+        (e.g. 'Hyponatremia.pdf' under an Admissions folder), misses the free
+        is_discharge() title heuristic and must still route through
+        ingest_discharge() via classify() -- not fall into the generic
+        "no extractor" bucket, which crashed run_extract_queue.py in production
+        (KeyError formatting a result with no 'medications' key)."""
+        stub_extractors["classify_as"] = "discharge"
+        doc = _doc(tag="Medical/Admissions", title="Hyponatremia")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "discharge"
+        assert result == {
+            "doc_type": "discharge",
+            "medications": 2,
+            "encounters": 1,
+            "misfiled": None,
+        }
+
+    def test_falls_through_to_classify_then_lab(self, stub_extractors: dict[str, Any]) -> None:
+        stub_extractors["classify_as"] = "lab"
+        doc = _doc(tag="Medical/Admissions", title="Sodium Levels")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "lab"
+        assert result == {"doc_type": "lab", "committed": 3, "review": 1}
+
     def test_classified_as_something_unsupported_is_reported_not_dropped(
         self, stub_extractors: dict[str, Any]
     ) -> None:

@@ -76,28 +76,30 @@ def _doc_from_item(item: dict) -> Doc:
 
 
 def _result_text(result: dict) -> str:
+    # .get() throughout, deliberately: this formats whatever ingest_document()
+    # handed back, in a process that must never crash mid-tick and strand the
+    # item un-popped (see ingest_document()'s classify()-fallback comment for
+    # the bug this guards against -- a doc_type string with no matching keys).
     doc_type = result.get("doc_type")
     if doc_type == "lab":
-        return f"Extracted: {result['committed']} observations, {result['review']} to review."
-    if doc_type == "discharge":
+        return (
+            f"Extracted: {result.get('committed', 0)} observations, "
+            f"{result.get('review', 0)} to review."
+        )
+    if doc_type in ("discharge", "prescription") and "medications" in result:
         note = (
             f" (document names {result['misfiled']} -- filed there)"
             if result.get("misfiled")
             else ""
         )
+        if doc_type == "discharge":
+            return (
+                f"Extracted: {result.get('medications', 0)} medications, "
+                f"{result.get('encounters', 0)} encounter{note}."
+            )
         return (
-            f"Extracted: {result['medications']} medications, "
-            f"{result['encounters']} encounter{note}."
-        )
-    if doc_type == "prescription":
-        note = (
-            f" (document names {result['misfiled']} -- filed there)"
-            if result.get("misfiled")
-            else ""
-        )
-        return (
-            f"Extracted: {result['medications']} medications, "
-            f"{result['uncorroborated']} not corroborated (-> review){note}."
+            f"Extracted: {result.get('medications', 0)} medications, "
+            f"{result.get('uncorroborated', 0)} not corroborated (-> review){note}."
         )
     if doc_type == "encrypted":
         return "Not extracted: password-protected PDF."
