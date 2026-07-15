@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -27,6 +28,8 @@ ENV_PAPERLESS_PUSH_URL = "NALAM_PAPERLESS_PUSH_URL"
 
 _PUSH_TIMEOUT_SECONDS = 15
 _PROBE_TIMEOUT_SECONDS = 15
+_PROBE_RETRIES = 3
+_PROBE_RETRY_BACKOFF_SECONDS = 2
 
 
 def check_paperless() -> tuple[bool, str]:
@@ -41,21 +44,33 @@ def check_paperless() -> tuple[bool, str]:
     header every other call in this codebase already sends -- a false DOWN,
     not a real outage. `/api/correspondents/` is the same endpoint
     `Paperless._get_all()` already uses elsewhere, known to work.
+
+    Retries here, not in Uptime-Kuma: this is a push monitor (nalam calls
+    Kuma, not the other way around), so Kuma has no "retry before marking
+    down" knob to configure -- that only exists for its own active monitors.
+    A single flaky request otherwise pages a human for nothing.
     """
     try:
         paperless = Paperless()
     except PaperlessError as e:
         return False, f"credentials: {e}"
-    try:
-        resp = paperless.session.get(
-            f"{paperless.url}/api/correspondents/",
-            params={"page_size": 1},
-            timeout=_PROBE_TIMEOUT_SECONDS,
-        )
-        resp.raise_for_status()
-        return True, "OK"
-    except requests.RequestException as e:
-        return False, f"unreachable: {e}"
+
+    last_error: Optional[str] = None
+    for attempt in range(1, _PROBE_RETRIES + 1):
+        try:
+            resp = paperless.session.get(
+                f"{paperless.url}/api/correspondents/",
+                params={"page_size": 1},
+                timeout=_PROBE_TIMEOUT_SECONDS,
+            )
+            resp.raise_for_status()
+            return True, "OK"
+        except requests.RequestException as e:
+            last_error = f"unreachable: {e}"
+            if attempt < _PROBE_RETRIES:
+                logger.warning(f"Paperless probe attempt {attempt}/{_PROBE_RETRIES} failed: {e}")
+                time.sleep(_PROBE_RETRY_BACKOFF_SECONDS * attempt)
+    return False, last_error
 
 
 def push(url: Optional[str], is_up: bool, msg: str) -> None:

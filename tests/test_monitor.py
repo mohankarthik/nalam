@@ -17,6 +17,12 @@ import requests
 from src import monitor
 
 
+@pytest.fixture(autouse=True)
+def no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retries backoff for real seconds; skip that in tests."""
+    monkeypatch.setattr(monitor.time, "sleep", lambda _seconds: None)
+
+
 class TestCheckPaperless:
     def test_up_on_2xx(self, monkeypatch: pytest.MonkeyPatch) -> None:
         resp = MagicMock(ok=True)
@@ -50,6 +56,33 @@ class TestCheckPaperless:
 
         up, msg = monitor.check_paperless()
         assert up is False
+
+    def test_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        resp = MagicMock(ok=True)
+        resp.raise_for_status.return_value = None
+        fake_session = MagicMock()
+        fake_session.get.side_effect = [
+            requests.ConnectionError("refused"),
+            resp,
+        ]
+        fake_paperless = MagicMock(url="http://paperless.local", session=fake_session)
+        monkeypatch.setattr(monitor, "Paperless", lambda: fake_paperless)
+
+        up, msg = monitor.check_paperless()
+        assert up is True
+        assert msg == "OK"
+        assert fake_session.get.call_count == 2
+
+    def test_down_after_exhausting_retries(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake_session = MagicMock()
+        fake_session.get.side_effect = requests.ConnectionError("refused")
+        fake_paperless = MagicMock(url="http://paperless.local", session=fake_session)
+        monkeypatch.setattr(monitor, "Paperless", lambda: fake_paperless)
+
+        up, msg = monitor.check_paperless()
+        assert up is False
+        assert "unreachable" in msg
+        assert fake_session.get.call_count == monitor._PROBE_RETRIES
 
     def test_down_on_bad_credentials(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def boom() -> Any:
