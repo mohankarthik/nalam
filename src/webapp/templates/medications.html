@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Medications · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1 class="page-title">Medications <span class="sub">· {{ person.correspondent }}</span></h1>
+  <span class="count-pill">{{ active|length }} current</span>
+</div>
+
+{% if mismatches %}
+<div class="card card--flag">
+  <div class="card-head"><span class="dot"></span>{{ mismatches|length }} document(s) flagged — printed patient name did not match this folder</div>
+  {% for m in mismatches %}
+  <div class="mismatch-row">
+    <span class="name">{{ m.printed_name or '?' }}</span>
+    <span class="reason">{{ m.reasons }}</span>
+    <span class="spacer"></span>
+    {% if m.doc_link %}<a href="{{ m.doc_link }}" target="_blank" rel="noopener">view scan</a>{% endif %}
+    <form class="inline" method="post" action="/review-queue/{{ m.id }}/resolve">
+      <input type="hidden" name="person" value="{{ person.correspondent }}">
+      <button class="btn" type="submit">mark reviewed</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-frame">
+  <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th>Medicine</th><th>Started</th><th>Dose</th><th>Frequency</th><th></th></tr></thead>
+      <tbody>
+      {% for m in active %}
+        <tr class="{{ 'stale' if m.stale else '' }}">
+          <td class="name">
+            {{ m.display }}
+            {% if m.stale %}<span class="badge badge-stale">stale</span>{% endif %}
+            {% if m.status != 'ok' %}<span class="badge badge-unconfirmed">unconfirmed</span>{% endif %}
+          </td>
+          <td class="num when">{{ m.started or '—' }}</td>
+          <td>{{ m.strength or '—' }}</td>
+          <td>{{ m.frequency or '—' }}</td>
+          <td class="actions">
+            <form class="inline" method="post" action="/medications/confirm">
+              <input type="hidden" name="person" value="{{ person.correspondent }}">
+              <input type="hidden" name="drug" value="{{ m.drug }}">
+              <input type="hidden" name="event" value="continued">
+              <button class="btn btn-primary" type="submit">still taking</button>
+            </form>
+            <form class="inline" method="post" action="/medications/confirm">
+              <input type="hidden" name="person" value="{{ person.correspondent }}">
+              <input type="hidden" name="drug" value="{{ m.drug }}">
+              <input type="hidden" name="event" value="stopped">
+              <button class="btn btn-danger" type="submit">stopped</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr class="empty-row"><td colspan="5">No current medications on file.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if active|selectattr('stale')|list %}
+<p class="section-note">Rows marked <span class="badge badge-stale">stale</span> haven't been confirmed since 2024 — nothing says they stopped, but nothing says they didn't either.</p>
+{% endif %}
+
+{% if review %}
+<h2 class="section-title">Drug names awaiting review</h2>
+<p class="section-note">Read off handwriting or a low-quality scan; nothing here is trusted until a human confirms it.</p>
+<div class="table-frame">
+  <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th>As read</th><th>Dose</th><th>Date</th><th>Scan</th><th>Correction</th></tr></thead>
+      <tbody>
+      {% for r in review %}
+        <tr>
+          <td class="name">{{ r.drug }}</td>
+          <td>{{ r.strength or '—' }} {{ r.frequency or '' }}</td>
+          <td class="num">{{ r.doc_date or '—' }}</td>
+          <td>{% if r.doc_link %}<a href="{{ r.doc_link }}" target="_blank" rel="noopener">view</a>{% else %}—{% endif %}</td>
+          <td>
+            <form class="correct-form" method="post" action="/medications/review">
+              <input type="hidden" name="person" value="{{ person.correspondent }}">
+              <input type="hidden" name="med_id" value="{{ r.id }}">
+              <input type="text" name="correction" placeholder="blank = accept · - = delete · A||B = split">
+              <button class="btn btn-primary" type="submit">apply</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

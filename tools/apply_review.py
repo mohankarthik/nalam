@@ -14,75 +14,19 @@ Left merged, neither maps to a molecule and "is he on metformin?" misses it.
 Everything applied here is recorded `entered_by='human'`. What a model read and
 what a person confirmed are different kinds of fact, and the log must never blur
 them.
+
+The actual decision logic lives in src/meds.py:apply_drug_decision -- shared
+with the web UI, so a correction typed here and one clicked there go through
+the exact same code.
 """
 
 from __future__ import annotations
 
-import re
 import sys
 
 from src import db
-from src.drugs import load_drugs, lookup
-
-# "Cilostazol 50mg" -> ("Cilostazol", "50mg"). The name belongs in `drug`, the
-# strength in `strength` -- and the strength as READ is often wrong ("50g" for
-# 50mg), so a correction that supplies one must replace it.
-_STRENGTH = re.compile(
-    r"\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)"
-    r"(?:\s*/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml))?)\s*$",
-    re.IGNORECASE,
-)
-
-
-def split_strength(text: str) -> tuple[str, str | None]:
-    m = _STRENGTH.search(text)
-    if not m:
-        return text.strip(), None
-    return text[: m.start()].strip(), m.group(1).strip()
-
-
-def _split(con, table, med_id: int, row, parts: list[str]) -> None:
-    """One extracted entry is really several drugs. Make it several rows."""
-    source = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
-
-    for i, part in enumerate(parts):
-        name, strength = split_strength(part)
-        d = lookup(name, table)
-        generic = " + ".join(d.generic) if d and d.confirmed and d.generic else None
-        shown = f"{generic} ({name})" if generic else name
-
-        if i == 0:
-            con.execute(
-                """UPDATE medication_events
-                   SET drug=?, generic=?, strength=COALESCE(?, strength),
-                       status='ok', review_reason=NULL, entered_by='human'
-                   WHERE id=?""",
-                (name, generic, strength, med_id),
-            )
-            print(f"  {med_id}: {shown:<44} split from {row['drug']!r}")
-        else:
-            con.execute(
-                """INSERT INTO medication_events
-                     (document_id, subject, drug, generic, strength, form, dose,
-                      frequency, duration, event, effective, raw_text, entered_by,
-                      status)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'human','ok')""",
-                (
-                    source["document_id"],
-                    source["subject"],
-                    name,
-                    generic,
-                    strength or source["strength"],
-                    source["form"],
-                    source["dose"],
-                    source["frequency"],
-                    source["duration"],
-                    source["event"],
-                    source["effective"],
-                    source["raw_text"],
-                ),
-            )
-            print(f"      + {shown:<42} (new row, split from the same line)")
+from src.drugs import load_drugs
+from src.meds import apply_drug_decision
 
 
 def main() -> None:
@@ -97,48 +41,15 @@ def main() -> None:
             raise SystemExit(f"expected <id>=<name>, got {arg!r}")
         raw_id, correction = arg.split("=", 1)
         med_id = int(raw_id)
-        correction = correction.strip()
 
-        row = con.execute(
-            "SELECT drug, subject FROM medication_events WHERE id = ?", (med_id,)
-        ).fetchone()
-        if not row:
+        try:
+            summary = apply_drug_decision(con, table, med_id, correction)
+        except KeyError:
             print(f"  {med_id}: no such entry")
             continue
 
-        if correction == "-":
-            con.execute("DELETE FROM medication_events WHERE id = ?", (med_id,))
-            print(f"  {med_id}: deleted  ({row['drug']!r} — not a drug)")
-            continue
-
-        if "||" in correction:
-            parts = [x.strip() for x in correction.split("||") if x.strip()]
-            _split(con, table, med_id, row, parts)
-            continue
-
-        name, strength = split_strength(correction or row["drug"])
-        d = lookup(name, table)
-        generic = " + ".join(d.generic) if d and d.confirmed and d.generic else None
-
-        if strength:
-            con.execute(
-                """UPDATE medication_events
-                   SET drug=?, generic=?, strength=?, status='ok',
-                       review_reason=NULL, entered_by='human'
-                   WHERE id=?""",
-                (name, generic, strength, med_id),
-            )
-        else:
-            con.execute(
-                """UPDATE medication_events
-                   SET drug=?, generic=?, status='ok', review_reason=NULL,
-                       entered_by='human'
-                   WHERE id=?""",
-                (name, generic, med_id),
-            )
-        shown = f"{generic} ({name})" if generic else name
-        how = "confirmed as read" if not correction else f"corrected from {row['drug']!r}"
-        print(f"  {med_id}: {shown:<44} {how}")
+        for line in summary.split("\n"):
+            print(f"  {line}")
 
     con.commit()
     left = con.execute("SELECT count(*) FROM medication_events WHERE status='review'").fetchone()[0]

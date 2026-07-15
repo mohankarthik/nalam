@@ -896,3 +896,107 @@ class TestForConditionMatchesColloquialAndClinicalWording:
 
         episodes = meds.for_condition(self.build(tmp_path), "AURTI", subject="A Child")
         assert len(episodes) == 1
+
+
+class TestApplyDrugDecision:
+    """apply_drug_decision is the one code path both tools/apply_review.py
+    (CLI) and the web UI's confirm buttons go through -- a correction typed
+    in one place and one clicked in the other must behave identically."""
+
+    @pytest.fixture()
+    def con(self, tmp_path):
+        from src import db
+
+        con = db.connect(str(tmp_path / "t.db"))
+        doc = db.upsert_document(
+            con,
+            subject="A Person",
+            source_path="x.pdf",
+            doc_type="prescription",
+            doc_date="2024-03-01",
+            model="test",
+            text_layer=True,
+        )
+
+        def add(drug, raw_text=None):
+            con.execute(
+                """INSERT INTO medication_events
+                     (document_id, subject, drug, form, dose, frequency, duration,
+                      event, effective, raw_text, entered_by, status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    doc,
+                    "A Person",
+                    drug,
+                    "tablet",
+                    None,
+                    "1-0-1",
+                    None,
+                    "prescribed",
+                    "2024-03-01",
+                    raw_text or drug,
+                    "extractor",
+                    "review",
+                ),
+            )
+            con.commit()
+            return con.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        return con, add
+
+    def test_accept_as_read(self, con, table) -> None:
+        from src.meds import apply_drug_decision
+
+        con, add = con
+        med_id = add("CLOPILET")
+        summary = apply_drug_decision(con, table, med_id, "")
+
+        row = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
+        assert row["drug"] == "CLOPILET"
+        assert row["status"] == "ok"
+        assert row["entered_by"] == "human"
+        assert "confirmed as read" in summary
+
+    def test_correct_the_name(self, con, table) -> None:
+        from src.meds import apply_drug_decision
+
+        con, add = con
+        med_id = add("CLOPLET")  # misread
+        apply_drug_decision(con, table, med_id, "CLOPILET")
+
+        row = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
+        assert row["drug"] == "CLOPILET"
+        assert row["status"] == "ok"
+
+    def test_not_a_drug_deletes_it(self, con, table) -> None:
+        from src.meds import apply_drug_decision
+
+        con, add = con
+        med_id = add("SOME DEVICE")
+        apply_drug_decision(con, table, med_id, "-")
+
+        row = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
+        assert row is None
+
+    def test_split_one_line_into_two_drugs(self, con, table) -> None:
+        from src.meds import apply_drug_decision
+
+        con, add = con
+        med_id = add("losar and galvus met", raw_text="continue losar and galvus met")
+        apply_drug_decision(con, table, med_id, "LOSAR||GALVUS MET")
+
+        rows = con.execute(
+            "SELECT drug, raw_text FROM medication_events WHERE document_id = "
+            "(SELECT document_id FROM medication_events WHERE id = ?) ORDER BY id",
+            (med_id,),
+        ).fetchall()
+        assert [r["drug"] for r in rows] == ["LOSAR", "GALVUS MET"]
+        # the split-off row keeps the ORIGINAL line, not an invented one
+        assert rows[1]["raw_text"] == "continue losar and galvus met"
+
+    def test_unknown_id_raises(self, con, table) -> None:
+        from src.meds import apply_drug_decision
+
+        con, _add = con
+        with pytest.raises(KeyError):
+            apply_drug_decision(con, table, 999999, "")

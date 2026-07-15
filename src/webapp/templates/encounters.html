@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Encounters · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1 class="page-title">Encounters <span class="sub">· {{ person.correspondent }}</span></h1>
+  <span class="count-pill">{{ encounters|length }} on file</span>
+</div>
+
+{% for e in encounters %}
+<a class="card encounter-card" href="/encounters/{{ e.document_id }}?person={{ person.correspondent }}">
+  <span class="chevron">›</span>
+  <span class="when">{{ e.admitted or '?' }}{% if e.discharged and e.discharged != e.admitted %} → {{ e.discharged }}{% endif %}</span>
+  <span class="where"> · {{ e.hospital or 'unknown hospital' }}</span>
+  <div class="dx">{{ (e.diagnoses|join('; ')) or e.reason or '—' }}</div>
+  {% if e.follow_up %}
+  <div class="followup">follow-up: {{ e.follow_up }}{% if e.follow_up_date %} (due {{ e.follow_up_date }}){% endif %}</div>
+  {% endif %}
+</a>
+{% else %}
+<div class="empty">No encounters on file.</div>
+{% endfor %}
+
+{% endblock %}

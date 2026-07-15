@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}nalam{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-row">
+      <a class="wordmark" href="/medications?person={{ person.correspondent }}">
+        nalam<span class="wordmark-sub">health record</span>
+      </a>
+      <form class="person-picker" method="get" action="{{ request.url.path }}">
+        <label for="person-select">Viewing</label>
+        <span class="select-wrap">
+          <select id="person-select" name="person" onchange="this.form.submit()">
+            {% for p in people %}
+            <option value="{{ p.correspondent }}" {% if p.correspondent == person.correspondent %}selected{% endif %}>
+              {{ p.correspondent }}{% if p.deceased %} (deceased){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </span>
+      </form>
+    </div>
+    <div class="wrap">
+      <nav class="tabs">
+        <a href="/medications?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path == '/medications' else '' }}">Medications</a>
+        <a href="/observations?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path.startswith('/observations') else '' }}">Observations</a>
+        <a href="/encounters?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path.startswith('/encounters') else '' }}">Encounters</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

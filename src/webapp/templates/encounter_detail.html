@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ encounter.admitted or 'Encounter' }} · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<a class="backlink" href="/encounters?person={{ person.correspondent }}">← Encounters</a>
+
+<div class="page-head">
+  <h1 class="page-title">
+    {{ encounter.admitted or '?' }}{% if encounter.discharged and encounter.discharged != encounter.admitted %} → {{ encounter.discharged }}{% endif %}
+    <span class="sub">· {{ encounter.hospital or 'unknown hospital' }}</span>
+  </h1>
+</div>
+
+<div class="card">
+  <dl class="detail-grid">
+    <dt>Reason</dt><dd>{{ encounter.reason or '—' }}</dd>
+    {% if encounter.diagnoses %}<dt>Diagnoses</dt><dd>{{ encounter.diagnoses|join('; ') }}</dd>{% endif %}
+    {% if encounter.procedures %}<dt>Procedures</dt><dd>{{ encounter.procedures|join('; ') }}</dd>{% endif %}
+    {% if encounter.follow_up %}<dt>Follow-up</dt><dd>{{ encounter.follow_up }}{% if encounter.follow_up_date %} <span class="muted">(due {{ encounter.follow_up_date }})</span>{% endif %}</dd>{% endif %}
+  </dl>
+  {% if encounter.doc_link %}<a href="{{ encounter.doc_link }}" target="_blank" rel="noopener">view discharge summary →</a>{% endif %}
+</div>
+
+{% if medications %}
+<h2 class="section-title">Medications from this encounter</h2>
+<div class="table-frame">
+  <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th>Medicine</th><th>Dose</th><th>Frequency</th><th>Event</th></tr></thead>
+      <tbody>
+      {% for m in medications %}
+        <tr>
+          <td class="name">{{ m.display }}</td>
+          <td>{{ m.strength or '—' }}</td>
+          <td>{{ m.frequency or '—' }}</td>
+          <td>{{ m.event }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

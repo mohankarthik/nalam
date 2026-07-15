@@ -30,6 +30,15 @@ from typing import Optional
 
 from src.drugs import lookup
 
+# "Cilostazol 50mg" -> ("Cilostazol", "50mg"). The name belongs in `drug`, the
+# strength in `strength` -- and the strength as READ is often wrong ("50g" for
+# 50mg), so a correction that supplies one must replace it.
+_STRENGTH = re.compile(
+    r"\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)"
+    r"(?:\s*/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml))?)\s*$",
+    re.IGNORECASE,
+)
+
 
 def display_name(drug: str, generic: Optional[str]) -> str:
     """ "Molecule (Brand)" when the molecule is known, else just the brand as
@@ -570,3 +579,113 @@ def for_condition(
         ]
         episodes.append(row)
     return episodes
+
+
+def split_strength(text: str) -> tuple[str, Optional[str]]:
+    m = _STRENGTH.search(text)
+    if not m:
+        return text.strip(), None
+    return text[: m.start()].strip(), m.group(1).strip()
+
+
+def _split_drug_entry(
+    con: sqlite3.Connection, table: dict, med_id: int, row: sqlite3.Row, parts: list[str]
+) -> list[str]:
+    """One extracted entry is really several drugs. Make it several rows.
+    Returns one summary line per resulting row."""
+    source = con.execute("SELECT * FROM medication_events WHERE id = ?", (med_id,)).fetchone()
+    lines = []
+
+    for i, part in enumerate(parts):
+        name, strength = split_strength(part)
+        d = lookup(name, table)
+        generic = " + ".join(d.generic) if d and d.confirmed and d.generic else None
+        shown = display_name(name, generic)
+
+        if i == 0:
+            con.execute(
+                """UPDATE medication_events
+                   SET drug=?, generic=?, strength=COALESCE(?, strength),
+                       status='ok', review_reason=NULL, entered_by='human'
+                   WHERE id=?""",
+                (name, generic, strength, med_id),
+            )
+            lines.append(f"{med_id}: {shown} split from {row['drug']!r}")
+        else:
+            con.execute(
+                """INSERT INTO medication_events
+                     (document_id, subject, drug, generic, strength, form, dose,
+                      frequency, duration, event, effective, raw_text, entered_by,
+                      status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'human','ok')""",
+                (
+                    source["document_id"],
+                    source["subject"],
+                    name,
+                    generic,
+                    strength or source["strength"],
+                    source["form"],
+                    source["dose"],
+                    source["frequency"],
+                    source["duration"],
+                    source["event"],
+                    source["effective"],
+                    source["raw_text"],
+                ),
+            )
+            lines.append(f"+ {shown} (new row, split from the same line)")
+    return lines
+
+
+def apply_drug_decision(con: sqlite3.Connection, table: dict, med_id: int, correction: str) -> str:
+    """Apply one human decision on a drug read off a scan that no independent
+    reading could confirm. Shared by tools/apply_review.py (CLI, one id at a
+    time from argv) and the web UI (one id at a time from a form post) -- the
+    parsing rules are the same either way:
+
+        ""      the name as read is right -> trust it as-is
+        "-"      not a drug -> delete it
+        "A||B"   ONE entry that is really TWO drugs -> split it
+        "NAME"   the correct name -> replace, trust, map to a molecule
+
+    Returns a human-readable summary line. Raises KeyError if med_id doesn't
+    exist -- callers decide how to surface that.
+    """
+    correction = correction.strip()
+    row = con.execute(
+        "SELECT drug, subject FROM medication_events WHERE id = ?", (med_id,)
+    ).fetchone()
+    if not row:
+        raise KeyError(f"no such medication_events row: {med_id}")
+
+    if correction == "-":
+        con.execute("DELETE FROM medication_events WHERE id = ?", (med_id,))
+        return f"{med_id}: deleted  ({row['drug']!r} — not a drug)"
+
+    if "||" in correction:
+        parts = [x.strip() for x in correction.split("||") if x.strip()]
+        return "\n".join(_split_drug_entry(con, table, med_id, row, parts))
+
+    name, strength = split_strength(correction or row["drug"])
+    d = lookup(name, table)
+    generic = " + ".join(d.generic) if d and d.confirmed and d.generic else None
+
+    if strength:
+        con.execute(
+            """UPDATE medication_events
+               SET drug=?, generic=?, strength=?, status='ok',
+                   review_reason=NULL, entered_by='human'
+               WHERE id=?""",
+            (name, generic, strength, med_id),
+        )
+    else:
+        con.execute(
+            """UPDATE medication_events
+               SET drug=?, generic=?, status='ok', review_reason=NULL,
+                   entered_by='human'
+               WHERE id=?""",
+            (name, generic, med_id),
+        )
+    shown = display_name(name, generic)
+    how = "confirmed as read" if not correction else f"corrected from {row['drug']!r}"
+    return f"{med_id}: {shown} {how}"

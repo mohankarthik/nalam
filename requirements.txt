@@ -2,6 +2,10 @@
 litellm
 pypdf
 requests
+fastapi
+uvicorn
+jinja2
+python-multipart
 
 # dev / test
 pytest

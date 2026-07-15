@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Observations · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1 class="page-title">Observations <span class="sub">· {{ person.correspondent }}</span></h1>
+  <span class="count-pill">{{ rows|length }} analytes</span>
+</div>
+
+{% if alerts %}
+<div class="card card--flag">
+  <div class="card-head"><span class="dot"></span>{{ alerts|length }} value(s) outside the reference range</div>
+  <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th>Analyte</th><th>Latest value</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+      {% for a in alerts %}
+        <tr>
+          <td class="name">{{ a.analyte }}</td>
+          <td class="num">
+            <span class="val-{{ a.flag }}">{{ a.value }} {{ a.unit or '' }}</span>
+            <span class="badge badge-{{ a.flag }}">{{ 'High' if a.flag == 'high' else 'Low' }}</span>
+          </td>
+          <td class="num">{{ a.date }}</td>
+          <td class="actions"><a href="/observations/trend?person={{ person.correspondent }}&analyte={{ a.analyte | urlencode }}">trend →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="section-title">Latest value of every analyte on file</h2>
+<div class="table-frame">
+  <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th>Analyte</th><th>Value</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="name">
+            {{ r.analyte }}
+            {% if r.unnamed %}<span class="unnamed-tag">(unnamed)</span>{% endif %}
+            {% if not r.trusted %}<span class="badge badge-unconfirmed">unconfirmed</span>{% endif %}
+          </td>
+          <td class="num">
+            {% if r.flag in ('high', 'low') %}<span class="val-{{ r.flag }}">{{ r.value }} {{ r.unit or '' }}</span><span class="badge badge-{{ r.flag }}">{{ 'High' if r.flag == 'high' else 'Low' }}</span>
+            {% else %}{{ r.value }} {{ r.unit or '' }}{% endif %}
+          </td>
+          <td class="num">{{ r.date }}</td>
+          <td class="actions"><a href="/observations/trend?person={{ person.correspondent }}&analyte={{ r.analyte | urlencode }}">trend →</a></td>
+        </tr>
+      {% else %}
+        <tr class="empty-row"><td colspan="4">No observations on file.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
