@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime
 import os
 import sqlite3
-from typing import Generator, Optional
+from typing import Generator, List, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -226,17 +226,32 @@ def _promote_candidates(con: sqlite3.Connection, subject: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def _selected(selected: List[int], values: List[str]) -> list[str]:
+    """The values of the checked rows. The three per-row arrays (printed_name,
+    canonical, segment) submit for EVERY row in document order, so row i's data
+    is at index i; ``selected`` carries only the checked indices. Guard the
+    bounds so a malformed post can't index off the end."""
+    return [values[i] for i in selected if 0 <= i < len(values)]
+
+
 @router.post("/observations/promote")
 def promote_observation(
     person: str = Form(...),
-    printed_name: str = Form(...),
-    canonical: str = Form(""),
-    segment: str = Form(""),
+    selected: List[int] = Form(default=[]),
+    printed_name: List[str] = Form(default=[]),
+    canonical: List[str] = Form(default=[]),
+    segment: List[str] = Form(default=[]),
     con: sqlite3.Connection = Depends(get_db),
 ) -> RedirectResponse:
     who = current_person(person)
-    promote(printed_name, canonical, segment)
-    # Redeem every past row the new alias now names -- free and offline, and not
+    for i in selected:
+        if 0 <= i < len(printed_name):
+            promote(
+                printed_name[i],
+                canonical[i] if i < len(canonical) else "",
+                segment[i] if i < len(segment) else "",
+            )
+    # One redemption pass after all promotions -- free and offline, and not
     # limited to this person: an alias helps the whole family.
     codebook = load_codebook()
 
@@ -251,11 +266,13 @@ def promote_observation(
 @router.post("/observations/reject")
 def reject_observation(
     person: str = Form(...),
-    printed_name: str = Form(...),
+    selected: List[int] = Form(default=[]),
+    printed_name: List[str] = Form(default=[]),
     con: sqlite3.Connection = Depends(get_db),
 ) -> RedirectResponse:
     who = current_person(person)
-    db.drop_unnamed(con, who.correspondent, printed_name)
+    for name in _selected(selected, printed_name):
+        db.drop_unnamed(con, who.correspondent, name)
     return RedirectResponse(url=f"/observations?person={who.correspondent}", status_code=303)
 
 

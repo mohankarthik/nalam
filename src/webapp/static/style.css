@@ -409,6 +409,24 @@ form.inline { display: inline; margin: 0; }
   min-width: 15rem;
 }
 .correct-form input[type=text]::placeholder { color: var(--ink-faint); }
+
+/* Bulk promote/reject on the observations review table. */
+.tick { width: 1.5rem; text-align: center; }
+.tick input[type=checkbox] { cursor: pointer; }
+.promote-cell { display: flex; gap: .4rem; align-items: center; }
+.promote-cell input[type=text] {
+  font-family: var(--sans);
+  font-size: .85rem;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: .34rem .55rem;
+}
+.promote-cell input[name=canonical] { min-width: 12rem; }
+.promote-cell input[name=segment] { max-width: 7rem; }
+.promote-cell input[type=text]::placeholder { color: var(--ink-faint); }
+.bulk-actions { display: flex; gap: .5rem; margin: .85rem 0 0; }
 .correct-form input[type=text]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 
 /* --- Trend chart ---------------------------------------------------- */

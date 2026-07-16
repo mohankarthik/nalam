@@ -60,39 +60,43 @@
 
 {% if candidates %}
 <h2 class="section-title">Unrecognised tests — promote or reject</h2>
-<p class="section-note">Test names the codebook doesn't know, so they're held out of the list above. <strong>Promote</strong> one to add it to the allowlist (edit the canonical name; leave segment blank for a blood test) — every past value it names is redeemed for free. <strong>Reject</strong> to delete these rows for good.</p>
-<div class="table-frame">
-  <div class="table-scroll">
-    <table class="data">
-      <thead><tr><th>Printed name</th><th>Seen</th><th>Sample</th><th>Promote as</th><th></th></tr></thead>
-      <tbody>
-      {% for c in candidates %}
-        <tr>
-          <td class="name">{{ c.printed_name }}{% if c.section %}<span class="unnamed-tag">{{ c.section }}</span>{% endif %}</td>
-          <td class="num">{{ c.n }}× · {{ c.last_seen }}</td>
-          <td class="num">{{ c.sample }}</td>
-          <td>
-            <form class="correct-form" method="post" action="/observations/promote">
-              <input type="hidden" name="person" value="{{ person.correspondent }}">
+<p class="section-note">Test names the codebook doesn't know, so they're held out of the list above. Tick the ones you mean, then <strong>Promote selected</strong> to add them to the allowlist (edit the canonical name; leave segment blank for a blood test) — every past value they name is redeemed for free — or <strong>Reject selected</strong> to delete those rows for good.</p>
+<form method="post" id="review-form">
+  <input type="hidden" name="person" value="{{ person.correspondent }}">
+  <div class="table-frame">
+    <div class="table-scroll">
+      <table class="data">
+        <thead><tr>
+          <th class="tick"><input type="checkbox" aria-label="select all"
+              onclick="for (const b of document.querySelectorAll('#review-form input[name=selected]')) b.checked = this.checked;"></th>
+          <th>Printed name</th><th>Seen</th><th>Sample</th><th>Promote as</th>
+        </tr></thead>
+        <tbody>
+        {% for c in candidates %}
+          <tr>
+            <td class="tick"><input type="checkbox" name="selected" value="{{ loop.index0 }}" aria-label="select {{ c.printed_name }}"></td>
+            <td class="name">
+              {{ c.printed_name }}{% if c.section %}<span class="unnamed-tag">{{ c.section }}</span>{% endif %}
               <input type="hidden" name="printed_name" value="{{ c.printed_name }}">
+            </td>
+            <td class="num">{{ c.n }}× · {{ c.last_seen }}</td>
+            <td class="num">{{ c.sample }}</td>
+            <td class="promote-cell">
               <input type="text" name="canonical" value="{{ c.printed_name }}" aria-label="canonical name">
-              <input type="text" name="segment" placeholder="segment" aria-label="segment">
-              <button class="btn btn-primary" type="submit">promote</button>
-            </form>
-          </td>
-          <td class="actions">
-            <form class="inline" method="post" action="/observations/reject" onsubmit="return confirm('Delete all {{ c.n }} unnamed “{{ c.printed_name }}” row(s) for {{ person.correspondent }}?');">
-              <input type="hidden" name="person" value="{{ person.correspondent }}">
-              <input type="hidden" name="printed_name" value="{{ c.printed_name }}">
-              <button class="btn btn-danger" type="submit">reject</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+              <input type="text" name="segment" value="" placeholder="segment" aria-label="segment">
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
+  <div class="bulk-actions">
+    <button class="btn btn-primary" type="submit" formaction="/observations/promote">Promote selected</button>
+    <button class="btn btn-danger" type="submit" formaction="/observations/reject"
+            onclick="return confirm('Delete every selected unnamed test for {{ person.correspondent }}? This cannot be undone.');">Reject selected</button>
+  </div>
+</form>
 {% endif %}
 
 {% endblock %}
