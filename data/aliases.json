@@ -169,6 +169,7 @@
   "Absolute Neutrophil Count": [
     "Absolute Neutrophils",
     "Absolute Neutrophils Count",
+    "Neutrophil Absolute",
     "ANC"
   ],
   "Absolute Lymphocyte Count": [
@@ -344,5 +345,14 @@
   ],
   "Aorta": [
     "AO"
+  ],
+  "Platelet Count": [
+    "Platelet"
+  ],
+  "Plateletcrit": [
+    "Platelet Crit"
+  ],
+  "C-Reactive Protein": [
+    "CRP"
   ]
 }

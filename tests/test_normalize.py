@@ -63,7 +63,9 @@ class TestQualifierIsIdentity:
         [
             ("DIRECT BILIRUBIN", "Direct Bilirubin"),
             ("TOTAL BILIRUBIN", "Total Bilrubin"),  # codebook spells it 'Bilrubin'
-            ("INDIRECT BILIRUBIN", None),  # not tracked; must never become Direct
+            # Now a tracked analyte (data/analytes_extra.json); the invariant it
+            # guards is that it resolves to Indirect and never to Direct/Total.
+            ("INDIRECT BILIRUBIN", "Indirect Bilirubin"),
         ],
     )
     def test_qualifiers_distinguish_tests(

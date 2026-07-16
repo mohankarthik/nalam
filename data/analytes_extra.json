@@ -67,5 +67,20 @@
   "Days with Device Usage":   {"segment": "Sleep"},
   "Days without Device Usage": {"segment": "Sleep"},
   "Percent Days with Device Usage": {"segment": "Sleep"},
-  "Large Leak Percent":       {"segment": "Sleep"}
+  "Large Leak Percent":       {"segment": "Sleep"},
+
+  "_chem_comment": "Blood-chemistry analytes reports carry that the master sheet never tracked: calculated ratios, an extra bilirubin fraction, inflammation and electrolyte markers. No ranges (see _ranges). Ratios rely on DISQUALIFIERS ('ratio','non') to keep the bare parent analyte from also claiming them.",
+  "Indirect Bilirubin":       {"segment": "LFT"},
+  "SGOT/SGPT Ratio":          {"segment": "LFT"},
+  "eGFR":                     {"segment": "KFT"},
+  "Bicarbonate":              {"segment": "KFT"},
+  "BUN/Creatinine Ratio":     {"segment": "KFT"},
+  "Urea/Creatinine Ratio":    {"segment": "KFT"},
+  "Magnesium":                {"segment": "KFT"},
+  "Non-HDL Cholesterol":      {"segment": "Lipid"},
+  "C-Reactive Protein":       {"segment": "CBC"},
+
+  "_platelet_comment": "Peripheral-smear platelet lines are three different things sharing the word 'platelet': a numeric count (aliased 'Platelet'), the plateletcrit index PCT, and a free-text morphology note. Kept as three analytes so a bare 'Platelet' count does not swallow the crit value or the 'adequate/reduced' narrative.",
+  "Plateletcrit":             {"segment": "CBC"},
+  "Platelet Morphology":      {"segment": "CBC"}
 }
