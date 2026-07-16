@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ report.study_type or 'Radiology' }} · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<a class="backlink" href="/radiology?person={{ person.correspondent }}">← Radiology</a>
+
+<div class="page-head">
+  <h1 class="page-title">
+    {{ report.study_type or 'Radiology' }}
+    <span class="sub">· {{ report.effective or '?' }}</span>
+  </h1>
+</div>
+
+<div class="card">
+  <dl class="detail-grid">
+    <dt>Impression</dt><dd>{{ report.impression or '—' }}</dd>
+  </dl>
+  {% if report.doc_link %}<a href="{{ report.doc_link }}" target="_blank" rel="noopener">view scan →</a>{% endif %}
+</div>
+
+<h2 class="section-title">Report</h2>
+<div class="card">
+  <pre class="report-text">{{ report.report_text or 'No report text on file.' }}</pre>
+</div>
+
+{% endblock %}

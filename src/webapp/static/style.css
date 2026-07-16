@@ -436,3 +436,15 @@ svg.trend { width: 100%; height: auto; display: block; color: var(--accent); }
   padding: 3rem 1rem;
   font-style: italic;
 }
+
+.report-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .82rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0;
+  max-height: 32rem;
+  overflow-y: auto;
+}

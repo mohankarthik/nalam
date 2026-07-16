@@ -31,6 +31,7 @@
         <a href="/medications?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path == '/medications' else '' }}">Medications</a>
         <a href="/observations?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path.startswith('/observations') else '' }}">Observations</a>
         <a href="/encounters?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path.startswith('/encounters') else '' }}">Encounters</a>
+        <a href="/radiology?person={{ person.correspondent }}" class="tab {{ 'active' if request.url.path.startswith('/radiology') else '' }}">Radiology</a>
       </nav>
     </div>
   </header>

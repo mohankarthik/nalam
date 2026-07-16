@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Radiology · {{ person.correspondent }} · nalam{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1 class="page-title">Radiology <span class="sub">· {{ person.correspondent }}</span></h1>
+  <span class="count-pill">{{ reports|length }} on file</span>
+</div>
+
+{% for r in reports %}
+<a class="card encounter-card" href="/radiology/{{ r.document_id }}?person={{ person.correspondent }}">
+  <span class="chevron">›</span>
+  <span class="when">{{ r.effective or '?' }}</span>
+  <span class="where"> · {{ r.study_type or 'Radiology' }}</span>
+  <div class="dx">{{ r.impression or '—' }}</div>
+</a>
+{% else %}
+<div class="empty">No imaging reports on file.</div>
+{% endfor %}
+
+{% endblock %}

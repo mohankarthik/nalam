@@ -206,7 +206,16 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
 `health.db`: 3,793 observations · 461 medication events · 103 encounters, 8 people, 2013–2026.
 All 470 PDFs classified **by content**: 168 prescription · 157 lab · 61 radiology · 36 insurance ·
 15 discharge · 12 vaccination. Labs, discharges and prescriptions are extracted.
-**Radiology (61 documents) is not.**
+
+**Radiology is stored as ONE verbatim text record per study, not per-parameter rows.** An imaging
+report is narrative (MRI/USG/CT prose; the echo measurements are the exception), and forcing it into
+the analyte-shaped `observations` table produced junk — one `IVS` analyte holding a septum finding,
+a septum:wall ratio and a thickening percent at once. Nobody trends a single radiology number over
+years; they read the report, and Paperless already full-text-searches the PDF. So `ingest_radiology`
+now writes one row to `radiology_reports` (`study_type` bucket via `src/radiology.py:study_bucket`,
+verbatim `report_text`, the radiologist's `impression`), keeping the patient-misfile guard. Browse
+it with `run_radiology_browse.py`, the web UI's Radiology tab, or the bot's `get_radiology`. Labs
+stay structured in `observations`; that split is the point.
 
 A Telegram-filed document now extracts on-demand instead of waiting for the nightly pass — see
 `docs/telegram_ingest_queue.md`. Filing enqueues (`src/extract_queue.py`); `run_extract_queue.py`
@@ -235,6 +244,8 @@ a reading for each, flag confidence, they correct what's wrong.
 
 ### Not started
 
-MCP agent · Todoist reminders · Telegram bot · **deployment** (shared `cron-base` image, not a
-shared container with gajana) · radiology extractor · reconciling the live medicine list (people
+MCP agent · Todoist reminders · Telegram bot · reconciling the live medicine list (people
 still show 2023 antibiotics as "current" because nothing ever said stop).
+
+(Deployment is done — live supercronic container on a shared `cron-base` image with gajana.
+Radiology extraction is done — see the text-record note above.)

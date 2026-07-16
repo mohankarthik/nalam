@@ -47,6 +47,7 @@ QA_LOG = os.path.join(STATE_DIR, "qa_log.jsonl")
 MAX_TOOL_ROUNDS = 4
 OBSERVATION_LIMIT = 10
 ENCOUNTER_LIMIT = 5
+RADIOLOGY_LIMIT = 10
 
 
 def doc_link(con: sqlite3.Connection, document_id: Optional[int]) -> Optional[str]:
@@ -180,6 +181,25 @@ def get_encounters(
     ]
 
 
+def get_radiology(
+    con: sqlite3.Connection, subject: str, since: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Imaging reports (echo, USG, MRI, CT, X-ray), most recent first. Each is one
+    verbatim record -- radiology is read, not trended -- so the impression is the
+    line to quote, with the full report text available behind it."""
+    rows = db.radiology_for(con, subject, since)[:RADIOLOGY_LIMIT]
+    return [
+        {
+            "study_type": r["study_type"],
+            "date": r["effective"],
+            "impression": r["impression"],
+            "report_text": r["report_text"],
+            "document_id": r["document_id"],
+        }
+        for r in rows
+    ]
+
+
 def get_medication_history(
     con: sqlite3.Connection, subject: str, drug: Optional[str] = None
 ) -> list[dict[str, Any]]:
@@ -301,6 +321,26 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_radiology",
+            "description": "Imaging reports (echo, ultrasound, MRI, CT, X-ray, Doppler) for "
+            "this person. Use for any 'what did the scan / echo / MRI show' question. "
+            "Each result carries the radiologist's impression and the full report text; "
+            "quote the impression, never summarise a finding the report did not state.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "since": {
+                        "type": "string",
+                        "description": "ISO date (YYYY-MM-DD) lower bound. Omit for no lower "
+                        "bound.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_medication_history",
             "description": "Every medication event ever recorded for this person, including "
             "expired courses, children's prescriptions and one-offs that "
@@ -380,6 +420,7 @@ def _dispatch(con: sqlite3.Connection, subject: str) -> dict[str, Callable[..., 
             con, subject, analyte, since
         ),
         "get_encounters": lambda since=None: get_encounters(con, subject, since),
+        "get_radiology": lambda since=None: get_radiology(con, subject, since),
         "get_medication_history": lambda drug=None: get_medication_history(con, subject, drug),
         "get_medications_for_condition": lambda condition: get_medications_for_condition(
             con, subject, condition

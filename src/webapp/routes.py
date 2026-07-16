@@ -260,6 +260,49 @@ def encounters_page(
     return templates.TemplateResponse(request, "encounters.html", ctx)
 
 
+@router.get("/radiology")
+def radiology_page(
+    request: Request, person: Optional[str] = None, con: sqlite3.Connection = Depends(get_db)
+):
+    who = current_person(person)
+    rows = db.radiology_for(con, who.correspondent)
+    reports = [
+        {
+            "document_id": r["document_id"],
+            "study_type": r["study_type"],
+            "effective": r["effective"],
+            "impression": r["impression"],
+        }
+        for r in rows
+    ]
+    ctx = nav_context(request, who)
+    ctx.update(reports=reports)
+    return templates.TemplateResponse(request, "radiology.html", ctx)
+
+
+@router.get("/radiology/{document_id}")
+def radiology_detail(
+    request: Request,
+    document_id: int,
+    person: Optional[str] = None,
+    con: sqlite3.Connection = Depends(get_db),
+):
+    who = current_person(person)
+    row = db.radiology_report(con, document_id, who.correspondent)
+    if not row:
+        raise HTTPException(404, "no such imaging report for this person")
+    report = {
+        "study_type": row["study_type"],
+        "effective": row["effective"],
+        "impression": row["impression"],
+        "report_text": row["report_text"],
+        "doc_link": doc_link(con, document_id),
+    }
+    ctx = nav_context(request, who)
+    ctx.update(report=report)
+    return templates.TemplateResponse(request, "radiology_detail.html", ctx)
+
+
 @router.get("/encounters/{document_id}")
 def encounter_detail(
     request: Request,

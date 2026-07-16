@@ -211,11 +211,11 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
     paperless = Paperless()
     ocr = paperless.ocr_index()
     paperless_ids = paperless.document_id_index()
-    misfiled = untrusted = meas = find = 0
+    misfiled = unreadable = reports = 0
 
     for i, d in enumerate(todo, 1):
         try:
-            n_m, n_f, bad, moved = ingest_radiology(
+            n_reports, bad, moved = ingest_radiology(
                 con,
                 d.rel,
                 d.correspondent,
@@ -226,9 +226,8 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")
             continue
 
-        meas += n_m
-        find += n_f
-        untrusted += bad
+        reports += n_reports
+        unreadable += bad
         if moved:
             misfiled += 1
             logger.warning(
@@ -236,12 +235,12 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
             )
         logger.info(
             f"  [{i}/{len(todo)}] {d.correspondent} | {d.title[:34]} -> "
-            f"{n_m} measurements, {n_f} findings"
+            f"{'filed' if n_reports else 'review'}"
         )
 
     logger.info(
-        f"\ndone. {meas} measurements, {find} findings. "
-        f"{untrusted} were not corroborated by an independent reading (-> review). "
+        f"\ndone. {reports} imaging reports filed. "
+        f"{unreadable} had no readable text (-> review). "
         f"{misfiled} documents were filed under the wrong person."
     )
 

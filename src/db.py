@@ -117,6 +117,30 @@ CREATE TABLE IF NOT EXISTS encounters (
     UNIQUE (subject, admitted, hospital)
 );
 
+-- Radiology as a DOCUMENT, not a row of numbers.
+--
+-- An imaging report is narrative: an MRI, USG or CT is prose, and its handful of
+-- echo measurements are the exception, not the rule. Forcing that prose into the
+-- analyte-shaped `observations` table produced junk -- one 'IVS' analyte holding a
+-- septum finding, a septum:wall ratio and a thickening percent at once. Nobody
+-- trends a single radiology parameter over years; they read the report. Paperless
+-- already OCRs and full-text-searches the PDF, so what health.db needs to add is
+-- one verbatim record per study, bucketed by study type and findable by person and
+-- date. Labs stay in `observations`; radiology lives here.
+CREATE TABLE IF NOT EXISTS radiology_reports (
+    id           INTEGER PRIMARY KEY,
+    document_id  INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    subject      TEXT COLLATE NOCASE NOT NULL,
+    study_type   TEXT,          -- bucket: "Echo", "USG Abdomen", "MRI Brain", "X-Ray Chest"
+    effective    TEXT,          -- ISO study date
+    impression   TEXT,          -- the radiologist's conclusion, verbatim (may be NULL)
+    report_text  TEXT,          -- the entire report content, verbatim
+    -- One report per source document. NOT (subject, effective, study_type): two
+    -- distinct PDFs can be the same person's same-day same-modality study (two
+    -- X-ray views, a repeat echo), and keying on that silently dropped the second.
+    UNIQUE (document_id)
+);
+
 -- Medication as an EVENT LOG, not a table of truth.
 --
 -- A prescription records what was STARTED. Nothing records what was STOPPED. So
@@ -340,4 +364,52 @@ def latest(con: sqlite3.Connection, subject: str, analyte: str) -> Optional[sqli
            WHERE subject = ? AND analyte = ? AND effective IS NOT NULL
            ORDER BY effective DESC LIMIT 1""",
         (subject, analyte),
+    ).fetchone()
+
+
+def upsert_radiology_report(
+    con: sqlite3.Connection,
+    document_id: int,
+    subject: str,
+    study_type: Optional[str],
+    effective: Optional[str],
+    impression: Optional[str],
+    report_text: Optional[str],
+) -> None:
+    """Store one imaging report, replacing any prior record of the same document.
+
+    Unlike medication_events, this table carries no human rulings -- every field is
+    extractor- or OCR-produced -- so a re-ingest may safely DELETE and re-INSERT.
+    The replace is keyed by document_id (also the UNIQUE key): re-reading a document
+    overwrites its record; two different documents keep two records.
+    """
+    con.execute("DELETE FROM radiology_reports WHERE document_id = ?", (document_id,))
+    con.execute(
+        """INSERT OR IGNORE INTO radiology_reports
+             (document_id, subject, study_type, effective, impression, report_text)
+           VALUES (?,?,?,?,?,?)""",
+        (document_id, subject, study_type, effective, impression, report_text),
+    )
+
+
+def radiology_for(
+    con: sqlite3.Connection, subject: str, since: Optional[str] = None
+) -> list[sqlite3.Row]:
+    """A person's imaging reports, most recent first."""
+    sql = "SELECT * FROM radiology_reports WHERE subject = ?"
+    params: list[Any] = [subject]
+    if since:
+        sql += " AND (effective IS NULL OR effective >= ?)"
+        params.append(since)
+    sql += " ORDER BY effective DESC"
+    return con.execute(sql, params).fetchall()
+
+
+def radiology_report(
+    con: sqlite3.Connection, document_id: int, subject: str
+) -> Optional[sqlite3.Row]:
+    """One imaging report, scoped to the person so a URL cannot cross patients."""
+    return con.execute(
+        "SELECT * FROM radiology_reports WHERE document_id = ? AND subject = ?",
+        (document_id, subject),
     ).fetchone()

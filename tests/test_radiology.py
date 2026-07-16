@@ -324,7 +324,7 @@ class TestOneDocumentOneOwner:
 
         got = ingest.ingest_radiology(con, "Alice/Reports/echo.pdf", "Alice Doe")
 
-        assert got == (0, 0, 0, None), "radiology should have skipped a lab's document"
+        assert got == (0, 0, None), "radiology should have skipped a lab's document"
         survivors = con.execute("SELECT printed_name FROM observations").fetchall()
         assert [r["printed_name"] for r in survivors] == ["Haemoglobin"], (
             "the lab's observation was deleted by a radiology ingest. This is the bug "
@@ -358,3 +358,158 @@ def test_an_impression_is_never_invented_from_a_finding(printed, expected_impres
         oracle_source="ocr",
     )
     assert r.impression == expected_impression
+
+
+# --- Radiology is stored as ONE verbatim text record, not per-parameter rows ------
+
+
+class TestStudyBucket:
+    """The coarse study-type label an imaging report is filed under. Title-first,
+    tolerating a leading date and the person's name; extractor study as fallback."""
+
+    @pytest.mark.parametrize(
+        "title, expected",
+        [
+            ("2023-03-20 - Ila - MRI Brain.pdf", "MRI Brain"),
+            ("2019-09-11 - Xray Chest.pdf", "X-Ray Chest"),
+            ("2021-10-25 - xray - spine.pdf", "X-Ray Spine"),
+            ("2021-10-05 - Echo.pdf", "Echo"),
+            ("2023-05-02 - USG Abdomen.pdf", "USG Abdomen"),
+            ("2026-03-05 - Venous Doppler (lower limbs).pdf", "Doppler Lower Limb"),
+            ("2019-11-23 - Ila - Hysterosalpingography.pdf", "HSG"),
+            # No modality word at all: keep the human descriptor, drop the name.
+            ("2021-01-16 - Ila - Vishwas Collection.pdf", "Vishwas Collection"),
+        ],
+    )
+    def test_bucket_from_title(self, title, expected) -> None:
+        from src.radiology import study_bucket
+
+        assert study_bucket(title) == expected
+
+    def test_falls_back_to_extractor_study_when_title_is_uninformative(self) -> None:
+        from src.radiology import study_bucket
+
+        assert study_bucket("2021-01-16 - Ila - Report.pdf", {"name": "MRI BRAIN"}) == "MRI Brain"
+
+
+class TestRadiologyReportStore:
+    """The radiology_reports table: round-trip, patient scoping, and replace-on-reingest."""
+
+    def _con(self, tmp_path):
+        import sqlite3
+
+        from src import db
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+        con.execute(
+            "INSERT INTO documents (subject, source_path, doc_type) VALUES ('A','p','radiology')"
+        )
+        return con, con.execute("SELECT id FROM documents").fetchone()["id"]
+
+    def test_roundtrip_and_patient_scope(self, tmp_path) -> None:
+        from src import db
+
+        con, doc = self._con(tmp_path)
+        db.upsert_radiology_report(con, doc, "A", "MRI Brain", "2023-01-01", "imp1", "text one")
+        con.commit()
+
+        got = db.radiology_for(con, "A")
+        assert len(got) == 1 and got[0]["impression"] == "imp1"
+        assert db.radiology_report(con, doc, "A")["report_text"] == "text one"
+        # A URL that names the wrong person must not return another patient's scan.
+        assert db.radiology_report(con, doc, "B") is None
+
+    def test_reingest_replaces_not_duplicates(self, tmp_path) -> None:
+        from src import db
+
+        con, doc = self._con(tmp_path)
+        db.upsert_radiology_report(con, doc, "A", "MRI Brain", "2023-01-01", "imp1", "text one")
+        db.upsert_radiology_report(con, doc, "A", "MRI Brain", "2023-01-01", "imp2", "text two")
+        con.commit()
+        assert con.execute("SELECT count(*) FROM radiology_reports").fetchone()[0] == 1
+        assert db.radiology_report(con, doc, "A")["impression"] == "imp2"
+
+
+class TestIngestWritesOneRecord:
+    """ingest_radiology stores one text record and NO observations, and prefers the
+    fuller of the two independent readings for report_text."""
+
+    def _setup(self, tmp_path, monkeypatch, *, embedded, ocr, findings):
+        import sqlite3
+
+        from src import db, ingest
+        from src.extractor import Radiology
+        from src.validator import Verdict
+
+        con = sqlite3.connect(tmp_path / "t.db")
+        con.row_factory = sqlite3.Row
+        con.executescript(db.SCHEMA)
+
+        root = tmp_path / "root"
+        rel = "Ila/Scans/2023-03-20 - MRI Brain.pdf"
+        (root / "Ila" / "Scans").mkdir(parents=True)
+        (root / rel).write_bytes(b"%PDF-1.4 fake")
+        monkeypatch.setattr(ingest, "MEDICAL_ROOT", str(root))
+
+        fake = Radiology(
+            person="Ila",
+            source=rel,
+            model="m",
+            patient={"name": "Ila"},
+            study={"name": "MRI BRAIN", "modality": "MRI"},
+            measurements=[{"name": "ignored", "value": "99"}],
+            findings=findings,
+            doc_verdict=Verdict(ok=True, hard=[], soft=[]),
+            oracle_source="text_layer",
+        )
+        monkeypatch.setattr("src.extractor.extract_radiology", lambda *a, **k: fake)
+        monkeypatch.setattr("src.extractor.text_layer", lambda b: embedded)
+        monkeypatch.setattr(ingest, "resolve_patient", lambda rel, subj, pat: (subj, None, True))
+        return con, ingest, rel
+
+    def test_one_record_no_observations(self, tmp_path, monkeypatch) -> None:
+        con, ingest, rel = self._setup(
+            tmp_path,
+            monkeypatch,
+            embedded="FULL EMBEDDED REPORT no acute infarct seen in the brain",
+            ocr="short",
+            findings=[{"text": "No acute infarct.", "is_impression": True}],
+        )
+        got = ingest.ingest_radiology(con, rel, "Ila", ocr_text="short")
+
+        assert got == (1, 0, None)
+        assert con.execute("SELECT count(*) FROM observations").fetchone()[0] == 0
+        row = con.execute("SELECT * FROM radiology_reports").fetchone()
+        assert row["study_type"] == "MRI Brain"
+        assert row["impression"] == "No acute infarct."
+        assert row["effective"] == "2023-03-20"
+        # embedded text is longer than the OCR, so it wins
+        assert "FULL EMBEDDED" in row["report_text"]
+
+    def test_ocr_wins_when_it_is_fuller(self, tmp_path, monkeypatch) -> None:
+        con, ingest, rel = self._setup(
+            tmp_path,
+            monkeypatch,
+            embedded="",  # image-only PDF: no text layer
+            ocr="A much longer OCR transcription of the whole scanned report.",
+            findings=[{"text": "Normal.", "is_impression": True}],
+        )
+        ingest.ingest_radiology(
+            con,
+            rel,
+            "Ila",
+            ocr_text="A much longer OCR transcription " "of the whole scanned report.",
+        )
+        row = con.execute("SELECT report_text FROM radiology_reports").fetchone()
+        assert row["report_text"].startswith("A much longer OCR")
+
+    def test_unreadable_report_goes_to_review(self, tmp_path, monkeypatch) -> None:
+        con, ingest, rel = self._setup(tmp_path, monkeypatch, embedded="", ocr=None, findings=[])
+        got = ingest.ingest_radiology(con, rel, "Ila", ocr_text=None)
+
+        assert got == (0, 1, None)
+        assert con.execute("SELECT count(*) FROM radiology_reports").fetchone()[0] == 0
+        q = con.execute("SELECT kind FROM review_queue").fetchone()
+        assert q["kind"] == "unreadable_radiology"

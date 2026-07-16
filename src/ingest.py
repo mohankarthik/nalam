@@ -817,30 +817,26 @@ def ingest_radiology(
     ocr_text: Optional[str] = None,
     doc_date: Optional[datetime.date] = None,
     paperless_id: Optional[int] = None,
-) -> tuple[int, int, int, Optional[str]]:
-    """Ingest an imaging report. Returns (measurements, findings, untrusted, misfiled_to).
+) -> tuple[int, int, Optional[str]]:
+    """Ingest an imaging report. Returns (reports_written, untrusted, misfiled_to).
 
-    An imaging report holds two kinds of fact, and both become observations --
-    because both are things that were true of a person on a date, which is what
-    that table is.
+    An imaging report is narrative, so it is stored as ONE verbatim text record in
+    `radiology_reports`, not exploded into per-parameter `observations`. Nobody
+    trends a single radiology number over years; they read the report -- and
+    forcing the prose into an analyte-shaped table produced junk (see the
+    radiology_reports schema comment). Paperless already OCRs and full-text-searches
+    the PDF; what health.db adds is a browsable, bucketed, person-scoped record.
 
-    A MEASUREMENT lands as a number: value_num + unit. That is what makes it
-    TRENDABLE -- "what has his ejection fraction done over five years" is a
-    question a family health record should be able to answer, and it can only
-    answer it if the 55 was stored as 55 and not buried inside a sentence.
-
-    A FINDING lands as prose: value_text, verbatim. The impression is the single
-    most important line in the document -- it is the radiologist's own conclusion,
-    the thing a doctor reads first -- and it is stored word for word, never
-    summarised. `printed_name` is 'Impression' for that row, so it can be found.
-
-    `analyte` is left NULL for all of them: the codebook is a LAB codebook, and an
-    ejection fraction is not in it. That is not a loss. `--reclassify` re-resolves
-    NULL analytes for free, offline, whenever the codebook grows -- so adding
-    "Ejection Fraction" to it later names every echo ever ingested, retroactively,
-    at no cost.
+    Three fields matter and each keeps this system's guarantees:
+      - the printed patient name still gates the whole document (resolve_patient) --
+        the correspondent-is-the-patient rule is not relaxed for radiology;
+      - `report_text` is the entire report, verbatim, from whichever independent
+        reading is fuller (embedded text layer or Paperless OCR);
+      - `impression` is the radiologist's own conclusion, word for word, or NULL --
+        never a descriptive line promoted to a conclusion (see Radiology.impression).
     """
-    from src.extractor import extract_radiology
+    from src.extractor import extract_radiology, text_layer
+    from src.radiology import study_bucket
 
     # Does another extractor already own this document? Asked FIRST, before the file
     # is even opened: this walks an rclone mount that fetches the whole object on
@@ -867,7 +863,7 @@ def ingest_radiology(
             f"{rel_path}: already ingested as {owner['doc_type']!r}. Skipped -- "
             f"extracting it as radiology would delete that extractor's observations."
         )
-        return 0, 0, 0, None
+        return 0, 0, None
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -917,116 +913,51 @@ def ingest_radiology(
         )
         con.commit()
         logger.error(f"{rel_path}: names {printed!r}, filed under {subject!r} -- not committed")
-        return 0, 0, 0, None
+        return 0, 0, None
 
     effective = _collection_date(r.patient, doc_date)
 
-    # The study title is the section a bare measurement belongs to. An echo that
-    # prints "EF 55%" under no heading still belongs to "2D ECHOCARDIOGRAPHY", and
-    # without that the row is an unattributed number.
-    study_name = (study.get("name") or study.get("modality") or "").strip()
+    # The entire report, verbatim, is what we keep. Prefer whichever independent
+    # reading is fuller: a text-native PDF carries an embedded text layer, a scanned
+    # one only Paperless's OCR.
+    embedded = text_layer(pdf) or ""
+    fuller = embedded if len(embedded.strip()) >= len((ocr_text or "").strip()) else ocr_text
+    report_text = (fuller or "").strip() or None
 
-    # Re-ingesting must REPLACE this document's rows, not add a second copy. Every
-    # observation is extractor-produced -- unlike medication_events, this table has
-    # no entered_by column and carries no human rulings, so there is nothing here
-    # to preserve. If observations ever become human-correctable, this delete has
-    # to learn about it.
+    study_type = study_bucket(os.path.basename(rel_path), study)
+
+    # Radiology no longer produces observations; clear any this document wrote
+    # under the old per-parameter extractor before storing the single text record.
     con.execute("DELETE FROM observations WHERE document_id = ?", (document_id,))
 
-    rows: list[dict] = []
-    untrusted = 0
-    n_meas = n_find = 0
-
-    for m in r.measurements:
-        raw = str(m.get("value") or "").strip()
-        name = str(m.get("name") or "").strip()
-        if not raw or not name:
-            continue
-
-        corroborated = bool(m.get("corroborated"))
-        if not corroborated:
-            untrusted += 1
-
-        number, qualitative = parse_value(raw)
-        low, high = _reference_range(str(m.get("reference_range") or ""))
-        n_meas += 1
-
-        rows.append(
-            {
-                "subject": actual,
-                "segment": None,
-                "analyte": None,
-                "printed_name": name,
-                "section": (m.get("section") or "").strip() or study_name,
-                "effective": effective,
-                # "1.2 x 0.8" is a dimension, not a number. It keeps its raw form
-                # rather than being coerced into a float it is not.
-                "value_num": number,
-                "value_text": None if number is not None else (qualitative or raw),
-                "raw_value": raw,
-                "unit": (m.get("unit") or "").strip() or None,
-                "ref_low": low,
-                "ref_high": high,
-                "source_quality": "text" if r.oracle_source == "text_layer" else "image",
-                "status": "ok" if corroborated else "review",
-                "review_reason": (
-                    None
-                    if corroborated
-                    else json.dumps(
-                        [
-                            f"the value was not corroborated by the independent reading "
-                            f"({r.oracle_source or 'no oracle available'})"
-                        ]
-                    )
-                ),
-            }
+    # A report we could not read at all (no text layer, no OCR) is not filed as an
+    # empty record -- "we couldn't read it" goes to review, as everywhere else.
+    if not report_text:
+        db.queue_review(
+            con,
+            document_id,
+            [
+                {
+                    "subject": actual,
+                    "kind": "unreadable_radiology",
+                    "printed_name": study_type,
+                    "raw_value": None,
+                    "reasons": json.dumps(["no text layer and no OCR to read the report from"]),
+                }
+            ],
         )
+        con.commit()
+        logger.warning(f"{rel_path}: no readable text -- sent to review")
+        return 0, 1, misfiled_to
 
-    for f in r.findings:
-        prose = str(f.get("text") or "").strip()
-        if not prose:
-            continue
-
-        corroborated = bool(f.get("corroborated"))
-        if not corroborated:
-            untrusted += 1
-
-        section = (f.get("section") or "").strip()
-        is_impression = bool(f.get("is_impression"))
-        n_find += 1
-
-        rows.append(
-            {
-                "subject": actual,
-                "segment": None,
-                "analyte": None,
-                # The impression is findable by name, from any report, in any
-                # modality. Everything else is named for the structure it describes.
-                "printed_name": "Impression" if is_impression else (section or "Finding"),
-                "section": section or study_name,
-                "effective": effective,
-                "value_num": None,
-                "value_text": prose,
-                "raw_value": prose,
-                "unit": None,
-                "ref_low": None,
-                "ref_high": None,
-                "source_quality": "text" if r.oracle_source == "text_layer" else "image",
-                "status": "ok" if corroborated else "review",
-                "review_reason": (
-                    None
-                    if corroborated
-                    else json.dumps(
-                        [
-                            f"only {f.get('coverage', 0.0):.0%} of the words in this finding "
-                            f"appeared in the independent reading "
-                            f"({r.oracle_source or 'no oracle available'})"
-                        ]
-                    )
-                ),
-            }
-        )
-
-    db.insert_observations(con, document_id, rows)
+    db.upsert_radiology_report(
+        con,
+        document_id=document_id,
+        subject=actual,
+        study_type=study_type,
+        effective=effective,
+        impression=r.impression,
+        report_text=report_text,
+    )
     con.commit()
-    return n_meas, n_find, untrusted, misfiled_to
+    return 1, 0, misfiled_to
