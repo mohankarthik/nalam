@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.normalize import load_codebook, match, parse_value, values_agree
+import src.normalize as normalize
+from src.normalize import load_codebook, match, parse_value, promote, values_agree
 
 
 @pytest.fixture(scope="module")
@@ -218,3 +219,40 @@ class TestExtraAnalytes:
         self, codebook: dict, printed: str, section: str, expected: str
     ) -> None:
         assert match(printed, codebook, section) == expected
+
+
+class TestPromote:
+    """The review UI's 'promote' action installs a reviewed test name into the
+    allowlist. It writes only data/promoted.json, so it can never reformat or
+    clobber the hand-curated codebook -- and load_codebook must then honour it."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate(self, tmp_path, monkeypatch):
+        # Redirect the promotion file so tests never touch the real one.
+        monkeypatch.setattr(normalize, "PROMOTED", str(tmp_path / "promoted.json"))
+
+    def test_promote_new_analyte_becomes_matchable(self) -> None:
+        canonical = promote("ANTI MULLERIAN HORMONE (Sandwich Assay)", "Anti Mullerian Hormone")
+        assert canonical == "Anti Mullerian Hormone"
+        cb = load_codebook()
+        assert "Anti Mullerian Hormone" in cb
+        # The raw printed name resolves through the alias promote recorded.
+        assert match("ANTI MULLERIAN HORMONE (Sandwich Assay)", cb) == "Anti Mullerian Hormone"
+
+    def test_promote_variant_onto_existing_canonical(self) -> None:
+        # 'Glycosylated Hb' shares no matchable token with the existing HbA1c
+        # aliases (Hb != Hemoglobin), so it needs an explicit promotion.
+        assert match("Glycosylated Hb", load_codebook()) is None
+        promote("Glycosylated Hb", "HbA1c")
+        assert match("Glycosylated Hb", load_codebook()) == "HbA1c"
+
+    def test_promote_carries_segment_for_domain_gating(self) -> None:
+        promote("ESTRADIOL(E2)", "Estradiol", "Hormone")
+        cb = load_codebook()
+        assert cb["Estradiol"]["segment"] == "Hormone"
+
+    def test_promoting_a_variant_does_not_drop_existing_aliases(self) -> None:
+        before = set(load_codebook()["HbA1c"]["aliases"])
+        promote("Glycosylated Hb", "HbA1c")
+        after = set(load_codebook()["HbA1c"]["aliases"])
+        assert before <= after and "Glycosylated Hb" in after

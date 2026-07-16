@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 ANALYTES = "data/analytes.json"
 ANALYTES_EXTRA = "data/analytes_extra.json"
 ALIASES = "data/aliases.json"
+# Analytes promoted from the web review UI. Same role as analytes_extra.json +
+# aliases.json, but machine-written -- kept in its own file so a button press can
+# never reformat or clobber the hand-curated codebook. Generated, so gitignored.
+PROMOTED = "data/promoted.json"
 
 # Words that genuinely carry no identity: assay method and filler.
 #
@@ -240,7 +244,64 @@ def load_codebook() -> dict[str, dict]:
             continue
         codebook[canonical]["aliases"] = list(names)
 
+    # Promotions made through the review UI. Their analytes seed the codebook like
+    # analytes_extra; their aliases EXTEND whatever aliases.json already set (a
+    # promotion may add a printed variant to an analyte that already has some).
+    promoted = _load_promoted()
+    for name, entry in promoted["analytes"].items():
+        codebook.setdefault(name, {"segment": entry.get("segment"), "aliases": [], "ranges": {}})
+    for canonical, names in promoted["aliases"].items():
+        if canonical not in codebook:
+            logger.warning(f"promoted alias for unknown analyte {canonical!r}; ignoring")
+            continue
+        existing = codebook[canonical].get("aliases", [])
+        codebook[canonical]["aliases"] = list(existing) + [n for n in names if n not in existing]
+
     return codebook
+
+
+def _load_promoted() -> dict:
+    """The UI-promotion file, normalised to {'analytes': {...}, 'aliases': {...}}.
+    Missing file is not an error -- nothing has been promoted yet."""
+    if not os.path.exists(PROMOTED):
+        return {"analytes": {}, "aliases": {}}
+    with open(PROMOTED, encoding="utf-8") as f:
+        data = json.load(f)
+    data.setdefault("analytes", {})
+    data.setdefault("aliases", {})
+    return data
+
+
+def promote(printed_name: str, canonical: str = "", segment: str = "") -> str:
+    """Add a reviewed test name to the codebook allowlist, and return the canonical.
+
+    Two shapes, both handled: promoting to a NEW analyte (``canonical`` is not yet
+    in the codebook -> it is added, with ``segment``), or mapping a printed variant
+    onto an EXISTING analyte (``canonical`` already known -> only the alias is
+    added). The raw ``printed_name`` is always recorded as an alias so the exact
+    string a lab printed resolves, even when the human cleaned up the canonical.
+
+    Writes only ``data/promoted.json``. Call ``db.reclassify`` afterwards to redeem
+    the past rows this now names -- free and offline.
+    """
+    printed_name = (printed_name or "").strip()
+    canonical = (canonical or "").strip() or printed_name
+    if not printed_name:
+        raise ValueError("promote needs a printed_name")
+
+    data = _load_promoted()
+    known = load_codebook()  # existing canonical? then don't re-add the analyte
+    if canonical not in known and canonical not in data["analytes"]:
+        data["analytes"][canonical] = {"segment": (segment or "").strip() or None}
+
+    aliases = data["aliases"].setdefault(canonical, [])
+    if printed_name != canonical and printed_name not in aliases:
+        aliases.append(printed_name)
+
+    with open(PROMOTED, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    return canonical
 
 
 def match(printed: str, codebook: dict[str, dict], section: str = "") -> Optional[str]:

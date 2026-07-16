@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from src import db, meds
 from src.drugs import load_drugs
-from src.normalize import load_codebook
+from src.normalize import load_codebook, match, promote
 from src.people import Person, flag_observation, load_people
 from src.qa import doc_link, get_observations
 from src.webapp.charts import sparkline_svg
@@ -152,14 +152,15 @@ def _latest_per_analyte(con: sqlite3.Connection, subject: str) -> list[sqlite3.R
     src.qa.get_observations because that helper caps rows for Q&A answers
     (OBSERVATION_LIMIT), not for a full per-person snapshot."""
     rows = con.execute(
-        """SELECT * FROM observations WHERE subject = ? AND effective IS NOT NULL
-           ORDER BY IFNULL(analyte, printed_name), effective DESC""",
+        """SELECT * FROM observations
+           WHERE subject = ? AND effective IS NOT NULL AND analyte IS NOT NULL
+           ORDER BY analyte, effective DESC""",
         (subject,),
     ).fetchall()
     seen: set[str] = set()
     latest = []
     for r in rows:
-        key = (r["analyte"] or r["printed_name"]).lower()
+        key = r["analyte"].lower()
         if key in seen:
             continue
         seen.add(key)
@@ -178,13 +179,12 @@ def observations_page(
     rows = []
     alerts = []
     for r in latest:
-        name = r["analyte"] or r["printed_name"]
+        name = r["analyte"]
         flag, _source = flag_observation(
             who, name, r["raw_value"], r["value_num"], r["ref_low"], r["ref_high"], codebook
         )
         entry = {
             "analyte": name,
-            "unnamed": r["analyte"] is None,
             "value": r["value_num"] if r["value_num"] is not None else r["value_text"],
             "unit": r["unit"],
             "date": r["effective"],
@@ -198,8 +198,65 @@ def observations_page(
     rows.sort(key=lambda e: e["analyte"].lower())
 
     ctx = nav_context(request, who)
-    ctx.update(rows=rows, alerts=alerts)
+    ctx.update(rows=rows, alerts=alerts, candidates=_promote_candidates(con, who.correspondent))
     return templates.TemplateResponse(request, "observations.html", ctx)
+
+
+def _promote_candidates(con: sqlite3.Connection, subject: str) -> list[dict]:
+    """Distinct printed test names this person carries that the codebook can't name.
+
+    These are the review surface for observations: each is either a real analyte
+    worth promoting to the allowlist, or junk (a prose fragment, an antibiotic-
+    panel line, blood-group antisera) worth rejecting. Only 'no codebook entry'
+    rows -- not the ones held back over an OCR-corroboration failure, which are a
+    trust problem, not a naming one."""
+    rows = con.execute(
+        """SELECT printed_name,
+                  MAX(section)     AS section,
+                  COUNT(*)         AS n,
+                  MAX(effective)   AS last_seen,
+                  MAX(raw_value)   AS sample
+           FROM observations
+           WHERE subject = ? AND analyte IS NULL
+                 AND review_reason LIKE '%no codebook entry%'
+           GROUP BY printed_name
+           ORDER BY n DESC, printed_name""",
+        (subject,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.post("/observations/promote")
+def promote_observation(
+    person: str = Form(...),
+    printed_name: str = Form(...),
+    canonical: str = Form(""),
+    segment: str = Form(""),
+    con: sqlite3.Connection = Depends(get_db),
+) -> RedirectResponse:
+    who = current_person(person)
+    promote(printed_name, canonical, segment)
+    # Redeem every past row the new alias now names -- free and offline, and not
+    # limited to this person: an alias helps the whole family.
+    codebook = load_codebook()
+
+    def resolver(pn: str, section: str):
+        analyte = match(pn, codebook, section)
+        return analyte, (codebook[analyte].get("segment") if analyte else None)
+
+    db.reclassify(con, resolver)
+    return RedirectResponse(url=f"/observations?person={who.correspondent}", status_code=303)
+
+
+@router.post("/observations/reject")
+def reject_observation(
+    person: str = Form(...),
+    printed_name: str = Form(...),
+    con: sqlite3.Connection = Depends(get_db),
+) -> RedirectResponse:
+    who = current_person(person)
+    db.drop_unnamed(con, who.correspondent, printed_name)
+    return RedirectResponse(url=f"/observations?person={who.correspondent}", status_code=303)
 
 
 @router.get("/observations/trend")

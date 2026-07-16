@@ -11,6 +11,10 @@ plugins/telegram_bot/settings.json
 # tests they track and the ranges they chose. Personal.
 data/analytes.json
 
+# Analytes promoted through the review UI. Machine-written from the family's own
+# reports, so treated like the generated codebook: not committed.
+data/promoted.json
+
 # The deny-list the pre-commit PII guard reads. It names real people, so
 # committing it would be the exact thing it exists to prevent.
 data/pii_denylist.txt

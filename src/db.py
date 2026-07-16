@@ -335,6 +335,22 @@ def reclassify(con: sqlite3.Connection, resolver) -> int:
     return fixed
 
 
+def drop_unnamed(con: sqlite3.Connection, subject: str, printed_name: str) -> int:
+    """Delete a person's still-unnamed observations for one printed test name.
+
+    The review UI's 'reject' action: the user has judged this printed name to be
+    not a trackable analyte (blood-group antisera, an imaging prose fragment). Only
+    rows still carrying ``analyte IS NULL`` are removed -- once a name is promoted
+    and reclassified it is a real analyte and out of reach of reject.
+    """
+    cur = con.execute(
+        "DELETE FROM observations WHERE subject = ? AND printed_name = ? AND analyte IS NULL",
+        (subject, printed_name),
+    )
+    con.commit()
+    return cur.rowcount
+
+
 def queue_review(
     con: sqlite3.Connection, document_id: Optional[int], rows: Iterable[dict[str, Any]]
 ) -> int:
