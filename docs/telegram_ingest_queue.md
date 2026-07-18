@@ -16,8 +16,11 @@ data if Paperless is slow or down.
 - No change to nightly `run_extract.py` batch logic beyond factoring out a shared per-doc function
   it now calls too — it stays the backstop for Drive-only uploads (`run_sync.py`) and anything
   on-demand missed or failed on.
-- Radiology stays unextracted (no trusted extractor yet, per CLAUDE.md) — on-demand skips it same as
-  nightly.
+- ~~Radiology stays unextracted (no trusted extractor yet) — on-demand skips it same as nightly.~~
+  **Superseded (2026-07-18):** radiology now has a trusted extractor (`ingest_radiology` →
+  `radiology_reports`), so `ingest_document` routes it too. `is_radiology()` (a title heuristic,
+  checked before `is_lab()` because imaging shares the `Medical/Reports` tag) and the `classify()`
+  content fallback both reach it — on-demand and nightly stay identical, as designed.
 
 ## Why not just extract inline in the Telegram tick
 

@@ -38,17 +38,23 @@ def ingest_document(
 ) -> dict:
     """Route one document to its extractor and ingest it. Returns a result dict.
 
-    Same precedence run_extract.py's nightly batch passes use (is_lab ->
-    ingest_lab, is_discharge -> ingest_discharge, else classify() ->
-    prescription -> ingest_prescription), now shared with the on-demand queue
-    (run_extract_queue.py) so nightly and on-demand routing can never drift
-    apart. Radiology is deliberately excluded: it has no trusted extractor yet
-    (see CLAUDE.md), so it stays a manual, explicit `--radiology` pass.
+    Same precedence run_extract.py's nightly batch passes use (is_radiology ->
+    ingest_radiology, is_lab -> ingest_lab, is_discharge -> ingest_discharge,
+    else classify() -> prescription/radiology -> the matching ingest_*), now
+    shared with the on-demand queue (run_extract_queue.py) so nightly and
+    on-demand routing can never drift apart.
 
-    ``ocr_text`` is only useful to the prescription branch (labs and discharge
-    summaries corroborate off the PDF's own text layer; see src/extractor.py).
+    is_radiology() is checked FIRST, deliberately: imaging shares the
+    Medical/Reports tag with lab reports, so is_lab() -- which routes on that tag
+    -- would otherwise claim an echo or USG and explode it into junk analyte rows
+    (the failure radiology_reports exists to prevent). classify() is the
+    content-based backstop for an imaging report whose title names no study.
+
+    ``ocr_text`` corroborates the prescription and radiology branches (labs and
+    discharge summaries corroborate off the PDF's own text layer; see
+    src/extractor.py).
     """
-    from src.extractor import classify, is_discharge, is_encrypted, is_lab
+    from src.extractor import classify, is_discharge, is_encrypted, is_lab, is_radiology
 
     if doc.suffix != ".pdf":
         return {"doc_type": "unsupported", "note": "not a PDF"}
@@ -59,6 +65,9 @@ def ingest_document(
             doc_date = datetime.date.fromisoformat(doc.created)
         except ValueError:
             doc_date = None
+
+    if is_radiology(doc):
+        return _radiology_result(con, doc, ocr_text, paperless_id, doc_date)
 
     if is_lab(doc):
         committed, queued = ingest_lab(
@@ -142,7 +151,33 @@ def ingest_document(
         )
         return {"doc_type": "lab", "committed": committed, "review": queued}
 
+    if kind == "radiology":
+        return _radiology_result(con, doc, ocr_text, paperless_id, doc_date)
+
     return {"doc_type": kind, "note": "no extractor for this document type yet"}
+
+
+def _radiology_result(con, doc, ocr_text, paperless_id, doc_date) -> dict:
+    """Ingest an imaging report and shape the result dict the callers format.
+
+    Shared by both radiology entry points in ingest_document() -- the is_radiology()
+    title heuristic and the classify() content fallback -- so they can never
+    return differently-shaped results (the KeyError-in-formatting trap that once
+    stranded queue items; see run_extract_queue.py::_result_text)."""
+    reports, unreadable, misfiled = ingest_radiology(
+        con,
+        doc.rel,
+        doc.correspondent,
+        ocr_text=ocr_text,
+        doc_date=doc_date,
+        paperless_id=paperless_id,
+    )
+    return {
+        "doc_type": "radiology",
+        "reports": reports,
+        "unreadable": unreadable,
+        "misfiled": misfiled,
+    }
 
 
 def ingest_lab(

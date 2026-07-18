@@ -101,6 +101,17 @@ def _result_text(result: dict) -> str:
             f"Extracted: {result.get('medications', 0)} medications, "
             f"{result.get('uncorroborated', 0)} not corroborated (-> review){note}."
         )
+    if doc_type == "radiology":
+        if result.get("reports"):
+            note = (
+                f" (document names {result['misfiled']} -- filed there)"
+                if result.get("misfiled")
+                else ""
+            )
+            return f"Extracted: imaging report filed{note}."
+        if result.get("unreadable"):
+            return "Imaging report could not be read (no text layer or OCR) -- sent to review."
+        return "Imaging report -- sent to review."
     if doc_type == "encrypted":
         return "Not extracted: password-protected PDF."
     if doc_type == "unsupported":

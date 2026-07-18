@@ -66,6 +66,27 @@ def is_discharge(doc: Any) -> bool:
     return any(re.search(p, doc.title, re.IGNORECASE) for p in routing["title_patterns"])
 
 
+def is_radiology(doc: Any) -> bool:
+    """Is this an imaging report (X-ray, USG/Doppler, CT, MRI, echo, mammogram)?
+
+    Routed on the TITLE, like is_discharge() -- and this check has to run BEFORE
+    is_lab(): imaging shares the Medical/Reports tag with lab reports, so the tag
+    cannot tell them apart. is_lab() calls every Medical/Reports document a lab,
+    and a "2D Echo" or "USG Abdomen" filed under Reports was grabbed by it and
+    exploded into junk analyte rows -- the exact failure radiology_reports exists
+    to prevent. A title that names an imaging study routes to ingest_radiology
+    first. Keyword matching, not classification -- classify() reads the page and
+    is the content-based backstop for whatever these title patterns miss.
+    """
+    import re
+
+    with open(RADIOLOGY_CONFIG, encoding="utf-8") as f:
+        routing = json.load(f).get("routing", {})
+    if doc.tag in routing.get("tags", []):
+        return True
+    return any(re.search(p, doc.title, re.IGNORECASE) for p in routing.get("title_patterns", []))
+
+
 @dataclass
 class Extraction:
     person: str

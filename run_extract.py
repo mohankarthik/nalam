@@ -23,6 +23,7 @@ from src.extractor import (
     is_discharge,
     is_encrypted,
     is_lab,
+    is_radiology,
 )
 from src.ingest import ingest_document, ingest_radiology
 from src.paperless import Paperless, id_for, ocr_for
@@ -193,7 +194,15 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
     anyone else's; only the nagging (review, reconcile, reminders) skips them.
     """
     docs, _ = collect()
-    todo = [d for d in docs if d.suffix == ".pdf" and classified_type(d.rel) == "radiology"]
+    # Either source of truth: the page-1 classifier called it imaging, OR its
+    # title names a study (is_radiology). The title heuristic catches a scanned
+    # report the classifier never saw; the classifier catches one whose title
+    # names no study. ingest_radiology()'s owner guard makes a double-claim safe.
+    todo = [
+        d
+        for d in docs
+        if d.suffix == ".pdf" and (classified_type(d.rel) == "radiology" or is_radiology(d))
+    ]
     if person:
         todo = [d for d in todo if d.correspondent == person]
 
@@ -327,7 +336,11 @@ def main() -> None:
         return
 
     docs, _skipped = collect()
-    labs = [d for d in docs if d.suffix == ".pdf" and is_lab(d)]
+    # is_radiology() first: imaging shares the Medical/Reports tag with labs, so
+    # is_lab() would otherwise claim an echo/USG and ingest_document would route
+    # it to ingest_radiology anyway -- but a radiology doc has no business padding
+    # the "N lab PDFs" count or the labs todo. It is the --radiology pass's job.
+    labs = [d for d in docs if d.suffix == ".pdf" and is_lab(d) and not is_radiology(d)]
     if args.person:
         labs = [d for d in labs if d.correspondent == args.person]
 

@@ -50,6 +50,12 @@ def stub_extractors(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         calls["branch"] = "prescription"
         return 4, 0, None
 
+    def fake_ingest_radiology(
+        con, rel_path, subject, ocr_text=None, doc_date=None, paperless_id=None
+    ):
+        calls["branch"] = "radiology"
+        return 1, 0, None
+
     def fake_classify(pdf_bytes, source="", models=None):
         calls["branch"] = "classify"
         return {"doc_type": calls.get("classify_as", "radiology")}
@@ -57,6 +63,7 @@ def stub_extractors(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(ingest, "ingest_lab", fake_ingest_lab)
     monkeypatch.setattr(ingest, "ingest_discharge", fake_ingest_discharge)
     monkeypatch.setattr(ingest, "ingest_prescription", fake_ingest_prescription)
+    monkeypatch.setattr(ingest, "ingest_radiology", fake_ingest_radiology)
     monkeypatch.setattr("src.extractor.classify", fake_classify)
     monkeypatch.setattr("src.extractor.is_encrypted", lambda pdf: False)
 
@@ -98,6 +105,33 @@ class TestRouting:
         result = ingest.ingest_document(None, doc)
         assert stub_extractors["branch"] == "lab"
         assert result["doc_type"] == "lab"
+
+    def test_radiology_beats_lab_tag(self, stub_extractors: dict[str, Any]) -> None:
+        """An echo filed under Reports carries the Medical/Reports tag, so is_lab()
+        claims it -- and ingest_lab() explodes its prose into junk analyte rows.
+        is_radiology() runs first on the title, so it routes to radiology."""
+        doc = _doc(tag="Medical/Reports", title="2026-07-12 - 2D Echo")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "radiology"
+        assert result == {"doc_type": "radiology", "reports": 1, "unreadable": 0, "misfiled": None}
+
+    def test_radiology_usg_beats_lab_tag(self, stub_extractors: dict[str, Any]) -> None:
+        doc = _doc(tag="Medical/Reports", title="2026-07-14 - USG Abdomen")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "radiology"
+        assert result["doc_type"] == "radiology"
+
+    def test_falls_through_to_classify_then_radiology(
+        self, stub_extractors: dict[str, Any]
+    ) -> None:
+        """An imaging report whose title names no study (so is_radiology() misses)
+        must still route through ingest_radiology() via the content classifier,
+        not fall into the generic "no extractor" bucket."""
+        stub_extractors["classify_as"] = "radiology"
+        doc = _doc(tag="Medical/Admissions", title="Bladder Study")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "radiology"
+        assert result == {"doc_type": "radiology", "reports": 1, "unreadable": 0, "misfiled": None}
 
     def test_discharge_wins_on_title_when_not_a_lab(self, stub_extractors: dict[str, Any]) -> None:
         doc = _doc(tag="Medical/General", title="Discharge Summary")
