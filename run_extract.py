@@ -33,7 +33,16 @@ logger = logging.getLogger(__name__)
 
 def run_discharge(con, limit: int = 0) -> None:
     docs, _skipped = collect()
-    todo = [d for d in docs if d.suffix == ".pdf" and is_discharge(d)]
+    # Title heuristic OR the page-1 classifier, like run_radiology(): a discharge
+    # summary with an opaque title (an admission abbreviated to "NICU" / "UTI")
+    # trips no title pattern, and without the classifier backstop it fell through
+    # every pass and was silently never ingested. classify() read the page and
+    # called it a discharge; honour that.
+    todo = [
+        d
+        for d in docs
+        if d.suffix == ".pdf" and (is_discharge(d) or classified_type(d.rel) == "discharge")
+    ]
     done = {
         r["source_path"]
         for r in con.execute(
@@ -340,7 +349,18 @@ def main() -> None:
     # is_lab() would otherwise claim an echo/USG and ingest_document would route
     # it to ingest_radiology anyway -- but a radiology doc has no business padding
     # the "N lab PDFs" count or the labs todo. It is the --radiology pass's job.
-    labs = [d for d in docs if d.suffix == ".pdf" and is_lab(d) and not is_radiology(d)]
+    # is_lab() title/tag heuristic OR the page-1 classifier, like run_radiology()
+    # and run_discharge(): a lab report whose title is an opaque abbreviation
+    # ("TMS", "ABG") sits under no Reports tag and matches no title pattern, so
+    # without the classifier backstop it was never ingested. is_radiology() still
+    # wins first -- an echo/USG must not pad the lab count or explode into rows.
+    labs = [
+        d
+        for d in docs
+        if d.suffix == ".pdf"
+        and (is_lab(d) or classified_type(d.rel) == "lab")
+        and not is_radiology(d)
+    ]
     if args.person:
         labs = [d for d in labs if d.correspondent == args.person]
 

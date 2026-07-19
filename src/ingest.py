@@ -200,10 +200,17 @@ def ingest_lab(
 
     extraction = extract_lab(pdf, subject, rel_path, doc_date)
 
+    # Whose report is this REALLY? The single authoritative rule -- the same one
+    # the prescription and radiology paths already use -- NOT check_document()/
+    # `extraction.usable`, which only compares the printed name to the folder and
+    # so refuses a newborn's own screen for being labelled "B/O <mother>". A lab
+    # naming another family member re-files to them; a stranger's name blocks it.
+    actual, misfiled_to, reconciled = resolve_patient(rel_path, subject, extraction.patient)
+
     document_id = db.upsert_document(
         con,
         paperless_id=paperless_id,
-        subject=subject,
+        subject=actual,
         source_path=rel_path,
         doc_type="lab",
         doc_date=doc_date.isoformat() if doc_date else None,
@@ -212,8 +219,8 @@ def ingest_lab(
         text_layer=bool(extraction.passed or extraction.quarantined),
     )
 
-    # The report says it belongs to someone else. Trust nothing on it.
-    if not extraction.usable:
+    # Names someone we cannot identify as anyone in this family. Trust nothing on it.
+    if not reconciled:
         db.queue_review(
             con,
             document_id,
@@ -282,7 +289,7 @@ def ingest_lab(
         low, high = _reference_range(r.get("reference_range", ""))
         observations.append(
             {
-                "subject": subject,
+                "subject": actual,
                 "segment": codebook[analyte].get("segment") if analyte else None,
                 "analyte": analyte,
                 "printed_name": printed,
@@ -410,8 +417,6 @@ def ingest_discharge(
     a wrong cholesterol reading is not. A human confirms each one.
     """
     from src.extractor import extract_discharge
-    from src.people import load_people, shared_name_tokens
-    from src.validator import names_a_baby, parse_age_years, patient_matches
 
     path = os.path.join(MEDICAL_ROOT, rel_path)
     pdf = open(path, "rb").read()
@@ -425,57 +430,14 @@ def ingest_discharge(
 
     d = extract_discharge(pdf, subject, rel_path, doc_date)
 
-    # Whose document is this, really? The document usually wins over the folder --
-    # but NOT when it names a baby by its parent ("B/O <mother>"), which is how
-    # neonatal records are labelled.
-    misfiled_to: Optional[str] = None
+    # Whose document is this, really? The single authoritative rule -- shared with
+    # the prescription and radiology paths -- NOT check_document()/`d.usable`. A
+    # neonatal discharge is labelled "B/O <mother>" and would fail a name-vs-folder
+    # check, yet it is perfectly reconciled: the folder says WHICH child, and the
+    # mother is named only to identify him. resolve_patient() knows that; trusting
+    # `d.usable` refused a premature infant's own NICU and admission summaries.
     printed = (d.patient.get("name") or "").strip()
-    printed_age = (d.patient.get("age") or "").strip()
-    people = load_people()
-    shared = shared_name_tokens()
-
-    folder_person = people.get(subject)
-    printed_years = parse_age_years(printed_age)
-
-    if names_a_baby(printed, printed_age):
-        if not folder_person or not folder_person.child:
-            logger.warning(
-                f"{rel_path}: reads as a child's document ({printed!r}, age "
-                f"{printed_age!r}) but the folder is not a child's ({subject!r})."
-            )
-    elif (
-        folder_person
-        and folder_person.born
-        and doc_date
-        and doc_date.isoformat() < folder_person.born
-    ):
-        # The document predates the child's birth, so it cannot be the child's --
-        # whatever the folder says. A pregnancy folder under a child's name holds
-        # the MOTHER's consultations, and her progesterone and enoxaparin were
-        # being recorded as her unborn son's medication.
-        for candidate in people.values():
-            if printed and patient_matches(printed, candidate.correspondent, shared):
-                misfiled_to = candidate.correspondent
-                break
-        if not misfiled_to:
-            logger.warning(
-                f"{rel_path}: dated {doc_date} but {subject} was born "
-                f"{folder_person.born}. Cannot be theirs, and the document names "
-                f"{printed or 'nobody'}. Needs a human."
-            )
-    elif folder_person and folder_person.child and printed_years is None:
-        if printed and not patient_matches(printed, subject, shared):
-            logger.warning(
-                f"{rel_path}: names {printed!r} in a child's folder but prints no "
-                f"age. Keeping the folder's answer ({subject!r})."
-            )
-    elif printed and not patient_matches(printed, subject, shared):
-        for candidate in people.values():
-            if patient_matches(printed, candidate.correspondent, shared):
-                misfiled_to = candidate.correspondent
-                break
-
-    actual = misfiled_to or subject
+    actual, misfiled_to, reconciled = resolve_patient(rel_path, subject, d.patient)
 
     document_id = db.upsert_document(
         con,
@@ -489,8 +451,8 @@ def ingest_discharge(
         text_layer=d.text_layer,
     )
 
-    # The document names someone we cannot identify. Commit nothing.
-    if printed and not misfiled_to and not d.usable:
+    # Names someone we cannot identify as anyone in this family. Commit nothing.
+    if not reconciled:
         db.queue_review(
             con,
             document_id,
