@@ -198,7 +198,17 @@ def observations_page(
     rows.sort(key=lambda e: e["analyte"].lower())
 
     ctx = nav_context(request, who)
-    ctx.update(rows=rows, alerts=alerts, candidates=_promote_candidates(con, who.correspondent))
+    ctx.update(
+        rows=rows,
+        alerts=alerts,
+        candidates=_promote_candidates(con, who.correspondent),
+        # name -> segment for every codebook analyte; drives the promote-form
+        # datalist and its segment lock (pick a known analyte -> its segment is
+        # fixed; only a brand-new name leaves segment editable).
+        analyte_segments={
+            name: (entry.get("segment") or "") for name, entry in sorted(codebook.items())
+        },
+    )
     return templates.TemplateResponse(request, "observations.html", ctx)
 
 
@@ -211,19 +221,25 @@ def _promote_candidates(con: sqlite3.Connection, subject: str) -> list[dict]:
     rows -- not the ones held back over an OCR-corroboration failure, which are a
     trust problem, not a naming one."""
     rows = con.execute(
-        """SELECT printed_name,
-                  MAX(section)     AS section,
+        """SELECT o.printed_name,
+                  MAX(o.section)   AS section,
                   COUNT(*)         AS n,
-                  MAX(effective)   AS last_seen,
-                  MAX(raw_value)   AS sample
-           FROM observations
-           WHERE subject = ? AND analyte IS NULL
-                 AND review_reason LIKE '%no codebook entry%'
-           GROUP BY printed_name
-           ORDER BY n DESC, printed_name""",
+                  MAX(o.effective) AS last_seen,
+                  MAX(o.raw_value) AS sample,
+                  (SELECT s.document_id
+                     FROM observations s
+                    WHERE s.subject = o.subject AND s.printed_name = o.printed_name
+                          AND s.analyte IS NULL
+                          AND s.review_reason LIKE '%no codebook entry%'
+                    ORDER BY s.effective DESC LIMIT 1) AS document_id
+           FROM observations o
+           WHERE o.subject = ? AND o.analyte IS NULL
+                 AND o.review_reason LIKE '%no codebook entry%'
+           GROUP BY o.printed_name
+           ORDER BY n DESC, o.printed_name""",
         (subject,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    return [{**dict(r), "doc_link": doc_link(con, r["document_id"])} for r in rows]
 
 
 def _selected(selected: List[int], values: List[str]) -> list[str]:

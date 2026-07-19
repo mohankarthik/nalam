@@ -60,7 +60,10 @@
 
 {% if candidates %}
 <h2 class="section-title">Unrecognised tests — promote or reject</h2>
-<p class="section-note">Test names the codebook doesn't know, so they're held out of the list above. Tick the ones you mean, then <strong>Promote selected</strong> to add them to the allowlist (edit the canonical name; leave segment blank for a blood test) — every past value they name is redeemed for free — or <strong>Reject selected</strong> to delete those rows for good.</p>
+<p class="section-note">Test names the codebook doesn't know, so they're held out of the list above. Tick the ones you mean, then <strong>Promote selected</strong> to add them to the allowlist. Type into <em>Promote as</em> to pick an existing analyte from the suggestions (its segment is then fixed), or type a brand-new name and set its segment (blank for a blood test) — every past value they name is redeemed for free — or <strong>Reject selected</strong> to delete those rows for good.</p>
+<datalist id="analyte-names">
+  {% for name in analyte_segments %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>
 <form method="post" id="review-form">
   <input type="hidden" name="person" value="{{ person.correspondent }}">
   <div class="table-frame">
@@ -80,10 +83,11 @@
               <input type="hidden" name="printed_name" value="{{ c.printed_name }}">
             </td>
             <td class="num">{{ c.n }}× · {{ c.last_seen }}</td>
-            <td class="num">{{ c.sample }}</td>
+            <td class="num">{{ c.sample }}{% if c.doc_link %} <a href="{{ c.doc_link }}" target="_blank" rel="noopener">view</a>{% endif %}</td>
             <td class="promote-cell">
-              <input type="text" name="canonical" value="{{ c.printed_name }}" aria-label="canonical name">
-              <input type="text" name="segment" value="" placeholder="segment" aria-label="segment">
+              <input type="text" name="canonical" class="js-canonical" list="analyte-names"
+                     value="{{ c.printed_name }}" autocomplete="off" aria-label="canonical name">
+              <input type="text" name="segment" class="js-segment" value="" placeholder="segment" aria-label="segment">
             </td>
           </tr>
         {% endfor %}
@@ -97,6 +101,32 @@
             onclick="return confirm('Delete every selected unnamed test for {{ person.correspondent }}? This cannot be undone.');">Reject selected</button>
   </div>
 </form>
+<script>
+  // Pick a known analyte in "Promote as" -> its segment is fixed and locked.
+  // A brand-new name (not in the codebook) leaves segment editable.
+  (function () {
+    const segments = {{ analyte_segments | tojson }};
+    function sync(canonical) {
+      const seg = canonical.closest(".promote-cell").querySelector(".js-segment");
+      const name = canonical.value.trim();
+      if (Object.prototype.hasOwnProperty.call(segments, name)) {
+        seg.value = segments[name];
+        seg.readOnly = true;
+        seg.classList.add("locked");
+        seg.placeholder = "";
+      } else {
+        seg.readOnly = false;
+        seg.classList.remove("locked");
+        seg.placeholder = "segment";
+      }
+    }
+    for (const c of document.querySelectorAll("#review-form .js-canonical")) {
+      c.addEventListener("input", () => sync(c));
+      c.addEventListener("change", () => sync(c));
+      sync(c);  // set initial lock state on load
+    }
+  })();
+</script>
 {% endif %}
 
 {% endblock %}

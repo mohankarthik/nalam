@@ -426,6 +426,13 @@ form.inline { display: inline; margin: 0; }
 .promote-cell input[name=canonical] { min-width: 12rem; }
 .promote-cell input[name=segment] { max-width: 7rem; }
 .promote-cell input[type=text]::placeholder { color: var(--ink-faint); }
+/* segment locked to a chosen analyte's own: read-only, visibly inert */
+.promote-cell input.js-segment.locked {
+  background: var(--surface-1);
+  color: var(--ink-faint);
+  border-style: dashed;
+  cursor: not-allowed;
+}
 .bulk-actions { display: flex; gap: .5rem; margin: .85rem 0 0; }
 .correct-form input[type=text]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 
