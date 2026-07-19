@@ -1,4 +1,10 @@
-"""Import the hand-curated the master sheet.
+"""Import the hand-curated master sheet. **DEPRECATED — do not run.**
+
+The master sheet is no longer authoritative or maintained; it was a one-time
+seed. `data/analytes.json` is now the codebook, curated directly, and
+re-running this would clobber those edits. `tests/fixtures/golden.json` is
+already ingested and frozen. Kept only as the record of how both were first
+built.
 
 Produces two artefacts, both of which the rest of nalam depends on:
 

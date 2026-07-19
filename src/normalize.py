@@ -209,18 +209,20 @@ def _domain_compatible(printed: str, section: str, entry: dict) -> bool:
 
 
 def load_codebook() -> dict[str, dict]:
-    """The codebook: three files, merged. Only the first is machine-generated.
+    """The codebook: three files, merged.
 
-      data/analytes.json        regenerated from the master sheet.
-                                the analytes the sheet tracked -- typically for
-                                only one or two people.
+      data/analytes.json        the analytes the master sheet once tracked --
+                                typically for only one or two people. Seeded
+                                from that sheet long ago; now curated directly
+                                (the sheet is a dead historical reference).
       data/analytes_extra.json  analytes that reports contain
                                 but the sheet never did (RDW, MPV, urine
                                 microscopy, sleep-study AHI). Hand-curated.
       data/aliases.json         what labs print -> the canonical name.
                                 Hand-curated.
 
-    Split so that re-importing the sheet can never clobber the curated files.
+    The split predates the sheet's retirement -- it kept a re-import from
+    clobbering the curated files; now nothing re-imports.
     """
     with open(ANALYTES, encoding="utf-8") as f:
         codebook = json.load(f)

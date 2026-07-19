@@ -44,7 +44,7 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 # --- Tests ---
 ./venv/bin/python -m pytest              # ~167 regressions, offline and free
 ./venv/bin/python -m tools.extract_golden      # regenerate golden cache (slow, costs money)
-./venv/bin/python -m tools.import_master_sheet # re-import the codebook from the Sheet
+./venv/bin/python -m tools.import_master_sheet # DEPRECATED: seeded the codebook from the Sheet once; do not run (would clobber curated data/analytes.json)
 ./venv/bin/python -m tools.export_analytes     # codebook -> ~/nalam-analytes-review.md
 ```
 
@@ -149,7 +149,7 @@ file path into anything that gets committed.
 Paperless-ngx  (OCR, dedupe, full-text search, viewer — pre-existing, not ours)
         │
         ▼
-data/health.db  →  Sheets view / MCP server / Telegram bot / Todoist reminders
+data/health.db  →  web UI / MCP server / Telegram bot / Todoist reminders
 ```
 
 ## Key facts about the source data
@@ -194,12 +194,14 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
   quarantined, not committed. Copied from gajana's `StatementValidator`.
 - **Documents check themselves.** Cross-check the patient name printed on the report against the
   folder it came from. Mismatch → quarantine. (gajana's `reconcile_summary` trick.)
-- **`the master sheet` Google Sheet is the codebook**, not an output to be redesigned: 71–73
-  analytes, 20 segments, **per-person** reference ranges chosen by the user (not the lab's). It seeds
-  `data/analytes.json`, and its ~20 hand-entered historical dates are the extractor's golden test.
-- **`health.db` is the source of truth; the Sheet is a generated view.** Opposite of gajana, where
-  Sheets is primary. Consequence: the Sheet is read-only to humans; corrections go through the
-  Telegram review cards.
+- **`data/analytes.json` is the codebook**: 71–73 analytes, 20 segments, **per-person** reference
+  ranges chosen by the user (not the lab's). It was seeded once from a hand-curated Google Sheet
+  ("the master sheet"), which is now just a historical reference — **no longer authoritative and not
+  maintained**. The codebook is edited directly (and via the web UI's promote/reject path); do not
+  re-import from the Sheet. The Sheet's only lasting value was its hand-entered historical values,
+  already ingested into `health.db` and preserved as the extractor's golden test.
+- **`health.db` is the source of truth.** Opposite of gajana, where Sheets is primary. Corrections go
+  through the Telegram review cards and the web review UI, not a spreadsheet.
 
 ## Where the work stands (2026-07-13)
 

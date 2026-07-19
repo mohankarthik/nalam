@@ -1,4 +1,6 @@
-"""SQLite store. `health.db` is the source of truth; the Sheet is a view of it.
+"""SQLite store. `health.db` is the source of truth. (A Google Sheet once seeded
+the codebook and served as a read-only view; it is now a historical reference
+only -- see CLAUDE.md.)
 
 Identity columns are COLLATE NOCASE. `Ecosprin`, `ECOSPRIN` and `T. Ecosprin`
 are the same drug, and grouping them as three was simply wrong -- but LOWERCASING

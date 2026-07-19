@@ -1,8 +1,9 @@
 """Paths and settings.
 
-Everything personal -- where the documents live, who the people are, which
-spreadsheet seeds the codebook -- comes from `data/settings.json` and
-`data/people.json`, both gitignored. The code holds no names and no paths.
+Everything personal -- where the documents live, who the people are, and (for
+the deprecated one-time codebook import) which spreadsheet once seeded it --
+comes from `data/settings.json` and `data/people.json`, both gitignored. The
+code holds no names and no paths.
 """
 
 from __future__ import annotations
