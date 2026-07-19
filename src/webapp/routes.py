@@ -185,6 +185,7 @@ def observations_page(
         )
         entry = {
             "analyte": name,
+            "segment": r["segment"],
             "value": r["value_num"] if r["value_num"] is not None else r["value_text"],
             "unit": r["unit"],
             "date": r["effective"],
@@ -200,6 +201,7 @@ def observations_page(
     ctx = nav_context(request, who)
     ctx.update(
         rows=rows,
+        groups=_group_by_segment(rows),
         alerts=alerts,
         candidates=_promote_candidates(con, who.correspondent),
         # name -> segment for every codebook analyte; drives the promote-form
@@ -210,6 +212,17 @@ def observations_page(
         },
     )
     return templates.TemplateResponse(request, "observations.html", ctx)
+
+
+def _group_by_segment(rows: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Bucket the per-analyte snapshot by codebook segment for the UI.
+    Rows arrive sorted by analyte; buckets order by size (biggest first) so
+    the fat panels -- CBC, LFT -- sit up top, with the segment-less catch-all
+    ('Other') pinned last."""
+    groups: dict[str, list[dict]] = {}
+    for e in rows:
+        groups.setdefault(e["segment"] or "Other", []).append(e)
+    return sorted(groups.items(), key=lambda kv: (kv[0] == "Other", -len(kv[1]), kv[0].lower()))
 
 
 def _promote_candidates(con: sqlite3.Connection, subject: str) -> list[dict]:

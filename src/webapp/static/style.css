@@ -473,3 +473,38 @@ svg.trend { width: 100%; height: auto; display: block; color: var(--accent); }
   max-height: 32rem;
   overflow-y: auto;
 }
+
+/* --- Collapsible sections ------------------------------------------ */
+
+.collapse > summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+.collapse > summary::-webkit-details-marker { display: none; }
+.collapse > summary .chev {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: .8rem;
+  transition: transform .15s ease;
+}
+.collapse[open] > summary .chev { transform: rotate(180deg); }
+
+.collapse--segment {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  margin-bottom: .5rem;
+  overflow: hidden;
+}
+.collapse--segment > summary.segment-head {
+  padding: .65rem .9rem;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1rem;
+}
+.collapse--segment[open] > summary.segment-head { border-bottom: 1px solid var(--line); }
+.collapse--segment .table-scroll { border-top: none; }

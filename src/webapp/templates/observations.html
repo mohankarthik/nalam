@@ -8,8 +8,8 @@
 </div>
 
 {% if alerts %}
-<div class="card card--flag">
-  <div class="card-head"><span class="dot"></span>{{ alerts|length }} value(s) outside the reference range</div>
+<details class="card card--flag collapse" open>
+  <summary class="card-head"><span class="dot"></span>{{ alerts|length }} value(s) outside the reference range<span class="chev">▾</span></summary>
   <div class="table-scroll">
     <table class="data">
       <thead><tr><th>Analyte</th><th>Latest value</th><th>Date</th><th></th></tr></thead>
@@ -28,16 +28,18 @@
       </tbody>
     </table>
   </div>
-</div>
+</details>
 {% endif %}
 
 <h2 class="section-title">Latest value of every analyte on file</h2>
-<div class="table-frame">
+{% for segment, seg_rows in groups %}
+<details class="collapse collapse--segment" open>
+  <summary class="segment-head">{{ segment }}<span class="chev">▾</span></summary>
   <div class="table-scroll">
     <table class="data">
       <thead><tr><th>Analyte</th><th>Value</th><th>Date</th><th></th></tr></thead>
       <tbody>
-      {% for r in rows %}
+      {% for r in seg_rows %}
         <tr>
           <td class="name">
             {{ r.analyte }}
@@ -50,13 +52,16 @@
           <td class="num">{{ r.date }}</td>
           <td class="actions"><a href="/observations/trend?person={{ person.correspondent }}&analyte={{ r.analyte | urlencode }}">trend →</a></td>
         </tr>
-      {% else %}
-        <tr class="empty-row"><td colspan="4">No observations on file.</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
+</details>
+{% else %}
+<div class="table-frame"><div class="table-scroll"><table class="data"><tbody>
+  <tr class="empty-row"><td colspan="4">No observations on file.</td></tr>
+</tbody></table></div></div>
+{% endfor %}
 
 {% if candidates %}
 <h2 class="section-title">Unrecognised tests — promote or reject</h2>
