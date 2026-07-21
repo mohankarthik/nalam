@@ -322,43 +322,37 @@ def trusted_date(
     what: str = "",
     max_drift: int = MAX_DATE_DRIFT_DAYS,
 ) -> Optional[str]:
-    """The date to record, when the document and the filename disagree.
+    """The date to record for a document.
 
-    The date printed on the page is normally the better one -- a lab report knows
-    when the sample was collected, and the file may have been scanned weeks later.
-    So it won.
+    The uploader owns the filename. Every file arrives named `YYYY-MM-DD - ...`
+    (or with that date in its Telegram caption), and the uploader guarantees that
+    date is the event's REAL clinical date -- the day the sample was collected,
+    the day of discharge -- not the day it happened to be scanned. So the filename
+    date is authoritative and always wins when present; the date the model read
+    off the page is only a fallback, used for a document that arrived without one.
 
-    It won even when it was nonsense. A prescription filed 2024-06-14, whose drugs
-    are marked "till delivery", was recorded as effective 2024-08-24 -- a month AFTER
-    the delivery it was written for -- because the model misread the date off the
-    page and nothing checked. An arterial Doppler moved two months when 04/02 was
-    read as 02/04: the day/month swap, which is not an exotic failure, it is the
-    single commonest way a date goes wrong.
-
-    Filenames here begin with YYYY-MM-DD and are reliable. So: the printed date
-    wins, UNLESS it disagrees with the filename by more than `max_drift` days -- at
-    which point we do not know which is right, and this codebase does not guess. Take
-    the filename, which is the one that cannot be misread, and say so out loud.
+    This deliberately reverses the older "printed date wins within tolerance"
+    rule. The model misread dates in ways nothing caught: a prescription filed
+    2024-06-14, its drugs marked "till delivery", recorded 2024-08-24 -- a month
+    AFTER the delivery it preceded; an arterial Doppler that moved two months when
+    04/02 was read as 02/04, the day/month swap being the commonest way a date goes
+    wrong. The filename cannot be misread, and the uploader vouches for it, so it is
+    trusted over the page unconditionally -- a wide disagreement is logged, not
+    obeyed.
     """
     from src.validator import _parse_date
 
     printed = _parse_date(printed_text or "")
-    if not printed:
-        return filename_date.isoformat() if filename_date else None
     if not filename_date:
-        return printed.isoformat()
+        return printed.isoformat() if printed else None
 
-    drift = abs((printed - filename_date).days)
-    if drift > max_drift:
-        logger.warning(
-            f"{what}: the date read off the page ({printed}) is {drift} days from the "
-            f"filename's ({filename_date}). Too far to be a scanning delay -- most "
-            f"likely a misread, and a day/month swap is the usual one. Using the "
-            f"filename."
+    if printed and abs((printed - filename_date).days) > max_drift and what:
+        logger.info(
+            f"{what}: the model read {printed} off the page, "
+            f"{abs((printed - filename_date).days)} days from the filename's "
+            f"({filename_date}); using the filename (authoritative)."
         )
-        return filename_date.isoformat()
-
-    return printed.isoformat()
+    return filename_date.isoformat()
 
 
 def _collection_date(patient: dict, fallback: Optional[datetime.date]) -> Optional[str]:
@@ -471,6 +465,22 @@ def ingest_discharge(
         return 0, 0, None
 
     enc = d.encounter
+
+    # The uploader names the file with the encounter's real date -- the discharge
+    # date for an admission -- so the filename date is the authoritative anchor.
+    # The model only fills what the filename cannot carry: for a MULTI-DAY stay the
+    # filename is silent on the admit date, so a valid earlier admit date the model
+    # read is kept; anything missing, unparseable, or later than discharge collapses
+    # to the filename date (a same-day visit then shows one date, not a "?").
+    discharged = (
+        doc_date.isoformat()
+        if doc_date
+        else (_iso(enc.get("discharged")) or _iso(enc.get("admitted")))
+    )
+    admitted = _iso(enc.get("admitted"))
+    if not admitted or (discharged and admitted > discharged):
+        admitted = discharged
+
     n_enc = 0
     if enc.get("admitted") or enc.get("discharged") or enc.get("diagnoses"):
         con.execute(
@@ -482,8 +492,8 @@ def ingest_discharge(
                 document_id,
                 actual,
                 enc.get("hospital"),
-                _iso(enc.get("admitted")),
-                _iso(enc.get("discharged")),
+                admitted,
+                discharged,
                 enc.get("reason"),
                 json.dumps(enc.get("diagnoses") or []),
                 json.dumps(enc.get("procedures") or []),
@@ -493,7 +503,7 @@ def ingest_discharge(
         )
         n_enc = 1
 
-    effective = _iso(enc.get("discharged")) or (doc_date.isoformat() if doc_date else None)
+    effective = discharged
 
     # Re-ingesting a document must REPLACE its medications, not add another copy.
     # Without this, every re-run duplicated them -- one document was ingested six

@@ -742,9 +742,7 @@ class TestADrugCanBeTakenTwice:
 class TestADateReadOffThePageCanBeWrong:
     """And when it is, it is wrong by MONTHS, silently.
 
-    The printed date normally beats the filename -- a lab knows when the sample was
-    taken, and the scan may be weeks later. So it won unconditionally, and it won
-    even when it could not possibly be true:
+    The model misread dates in ways nothing caught:
 
       * a prescription filed 2024-06-14, whose drugs are marked "till delivery", was
         recorded effective 2024-08-24 -- a month AFTER the delivery they were written
@@ -753,20 +751,21 @@ class TestADateReadOffThePageCanBeWrong:
         day/month swap is not an exotic failure. It is the commonest way a date goes
         wrong, and nothing was watching for it.
 
-    Filenames here begin with YYYY-MM-DD and cannot be misread. So the printed date
-    wins UNLESS it disagrees with the filename by more than the tolerance -- at which
-    point we do not know which is right, and this codebase does not guess.
+    The filename begins with YYYY-MM-DD and cannot be misread, and the uploader
+    guarantees it is the event's real clinical date (not the scan date). So the
+    filename date is authoritative and always wins when present; the date read off
+    the page is only a fallback for a document that arrived without a filename date.
     """
 
     import datetime as _dt
 
     FILENAME = _dt.date(2024, 6, 14)
 
-    def test_a_plausible_printed_date_still_wins(self) -> None:
-        """A scanning delay is normal and must not be second-guessed."""
+    def test_the_filename_wins_even_over_a_plausible_printed_date(self) -> None:
+        """The uploader vouches for the filename; the page is not second-guessed."""
         from src.ingest import trusted_date
 
-        assert trusted_date("20/06/2024", self.FILENAME) == "2024-06-20"
+        assert trusted_date("20/06/2024", self.FILENAME) == "2024-06-14"
 
     def test_a_date_after_the_delivery_it_precedes_is_refused(self) -> None:
         from src.ingest import trusted_date

@@ -299,7 +299,12 @@ _DATE_FORMATS = (
 
 def _parse_date(text: str) -> Optional[datetime.date]:
     text = re.sub(r"\s+", " ", text.strip())
-    text = re.sub(r"\s*\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?$", "", text, flags=re.I)
+    # Strip a trailing time-of-day. The separators before it are not always a
+    # plain space: hospital discharge notes print "18/07/2026 /08:15PM" with a
+    # stray slash ("Date/Time of Epi. : ..."), which used to survive and defeat
+    # every %d/%m/%Y parse -- so consume any run of spaces and slashes ahead of
+    # the HH:MM token too. (A date has no bare "HH:MM", so this is unambiguous.)
+    text = re.sub(r"[\s/]*\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?$", "", text, flags=re.I)
     for fmt in _DATE_FORMATS:
         try:
             return datetime.datetime.strptime(text, fmt).date()
