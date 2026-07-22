@@ -33,7 +33,6 @@
     "diarrhea",
     "diarrhoea",
     "vomiting",
-    "AGE",
     "acute gastroenteritis"
   ],
   "diabetes": [
@@ -43,6 +42,11 @@
     "diabetes mellitus",
     "type 2 diabetes",
     "type 1 diabetes"
+  ],
+  "pulmonary hypertension": [
+    "pulmonary hypertension",
+    "PAH",
+    "cor pulmonale"
   ],
   "high blood pressure": [
     "HTN",

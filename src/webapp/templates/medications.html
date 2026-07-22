@@ -7,6 +7,8 @@
   <span class="count-pill">{{ active|length }} current</span>
 </div>
 
+{% with cat_label="Status", text_placeholder="medicine, dose, frequency…" %}{% include "_filter_bar.html" %}{% endwith %}
+
 {% if mismatches %}
 <div class="card card--flag">
   <div class="card-head"><span class="dot"></span>{{ mismatches|length }} document(s) flagged — printed patient name did not match this folder</div>
@@ -31,7 +33,12 @@
       <thead><tr><th>Medicine</th><th>Started</th><th>Dose</th><th>Frequency</th><th></th></tr></thead>
       <tbody>
       {% for m in active %}
-        <tr class="{{ 'stale' if m.stale else '' }}">
+        {% set cats = (['stale'] if m.stale else []) + (['unconfirmed'] if m.status != 'ok' else []) %}
+        {% if not cats %}{% set cats = ['confirmed'] %}{% endif %}
+        <tr class="{{ 'stale' if m.stale else '' }}" data-filter
+            data-filter-cat="{{ cats | join('|') }}"
+            data-filter-date="{{ m.started or '' }}"
+            data-filter-text="{{ m.display }} {{ m.strength or '' }} {{ m.frequency or '' }}">
           <td class="name">
             {{ m.display }}
             {% if m.stale %}<span class="badge badge-stale">stale</span>{% endif %}
@@ -58,6 +65,7 @@
       {% else %}
         <tr class="empty-row"><td colspan="5">No current medications on file.</td></tr>
       {% endfor %}
+        <tr class="empty-row js-filter-empty" hidden><td colspan="5">No medicines match the filter.</td></tr>
       </tbody>
     </table>
   </div>

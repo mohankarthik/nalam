@@ -65,6 +65,10 @@
 
 * { box-sizing: border-box; }
 
+/* [hidden] must win over element display rules (e.g. .encounter-card sets
+   display:block); the JS list filter toggles this attribute to hide rows. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -473,6 +477,53 @@ svg.trend { width: 100%; height: auto; display: block; color: var(--accent); }
   max-height: 32rem;
   overflow-y: auto;
 }
+
+/* --- Filter bar ----------------------------------------------------- */
+
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: .7rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: .85rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.filter-field { display: flex; flex-direction: column; gap: .25rem; margin: 0; }
+.filter-field > span {
+  font-size: .68rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+.filter-field--grow { flex: 1 1 12rem; }
+.filter-bar input,
+.filter-bar select {
+  font-family: var(--sans);
+  font-size: .9rem;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: .4rem .6rem;
+}
+.filter-bar .filter-cat {
+  cursor: pointer;
+  font-weight: 600;
+  min-width: 9rem;
+}
+.filter-bar .filter-text { width: 100%; }
+.filter-bar input:focus-visible,
+.filter-bar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.filter-bar .filter-clear { align-self: flex-end; }
 
 /* --- Collapsible sections ------------------------------------------ */
 

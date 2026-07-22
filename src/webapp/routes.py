@@ -17,6 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src import db, meds
+from src.conditions import canonical_labels
 from src.drugs import load_drugs
 from src.normalize import load_codebook, match, promote
 from src.people import Person, flag_observation, load_people
@@ -26,6 +27,21 @@ from src.webapp.charts import sparkline_svg
 logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+
+def _asset_version() -> str:
+    """A cache-busting token for /static links: the newest mtime among the
+    static files. Recomputed once at import (container start); a rebuild
+    re-copies the files with fresh mtimes, so browsers refetch changed CSS/JS
+    instead of serving a stale copy."""
+    static = os.path.join(os.path.dirname(__file__), "static")
+    try:
+        return str(int(max(os.path.getmtime(os.path.join(static, f)) for f in os.listdir(static))))
+    except (ValueError, OSError):
+        return "0"
+
+
+templates.env.globals["asset_v"] = _asset_version()
 
 
 def get_db() -> Generator[sqlite3.Connection, None, None]:
@@ -359,6 +375,7 @@ def encounters_page(
 
     encounters = []
     for r in rows:
+        diagnoses = json.loads(r["diagnoses"] or "[]")
         encounters.append(
             {
                 "document_id": r["document_id"],
@@ -366,7 +383,10 @@ def encounters_page(
                 "admitted": r["admitted"],
                 "discharged": r["discharged"],
                 "reason": r["reason"],
-                "diagnoses": json.loads(r["diagnoses"] or "[]"),
+                "diagnoses": diagnoses,
+                # Consolidated condition labels for the filter dropdown; the card
+                # body still shows the raw `diagnoses` above (record fidelity).
+                "conditions": canonical_labels(diagnoses),
                 "follow_up": r["follow_up"],
                 "follow_up_date": r["follow_up_date"],
             }
