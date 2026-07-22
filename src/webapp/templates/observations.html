@@ -7,6 +7,8 @@
   <span class="count-pill">{{ rows|length }} analytes</span>
 </div>
 
+{% with cat_label="Segment", text_placeholder="analyte name…" %}{% include "_filter_bar.html" %}{% endwith %}
+
 {% if alerts %}
 <details class="card card--flag collapse" open>
   <summary class="card-head"><span class="dot"></span>{{ alerts|length }} value(s) outside the reference range<span class="chev">▾</span></summary>
@@ -33,14 +35,17 @@
 
 <h2 class="section-title">Latest value of every analyte on file</h2>
 {% for segment, seg_rows in groups %}
-<details class="collapse collapse--segment" open>
+<details class="collapse collapse--segment" open data-filter-group>
   <summary class="segment-head">{{ segment }}<span class="chev">▾</span></summary>
   <div class="table-scroll">
     <table class="data">
       <thead><tr><th>Analyte</th><th>Value</th><th>Date</th><th></th></tr></thead>
       <tbody>
       {% for r in seg_rows %}
-        <tr>
+        <tr data-filter
+            data-filter-cat="{{ r.segment or 'Other' }}"
+            data-filter-date="{{ r.date or '' }}"
+            data-filter-text="{{ r.analyte }}">
           <td class="name">
             {{ r.analyte }}
             {% if not r.trusted %}<span class="badge badge-unconfirmed">unconfirmed</span>{% endif %}
@@ -62,6 +67,7 @@
   <tr class="empty-row"><td colspan="4">No observations on file.</td></tr>
 </tbody></table></div></div>
 {% endfor %}
+<p class="empty js-filter-empty" hidden>No observations match the filter.</p>
 
 {% if candidates %}
 <h2 class="section-title">Unrecognised tests — promote or reject</h2>

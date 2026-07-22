@@ -1,0 +1,25 @@
+{# Reusable client-side filter bar. Pass, before including:
+     cat_label        -- dropdown label (omit to drop the dropdown)
+     text_placeholder -- free-text input hint
+   filter.js reads the rows/cards, not this markup. #}
+<form class="filter-bar" role="search" onsubmit="return false">
+  {% if cat_label is defined %}
+  <label class="filter-field">
+    <span>{{ cat_label }}</span>
+    <select class="filter-cat"><option value="">All</option></select>
+  </label>
+  {% endif %}
+  <label class="filter-field">
+    <span>From</span>
+    <input type="date" class="filter-from">
+  </label>
+  <label class="filter-field">
+    <span>To</span>
+    <input type="date" class="filter-to">
+  </label>
+  <label class="filter-field filter-field--grow">
+    <span>Search</span>
+    <input type="search" class="filter-text" placeholder="{{ text_placeholder | default('filter…') }}">
+  </label>
+  <button type="button" class="btn filter-clear">Clear</button>
+</form>

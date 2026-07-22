@@ -58,3 +58,41 @@ def expand(condition: str) -> list[str]:
             terms.add(key)
             terms.update(synonyms)
     return sorted(terms)
+
+
+def canonical(diagnosis: str) -> str | None:
+    """The bucket key a printed diagnosis belongs to, or None if unmapped.
+
+    The inverse of expand(): "TYPE 2 DIABETES MELLITUS" -> "diabetes",
+    "K/C/O HTN" -> "high blood pressure". Same whole-word token containment,
+    so a generic committed alias ("HTN") matches a messy real string
+    ("K/C/O HTN") without the map ever holding that real string -- the reason
+    consolidation can run over personal records while the map stays generic.
+
+    First bucket wins (dict insertion order); a single string naming two
+    conditions is rare because discharge diagnoses arrive itemised. Unmapped ->
+    None, and the caller keeps the raw text; nothing is guessed or dropped.
+    """
+    dx = _tokens(diagnosis)
+    if not dx:
+        return None
+    for key, synonyms in load_conditions().items():
+        for term in (key, *synonyms):
+            t = _tokens(term)
+            if t and t <= dx:
+                return key
+    return None
+
+
+def canonical_labels(diagnoses: list[str]) -> list[str]:
+    """Consolidate an encounter's diagnoses to a sorted, de-duplicated set of
+    filter labels: each diagnosis becomes its bucket key if mapped, else its
+    own trimmed text. Drives the Encounters dropdown -- variants collapse, and
+    an unmapped diagnosis still appears (raw) so it stays filterable."""
+    labels: set[str] = set()
+    for dx in diagnoses:
+        dx = (dx or "").strip()
+        if not dx:
+            continue
+        labels.add(canonical(dx) or dx)
+    return sorted(labels)

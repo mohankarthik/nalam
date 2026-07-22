@@ -7,8 +7,14 @@
   <span class="count-pill">{{ encounters|length }} on file</span>
 </div>
 
+{% with cat_label="Diagnosis", text_placeholder="hospital, reason, diagnosis…" %}{% include "_filter_bar.html" %}{% endwith %}
+
 {% for e in encounters %}
-<a class="card encounter-card" href="/encounters/{{ e.document_id }}?person={{ person.correspondent }}">
+<a class="card encounter-card" href="/encounters/{{ e.document_id }}?person={{ person.correspondent }}"
+   data-filter
+   data-filter-cat="{{ e.conditions | join('|') }}"
+   data-filter-date="{{ e.admitted or '' }}"
+   data-filter-text="{{ e.hospital or '' }} {{ e.reason or '' }} {{ e.diagnoses | join(' ') }}">
   <span class="chevron">›</span>
   <span class="when">{{ e.admitted or '?' }}{% if e.discharged and e.discharged != e.admitted %} → {{ e.discharged }}{% endif %}</span>
   <span class="where"> · {{ e.hospital or 'unknown hospital' }}</span>
@@ -20,5 +26,6 @@
 {% else %}
 <div class="empty">No encounters on file.</div>
 {% endfor %}
+<div class="empty js-filter-empty" hidden>No encounters match the filter.</div>
 
 {% endblock %}

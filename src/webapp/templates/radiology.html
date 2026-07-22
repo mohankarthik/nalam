@@ -7,8 +7,14 @@
   <span class="count-pill">{{ reports|length }} on file</span>
 </div>
 
+{% with cat_label="Study type", text_placeholder="study type, impression…" %}{% include "_filter_bar.html" %}{% endwith %}
+
 {% for r in reports %}
-<a class="card encounter-card" href="/radiology/{{ r.document_id }}?person={{ person.correspondent }}">
+<a class="card encounter-card" href="/radiology/{{ r.document_id }}?person={{ person.correspondent }}"
+   data-filter
+   data-filter-cat="{{ r.study_type or 'Radiology' }}"
+   data-filter-date="{{ r.effective or '' }}"
+   data-filter-text="{{ r.study_type or '' }} {{ r.impression or '' }}">
   <span class="chevron">›</span>
   <span class="when">{{ r.effective or '?' }}</span>
   <span class="where"> · {{ r.study_type or 'Radiology' }}</span>
@@ -17,5 +23,6 @@
 {% else %}
 <div class="empty">No imaging reports on file.</div>
 {% endfor %}
+<div class="empty js-filter-empty" hidden>No imaging reports match the filter.</div>
 
 {% endblock %}
