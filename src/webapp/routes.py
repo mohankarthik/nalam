@@ -7,6 +7,7 @@ review_queue resolve) are the only net-new SQL in this file."""
 from __future__ import annotations
 
 import datetime
+import logging
 import os
 import sqlite3
 from typing import Generator, List, Optional
@@ -22,6 +23,7 @@ from src.people import Person, flag_observation, load_people
 from src.qa import doc_link, get_observations
 from src.webapp.charts import sparkline_svg
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
@@ -115,15 +117,19 @@ def confirm_medication(
     who = current_person(person)
     # A confirmation with no explicit date is dated TODAY -- "still on it" or
     # "he stopped it" is being said right now, whatever the last document said.
-    meds.record_decision(
-        con,
-        subject=who.correspondent,
-        drug=drug,
-        event=event,
-        effective=effective or datetime.date.today().isoformat(),
-        strength=strength or None,
-        frequency=frequency or None,
-    )
+    try:
+        meds.record_decision(
+            con,
+            subject=who.correspondent,
+            drug=drug,
+            event=event,
+            effective=effective or datetime.date.today().isoformat(),
+            strength=strength or None,
+            frequency=frequency or None,
+        )
+    except ValueError as e:
+        # An event outside the allowed set is a bad request, not a server error.
+        raise HTTPException(status_code=400, detail=str(e))
     return RedirectResponse(url=f"/medications?person={person}", status_code=303)
 
 
@@ -134,12 +140,14 @@ def review_medication(
     correction: str = Form(""),
     con: sqlite3.Connection = Depends(get_db),
 ) -> RedirectResponse:
+    who = current_person(person)
     table = load_drugs()
     try:
-        meds.apply_drug_decision(con, table, med_id, correction)
+        meds.apply_drug_decision(con, table, med_id, correction, subject=who.correspondent)
         con.commit()
-    except KeyError:
-        pass
+    except KeyError as e:
+        # Unknown id, or one belonging to another person -- a no-op, not a crash.
+        logger.warning(f"review_medication: {e}")
     return RedirectResponse(url=f"/medications?person={person}", status_code=303)
 
 
@@ -313,7 +321,13 @@ def observation_trend(
     con: sqlite3.Connection = Depends(get_db),
 ):
     who = current_person(person)
-    values = get_observations(con, who.correspondent, analyte=analyte)
+    # An empty analyte would drop the filter and mix every analyte onto one axis;
+    # a trend is about ONE test, so refuse it and show nothing rather than nonsense.
+    # limit=None because this view's whole purpose is the full multi-year history,
+    # not the capped handful get_observations returns for a Q&A answer.
+    values = (
+        get_observations(con, who.correspondent, analyte=analyte, limit=None) if analyte else []
+    )
     values = list(reversed(values))  # chronological for the chart
 
     points = [(v["date"], v["value"]) for v in values if isinstance(v["value"], (int, float))]
@@ -448,6 +462,13 @@ def encounter_detail(
 def resolve_review(
     review_id: int, person: str = Form(...), con: sqlite3.Connection = Depends(get_db)
 ) -> RedirectResponse:
-    con.execute("UPDATE review_queue SET resolved = 1 WHERE id = ?", (review_id,))
+    # Scope the dismissal to the viewed person. Without the subject clause a stale
+    # page or crafted post could clear ANOTHER patient's open patient_mismatch --
+    # the "wrong patient" warning that is the worst failure this system has.
+    who = current_person(person)
+    con.execute(
+        "UPDATE review_queue SET resolved = 1 WHERE id = ? AND subject = ?",
+        (review_id, who.correspondent),
+    )
     con.commit()
     return RedirectResponse(url=f"/medications?person={person}", status_code=303)

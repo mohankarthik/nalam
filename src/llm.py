@@ -127,6 +127,14 @@ def call_with_pdf(
     b64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
     for model in models or [PRIMARY_MODEL, FALLBACK_MODEL]:
+        # Honour a cooldown set when this model exhausted its rate-limit retries:
+        # skip straight to the fallback rather than re-hammering a model still
+        # inside its per-minute window (and burning more blocking backoffs). The
+        # write at the bottom of the loop was dead until this read existed.
+        if _is_primary(model) and time.monotonic() < _cooldown_until.get(model, 0.0):
+            logger.info(f"{model}: still in rate-limit cooldown, skipping to fallback")
+            continue
+
         if "anthropic" in model or "claude" in model:
             doc: dict[str, Any] = {
                 "type": "document",

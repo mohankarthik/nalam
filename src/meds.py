@@ -637,7 +637,13 @@ def _split_drug_entry(
     return lines
 
 
-def apply_drug_decision(con: sqlite3.Connection, table: dict, med_id: int, correction: str) -> str:
+def apply_drug_decision(
+    con: sqlite3.Connection,
+    table: dict,
+    med_id: int,
+    correction: str,
+    subject: Optional[str] = None,
+) -> str:
     """Apply one human decision on a drug read off a scan that no independent
     reading could confirm. Shared by tools/apply_review.py (CLI, one id at a
     time from argv) and the web UI (one id at a time from a form post) -- the
@@ -657,6 +663,11 @@ def apply_drug_decision(con: sqlite3.Connection, table: dict, med_id: int, corre
     ).fetchone()
     if not row:
         raise KeyError(f"no such medication_events row: {med_id}")
+    # When a caller names the person (the web UI does; the CLI worksheet does not),
+    # refuse an id that belongs to someone else -- a stale page or crafted post must
+    # not edit another patient's medication row. NOCASE to match the column collation.
+    if subject is not None and (row["subject"] or "").lower() != subject.lower():
+        raise KeyError(f"medication_events row {med_id} does not belong to {subject!r}")
 
     if correction == "-":
         con.execute("DELETE FROM medication_events WHERE id = ?", (med_id,))

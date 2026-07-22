@@ -344,9 +344,16 @@ def drop_unnamed(con: sqlite3.Connection, subject: str, printed_name: str) -> in
     not a trackable analyte (blood-group antisera, an imaging prose fragment). Only
     rows still carrying ``analyte IS NULL`` are removed -- once a name is promoted
     and reclassified it is a real analyte and out of reach of reject.
+
+    Restricted to the SAME rows the reject list surfaces: those quarantined for
+    'no codebook entry'. A name can also be NULL because it was ambiguous (two
+    results claiming one analyte, trap #4) or unverifiable -- those are never
+    offered as reject candidates, so a reject on the name must not silently sweep
+    them away too.
     """
     cur = con.execute(
-        "DELETE FROM observations WHERE subject = ? AND printed_name = ? AND analyte IS NULL",
+        "DELETE FROM observations WHERE subject = ? AND printed_name = ? "
+        "AND analyte IS NULL AND review_reason LIKE '%no codebook entry%'",
         (subject, printed_name),
     )
     con.commit()

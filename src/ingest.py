@@ -307,6 +307,15 @@ def ingest_lab(
             }
         )
 
+    # Re-ingesting a lab must REPLACE its observations, not accumulate them. The
+    # observations UNIQUE key includes `effective`, and trusted_date can now yield
+    # a different effective for the same document than a prior run did (the filename
+    # date supersedes a printed date it once tolerated), so INSERT OR IGNORE would
+    # see a new key and add a SECOND row rather than dedupe -- one draw trending as
+    # two points. Observations carry no human-entered rows (promotions live in the
+    # codebook and re-resolve on re-ingest; corrections go through review), so a
+    # clean delete-and-reinsert is safe -- the same rule radiology already uses.
+    con.execute("DELETE FROM observations WHERE document_id = ?", (document_id,))
     committed = db.insert_observations(con, document_id, observations)
     queued = db.queue_review(con, document_id, review)
     con.commit()

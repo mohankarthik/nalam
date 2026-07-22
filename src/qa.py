@@ -122,9 +122,12 @@ def get_observations(
     subject: str,
     analyte: Optional[str] = None,
     since: Optional[str] = None,
+    limit: Optional[int] = OBSERVATION_LIMIT,
 ) -> list[dict[str, Any]]:
     """Lab results, most recent first. `analyte` matches the canonical name or
-    the name as printed on the report; `since` is an ISO date lower bound."""
+    the name as printed on the report; `since` is an ISO date lower bound. `limit`
+    caps the rows (default OBSERVATION_LIMIT, sized for a Q&A answer); pass None for
+    the FULL history -- the trend chart needs every point, not the last handful."""
     sql = "SELECT * FROM observations WHERE subject = ? AND effective IS NOT NULL"
     params: list[Any] = [subject]
     if analyte:
@@ -133,8 +136,10 @@ def get_observations(
     if since:
         sql += " AND effective >= ?"
         params.append(since)
-    sql += " ORDER BY effective DESC LIMIT ?"
-    params.append(OBSERVATION_LIMIT)
+    sql += " ORDER BY effective DESC"
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(limit)
 
     rows = con.execute(sql, params).fetchall()
     return [
@@ -507,7 +512,16 @@ def answer_question(question: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT.format(person=person.correspondent)},
             {"role": "user", "content": question},
         ]
-        answer = _run_loop(FALLBACK_MODEL, messages, wrapped)
+        try:
+            answer = _run_loop(FALLBACK_MODEL, messages, wrapped)
+        except Exception as e2:
+            # Both models failed (a malformed tool call, a tool raising, an API
+            # error). Reply, don't crash the caller with a traceback.
+            logger.error(f"{FALLBACK_MODEL} also failed ({e2}); giving up on this question")
+            return (
+                "Sorry, I couldn't answer that just now — the assistant hit an "
+                "error. Please try again."
+            )
 
     links = sorted({link for d in seen_docs if (link := doc_link(con, d))})
     missing = seen_docs - {d for d in seen_docs if doc_link(con, d)}

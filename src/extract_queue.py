@@ -10,17 +10,41 @@ can never be marked done if Paperless is unreachable.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
+import fcntl
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Iterator
 
 from src.constants import STATE_DIR
 
 logger = logging.getLogger(__name__)
 
 QUEUE_PATH = os.path.join(STATE_DIR, "pending_extract.json")
+# Guards every read-modify-write of the queue file. The bot's enqueue() and the
+# drain's final write-back run in DIFFERENT processes; without a shared lock a
+# document filed mid-drain is clobbered when the drain writes back its snapshot.
+_LOCK_PATH = QUEUE_PATH + ".lock"
+
+
+@contextlib.contextmanager
+def _locked() -> Iterator[None]:
+    os.makedirs(os.path.dirname(_LOCK_PATH) or ".", exist_ok=True)
+    fd = open(_LOCK_PATH, "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        fd.close()
+
+
+def _item_key(item: dict[str, Any]) -> str:
+    """Identity of a queue item across a load/save round-trip. queued_at is an
+    ISO timestamp with microseconds, so rel+queued_at is effectively unique."""
+    return f"{item.get('rel')}|{item.get('queued_at')}"
 
 
 def load() -> list[dict[str, Any]]:
@@ -35,9 +59,16 @@ def load() -> list[dict[str, Any]]:
 
 
 def save(items: list[dict[str, Any]]) -> None:
+    # Write-then-rename so a crash/disk-full mid-write can never leave a torn file
+    # that load() would read as empty and then overwrite -- silently losing the
+    # whole backlog. os.replace() is atomic within a filesystem.
     os.makedirs(os.path.dirname(QUEUE_PATH) or ".", exist_ok=True)
-    with open(QUEUE_PATH, "w", encoding="utf-8") as f:
+    tmp = QUEUE_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(items, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, QUEUE_PATH)
 
 
 def enqueue(
@@ -61,6 +92,24 @@ def enqueue(
         "queued_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "attempts": 0,
     }
-    items = load()
-    items.append(item)
-    save(items)
+    with _locked():
+        items = load()
+        items.append(item)
+        save(items)
+
+
+def commit_drain(snapshot: list[dict[str, Any]], remaining: list[dict[str, Any]]) -> None:
+    """Write back the queue after a drain, preserving anything enqueued meanwhile.
+
+    A drain loads a `snapshot`, spends tens of seconds extracting, then wants to
+    write back only the items still pending (`remaining`). Overwriting the file
+    with `remaining` would drop any document the bot enqueued during that window.
+    So, under the lock, re-read the live queue and keep: (a) `remaining` -- the
+    snapshot items still pending, carrying their bumped attempt counts -- plus
+    (b) every live item that was NOT in the snapshot, i.e. filed mid-drain.
+    """
+    snap_keys = {_item_key(i) for i in snapshot}
+    with _locked():
+        live = load()
+        appended = [i for i in live if _item_key(i) not in snap_keys]
+        save(remaining + appended)

@@ -83,7 +83,10 @@ def convert(
         return value, printed_unit, None
 
     canonical = entry["canonical"]
-    if not printed_unit.strip():
+    # The model may emit `"unit": null`, which reaches here as None (not ""). Treat
+    # a missing unit as absent rather than dereferencing it -- an unlabelled numeric
+    # result is the review case this branch exists to flag, not a crash.
+    if not (printed_unit or "").strip():
         return None, canonical, f"{analyte}: numeric result with no unit printed"
 
     if _fold(printed_unit) == _fold(canonical):

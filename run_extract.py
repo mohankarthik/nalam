@@ -110,7 +110,11 @@ def run_classify(limit: int = 0) -> None:
                 cache.save(
                     source=d.rel,
                     doc_type="classify",
-                    prompt=open(CLASSIFY_CONFIG, encoding="utf-8").read(),
+                    # MUST match the key classified_type()/extractor.classify() read
+                    # under -- the "prompt" FIELD, not the whole config file. Keying
+                    # on the file text made this entry unfindable, so every encrypted
+                    # PDF was re-opened (re-downloaded off the rclone mount) each run.
+                    prompt=json.load(open(CLASSIFY_CONFIG, encoding="utf-8"))["prompt"],
                     raw=json.dumps(
                         {
                             "doc_type": "encrypted",

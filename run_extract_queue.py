@@ -139,21 +139,26 @@ def run_once() -> None:
     now = datetime.datetime.now(datetime.timezone.utc)
     remaining = []
     for item in items:
-        doc = _doc_from_item(item)
-        ocr_text = ocr_for(ocr_index, doc.correspondent, doc.rel)
-        queued_at = datetime.datetime.fromisoformat(item["queued_at"])
-        age_minutes = (now - queued_at).total_seconds() / 60
-
-        if ocr_text is None and age_minutes < OCR_WAIT_MINUTES:
-            remaining.append(item)  # Paperless is up; just give OCR more time
-            continue
-        if ocr_text is None:
-            logger.warning(
-                f"{doc.rel}: Paperless never OCR'd this document in {OCR_WAIT_MINUTES}m "
-                "(confirmed reachable throughout); extracting with text-layer only."
-            )
-
+        # The whole body is guarded, not just ingest_document: a malformed or
+        # legacy item (missing key, naive queued_at) that threw during _doc_from_item
+        # or the age math used to escape the loop before commit_drain ran, leaving
+        # the poison item at the head to re-crash every tick and wedge the queue.
+        # Now it is retried and, past MAX_ATTEMPTS, dropped like any other failure.
         try:
+            doc = _doc_from_item(item)
+            ocr_text = ocr_for(ocr_index, doc.correspondent, doc.rel)
+            queued_at = datetime.datetime.fromisoformat(item["queued_at"])
+            age_minutes = (now - queued_at).total_seconds() / 60
+
+            if ocr_text is None and age_minutes < OCR_WAIT_MINUTES:
+                remaining.append(item)  # Paperless is up; just give OCR more time
+                continue
+            if ocr_text is None:
+                logger.warning(
+                    f"{doc.rel}: Paperless never OCR'd this document in {OCR_WAIT_MINUTES}m "
+                    "(confirmed reachable throughout); extracting with text-layer only."
+                )
+
             result = ingest_document(
                 con,
                 doc,
@@ -163,21 +168,26 @@ def run_once() -> None:
         except Exception as e:
             item["attempts"] = item.get("attempts", 0) + 1
             logger.error(
-                f"{doc.rel}: extraction failed (attempt {item['attempts']}): {e}", exc_info=True
+                f"{item.get('rel')}: extraction failed (attempt {item['attempts']}): {e}",
+                exc_info=True,
             )
+            chat_id = item.get("chat_id")
             if item["attempts"] >= MAX_ATTEMPTS:
-                send_message(
-                    token,
-                    item["chat_id"],
-                    f"✗ Extraction failed for {doc.title} after {MAX_ATTEMPTS} attempts: {e}",
-                )
+                if chat_id is not None:
+                    send_message(
+                        token,
+                        chat_id,
+                        f"✗ Extraction failed for {item.get('title')} after "
+                        f"{MAX_ATTEMPTS} attempts: {e}",
+                    )
             else:
                 remaining.append(item)
             continue
 
         send_message(token, item["chat_id"], _result_text(result))
 
-    extract_queue.save(remaining)
+    # Preserve anything the bot enqueued while this drain was extracting.
+    extract_queue.commit_drain(items, remaining)
 
 
 def main() -> None:
