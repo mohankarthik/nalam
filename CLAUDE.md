@@ -159,8 +159,6 @@ data/health.db  →  web UI / MCP server / Telegram bot / Todoist reminders
 
 Established by survey; don't re-derive:
 
-- **The Drive folder may contain byte-identical duplicate copies of a person's folder** under a
-  slightly different name. Verified by checksum; listed in `skip_folders`.
 - **Extension is unreliable.** Some real PDFs have no extension at all. `sniff()` reads magic bytes,
   but only for the unlabelled ones — this walks an rclone mount that fetches the whole object on
   open, so opening every file to read 8 bytes downloads the entire folder.

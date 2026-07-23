@@ -162,7 +162,6 @@ def collect() -> tuple[list[Doc], list[str]]:
     # Longest prefix wins.
     overrides: dict[str, str] = people.get("folder_overrides", {})
     ordered_overrides = sorted(overrides.items(), key=lambda kv: -len(kv[0]))
-    skip_folders: set[str] = set(people["skip_folders"])
     tag_map: dict[str, str] = specialties["tags"]
     default_tag: str = specialties["default_tag"]
 
@@ -177,8 +176,6 @@ def collect() -> tuple[list[Doc], list[str]]:
             )
 
         for dirpath, dirnames, filenames in os.walk(person_dir):
-            dirnames[:] = [d for d in dirnames if d not in skip_folders]
-
             sub = os.path.relpath(dirpath, person_dir)  # "." at the person's root
             sub = "" if sub == "." else sub
             parts = sub.split(os.sep) if sub else []
