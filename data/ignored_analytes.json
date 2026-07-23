@@ -1,0 +1,315 @@
+{
+  "_comment": "Analytes deliberately removed from the codebook (echo->radiology, ratios, CPAP device metrics, qualitative urine, imaging buckets). Their printed names + aliases are matched at ingest and dropped silently, so re-extraction never re-floods the review queue. See docs/loinc-coverage-review.md.",
+  "ignored": {
+    "A:G Ratio": {
+      "segment": "LFT",
+      "aliases": []
+    },
+    "AHI": {
+      "segment": "Sleep",
+      "aliases": [
+        "Apnea Hypopnea Index"
+      ]
+    },
+    "Abdomen & Pelvis": {
+      "segment": "USG",
+      "aliases": []
+    },
+    "Aorta": {
+      "segment": "2D Echo",
+      "aliases": [
+        "AO"
+      ]
+    },
+    "Aortic Valve": {
+      "segment": "2D Echo",
+      "aliases": [
+        "AV",
+        "AORTIC VALVE"
+      ]
+    },
+    "BP": {
+      "segment": "Phys",
+      "aliases": []
+    },
+    "BUN/Creatinine Ratio": {
+      "segment": "KFT",
+      "aliases": []
+    },
+    "Breast": {
+      "segment": "USG",
+      "aliases": []
+    },
+    "Chest PA": {
+      "segment": "X-Ray",
+      "aliases": []
+    },
+    "Cholesterol:HDL Ratio": {
+      "segment": "Lipid",
+      "aliases": [
+        "CHOL HDL Ratio",
+        "Chol/HDL Ratio"
+      ]
+    },
+    "Clear Airway Index": {
+      "segment": "Sleep",
+      "aliases": [
+        "CA Index",
+        "Clear Airway"
+      ]
+    },
+    "Days with Device Usage": {
+      "segment": "Sleep",
+      "aliases": []
+    },
+    "Days without Device Usage": {
+      "segment": "Sleep",
+      "aliases": []
+    },
+    "EF": {
+      "segment": "2D Echo",
+      "aliases": [
+        "Ejection Fraction",
+        "LVEF"
+      ]
+    },
+    "EPAP": {
+      "segment": "Sleep",
+      "aliases": [
+        "90% EPAP",
+        "Device EPAP Pressure",
+        "Titrated EPAP Pressure"
+      ]
+    },
+    "Final Diag": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "Flow Limitation Index": {
+      "segment": "Sleep",
+      "aliases": [
+        "FL Index",
+        "Flow Limitation"
+      ]
+    },
+    "Hypopnea Index": {
+      "segment": "Sleep",
+      "aliases": [
+        "Hypopnea"
+      ]
+    },
+    "IAS": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "IPAP": {
+      "segment": "Sleep",
+      "aliases": [
+        "90% IPAP",
+        "Device IPAP Pressure",
+        "Titrated IPAP Pressure"
+      ]
+    },
+    "IVS": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "IVSD": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "LA": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "LDL:HDL Ratio": {
+      "segment": "Lipid",
+      "aliases": [
+        "LDL.CHOL/HDL.CHOL Ratio (Enzymatic)"
+      ]
+    },
+    "LVIDD": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "LVIDS": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "LVPWD": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "Large Leak Percent": {
+      "segment": "Sleep",
+      "aliases": [
+        "Night in Large Leak",
+        "Large Leak"
+      ]
+    },
+    "Left Atrium": {
+      "segment": "2D Echo",
+      "aliases": [
+        "LEFT ATRIUM"
+      ]
+    },
+    "Left Ventricle": {
+      "segment": "2D Echo",
+      "aliases": [
+        "LEFT VENTRICLE"
+      ]
+    },
+    "Mitral Valve": {
+      "segment": "2D Echo",
+      "aliases": [
+        "MV"
+      ]
+    },
+    "Obstructive Apnea Index": {
+      "segment": "Sleep",
+      "aliases": [
+        "OA Index",
+        "Obstructive Apnea"
+      ]
+    },
+    "P Duration": {
+      "segment": "ECG",
+      "aliases": [
+        "P"
+      ]
+    },
+    "Percent Days with Device Usage": {
+      "segment": "Sleep",
+      "aliases": []
+    },
+    "Pericardium": {
+      "segment": "2D Echo",
+      "aliases": []
+    },
+    "Platelet Morphology": {
+      "segment": "CBC",
+      "aliases": []
+    },
+    "Pulmonary Valve": {
+      "segment": "2D Echo",
+      "aliases": [
+        "PV"
+      ]
+    },
+    "RERA Index": {
+      "segment": "Sleep",
+      "aliases": [
+        "RERA"
+      ]
+    },
+    "Right Atrium": {
+      "segment": "2D Echo",
+      "aliases": [
+        "RIGHT ATRIUM"
+      ]
+    },
+    "Right Ventricle": {
+      "segment": "2D Echo",
+      "aliases": [
+        "RIGHT VENTRICLE"
+      ]
+    },
+    "SGOT/SGPT Ratio": {
+      "segment": "LFT",
+      "aliases": []
+    },
+    "Tricuspid Valve": {
+      "segment": "2D Echo",
+      "aliases": [
+        "TV"
+      ]
+    },
+    "Urea/Creatinine Ratio": {
+      "segment": "KFT",
+      "aliases": []
+    },
+    "Urine Appearance": {
+      "segment": "Urine",
+      "aliases": [
+        "Appearance",
+        "Appearance Visual"
+      ]
+    },
+    "Urine Bile Pigments": {
+      "segment": "Urine",
+      "aliases": [
+        "Bile Pigments",
+        "Bile Pigment"
+      ]
+    },
+    "Urine Bile Salt": {
+      "segment": "Urine",
+      "aliases": [
+        "Bile Salt",
+        "Bile Salts"
+      ]
+    },
+    "Urine Casts": {
+      "segment": "Urine",
+      "aliases": [
+        "Casts",
+        "Cast"
+      ]
+    },
+    "Urine Colour": {
+      "segment": "Urine",
+      "aliases": [
+        "Colour",
+        "Color"
+      ]
+    },
+    "Urine Crystals": {
+      "segment": "Urine",
+      "aliases": [
+        "Crystals",
+        "Crystal"
+      ]
+    },
+    "Urine Epithelial Cells": {
+      "segment": "Urine",
+      "aliases": [
+        "Epithelial Cells",
+        "Epithelial Cell"
+      ]
+    },
+    "Urine Ketone Bodies": {
+      "segment": "Urine",
+      "aliases": [
+        "Ketone Bodies",
+        "Ketonebodies",
+        "Ketones"
+      ]
+    },
+    "Urine Leucocyte Esterase": {
+      "segment": "Urine",
+      "aliases": [
+        "Leucocyte Esterase",
+        "Leukocyte Esterase"
+      ]
+    },
+    "Urine Nitrite": {
+      "segment": "Urine",
+      "aliases": [
+        "Nitrite",
+        "Nitrites"
+      ]
+    },
+    "Urine SG": {
+      "segment": "Urine",
+      "aliases": [
+        "Specific Gravity"
+      ]
+    },
+    "Urine Volume": {
+      "segment": "Urine",
+      "aliases": [
+        "Volume"
+      ]
+    }
+  }
+}

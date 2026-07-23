@@ -10,7 +10,14 @@ from __future__ import annotations
 import pytest
 
 import src.normalize as normalize
-from src.normalize import load_codebook, match, parse_value, promote, values_agree
+from src.normalize import (
+    is_ignored,
+    load_codebook,
+    match,
+    parse_value,
+    promote,
+    values_agree,
+)
 
 
 @pytest.fixture(scope="module")
@@ -40,9 +47,10 @@ class TestSectionGating:
             ("ALBUMIN", "URINE ROUTINE", "Urine Protein"),
             ("ALBUMIN", "BIOCHEMISTRY", "Albumin"),
             # 'Impression' exists in both the eye exam and the abdominal USG.
+            # The optometry impression is a tracked analyte; the USG one is
+            # narrative and domain-gated away.
             ("Impression", "ULTRASOUND ABDOMEN", None),
             ("Impression", "OPHTHALMOLOGY", "Impression"),
-            ("EF", "2D ECHOCARDIOGRAPHY", "EF"),
         ],
     )
     def test_cross_section_matches_are_refused(
@@ -64,8 +72,8 @@ class TestQualifierIsIdentity:
         [
             ("DIRECT BILIRUBIN", "Direct Bilirubin"),
             ("TOTAL BILIRUBIN", "Total Bilrubin"),  # codebook spells it 'Bilrubin'
-            # Now a tracked analyte (data/analytes_extra.json); the invariant it
-            # guards is that it resolves to Indirect and never to Direct/Total.
+            # A tracked analyte in the codebook; the invariant it guards is that
+            # it resolves to Indirect and never to Direct/Total.
             ("INDIRECT BILIRUBIN", "Indirect Bilirubin"),
         ],
     )
@@ -140,21 +148,18 @@ class TestValueParsing:
 class TestSubSectionHeadings:
     """Reports label sections with sub-headings, not domain words.
 
-    'GREAT VESSELS' and 'M-MODE MEASUREMENTS' never say "echo", so every echo
-    measurement the user actually tracks (EF, LVIDD, Aorta) fell back to 'blood'
-    and could not match its own analyte. And 'MICROSCOPIC EXAMINATION' never says
-    "urine", so a urine RBC was classified as blood -- one duplicate-guard away
-    from being recorded as a blood cell count.
+    'MICROSCOPIC EXAMINATION' never says "urine", so a urine RBC was classified as
+    blood -- one duplicate-guard away from being recorded as a blood cell count.
+    Domain gating off the sub-heading is what routes it correctly.
+
+    (Echo measurements -- Aorta, LVIDD, IVSD, EF, valves -- used to resolve here
+    too. Echo is now radiology: those analytes were dropped and are on the
+    ignore-list, verified in test_loinc.py and TestDroppedAnalytes below.)
     """
 
     @pytest.mark.parametrize(
         "printed, section, expected",
         [
-            ("AORTA", "GREAT VESSELS", "Aorta"),
-            ("LVIDd", "M-MODE MEASUREMENTS", "LVIDD"),
-            ("IVSd", "M-MODE MEASUREMENTS", "IVSD"),
-            ("EF", "M-MODE MEASUREMENTS", "EF"),
-            ("MITRAL VALVE", "VALVES", "Mitral Valve"),
             # Urine findings -- must reach the urine analyte, NEVER the blood one.
             ("RBC", "MICROSCOPIC EXAMINATION", "Urine RBC"),
             ("RBC", "Microscopy", "Urine RBC"),
@@ -202,16 +207,12 @@ class TestExtraAnalytes:
     @pytest.mark.parametrize(
         "printed, section, expected",
         [
-            ("Average AHI", "Auto Bi-Level Summary", "AHI"),
-            ("Average 90% IPAP", "Sleep Therapy", "IPAP"),
-            ("Average Hypopnea Index", "Hypopnea And RERA Index", "Hypopnea Index"),
             ("RDW-CV", "HAEMATOLOGY", "RDW-CV"),
             ("MPV", "HAEMATOLOGY", "MPV"),
             # The absolute count is a different test from the percentage, and
             # must not swallow it.
             ("Absolute Neutrophils Count", "HAEMATOLOGY", "Absolute Neutrophil Count"),
             ("Neutrophils", "HAEMATOLOGY", "Neutrophil"),
-            ("LVEF", "M-MODE MEASUREMENTS", "EF"),
             ("QRS", "ELECTROCARDIOGRAPHY", "QRS Duration"),
         ],
     )
@@ -219,6 +220,32 @@ class TestExtraAnalytes:
         self, codebook: dict, printed: str, section: str, expected: str
     ) -> None:
         assert match(printed, codebook, section) == expected
+
+
+class TestDroppedAnalytes:
+    """Analytes removed from the codebook (echo -> radiology, ratios, CPAP device
+    metrics, qualitative urine). They must NOT resolve, and must be recognised by
+    the ignore-list so re-extraction drops them silently instead of flooding the
+    review queue."""
+
+    @pytest.mark.parametrize(
+        "printed, section",
+        [
+            ("EF", "M-MODE MEASUREMENTS"),
+            ("LVEF", "2D ECHOCARDIOGRAPHY"),
+            ("AORTA", "GREAT VESSELS"),
+            ("LVIDd", "M-MODE MEASUREMENTS"),
+            ("MITRAL VALVE", "VALVES"),
+            ("Average AHI", "Auto Bi-Level Summary"),
+            ("Average 90% IPAP", "Sleep Therapy"),
+            ("A:G Ratio", "BIOCHEMISTRY"),
+        ],
+    )
+    def test_dropped_names_do_not_resolve_but_are_ignored(
+        self, codebook: dict, printed: str, section: str
+    ) -> None:
+        assert match(printed, codebook, section) is None
+        assert is_ignored(printed, section)
 
 
 class TestPromote:
@@ -232,19 +259,20 @@ class TestPromote:
         monkeypatch.setattr(normalize, "PROMOTED", str(tmp_path / "promoted.json"))
 
     def test_promote_new_analyte_becomes_matchable(self) -> None:
-        canonical = promote("ANTI MULLERIAN HORMONE (Sandwich Assay)", "Anti Mullerian Hormone")
-        assert canonical == "Anti Mullerian Hormone"
+        # A test the codebook does not yet track at all.
+        canonical = promote("HOMOCYSTEINE (LC-MS/MS)", "Homocysteine")
+        assert canonical == "Homocysteine"
         cb = load_codebook()
-        assert "Anti Mullerian Hormone" in cb
+        assert "Homocysteine" in cb
         # The raw printed name resolves through the alias promote recorded.
-        assert match("ANTI MULLERIAN HORMONE (Sandwich Assay)", cb) == "Anti Mullerian Hormone"
+        assert match("HOMOCYSTEINE (LC-MS/MS)", cb) == "Homocysteine"
 
     def test_promote_variant_onto_existing_canonical(self) -> None:
-        # 'Glycosylated Hb' shares no matchable token with the existing HbA1c
-        # aliases (Hb != Hemoglobin), so it needs an explicit promotion.
-        assert match("Glycosylated Hb", load_codebook()) is None
-        promote("Glycosylated Hb", "HbA1c")
-        assert match("Glycosylated Hb", load_codebook()) == "HbA1c"
+        # A printed variant that shares no matchable token with any HbA1c alias,
+        # so it resolves to nothing until an explicit promotion records it.
+        assert match("Glyco Marker ZZ", load_codebook()) is None
+        promote("Glyco Marker ZZ", "HbA1c")
+        assert match("Glyco Marker ZZ", load_codebook()) == "HbA1c"
 
     def test_promote_carries_segment_for_domain_gating(self) -> None:
         promote("ESTRADIOL(E2)", "Estradiol", "Hormone")
@@ -253,6 +281,6 @@ class TestPromote:
 
     def test_promoting_a_variant_does_not_drop_existing_aliases(self) -> None:
         before = set(load_codebook()["HbA1c"]["aliases"])
-        promote("Glycosylated Hb", "HbA1c")
+        promote("Glyco Marker ZZ", "HbA1c")
         after = set(load_codebook()["HbA1c"]["aliases"])
-        assert before <= after and "Glycosylated Hb" in after
+        assert before <= after and "Glyco Marker ZZ" in after

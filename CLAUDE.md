@@ -4,7 +4,7 @@ Guidance for Claude Code working in this repository.
 
 ## What nalam is
 
-Family health record pipeline for 8 people. Scanned documents (labs, scans, consults,
+Family health record pipeline for a family. Scanned documents (labs, scans, consults,
 prescriptions, discharge summaries, insurance) land in Google Drive; nalam files them into
 Paperless-ngx, extracts structured observations into SQLite, answers questions over them, and pushes
 follow-up reminders to Todoist.
@@ -42,10 +42,11 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 ./venv/bin/python run_meds.py --decide dad "FARONEM" stopped 2023-03-04
 
 # --- Tests ---
-./venv/bin/python -m pytest              # ~167 regressions, offline and free
+./venv/bin/python -m pytest              # ~389 regressions, offline and free
 ./venv/bin/python -m tools.extract_golden      # regenerate golden cache (slow, costs money)
-./venv/bin/python -m tools.import_master_sheet # DEPRECATED: seeded the codebook from the Sheet once; do not run (would clobber curated data/analytes.json)
+./venv/bin/python -m tools.import_master_sheet # DISABLED: seeded the codebook once; refuses to run (writes the old pre-consolidation schema)
 ./venv/bin/python -m tools.export_analytes     # codebook -> ~/nalam-analytes-review.md
+./venv/bin/python -m tools.loinc_coverage      # codebook vs licensed LOINC table -> docs/loinc-coverage-review.md
 ```
 
 **Gemini billing is enabled**, so set `NALAM_GEMINI_MIN_INTERVAL=0` for bulk runs — the default
@@ -128,8 +129,8 @@ the shape of the problem; the config holds the family.
 | Committed (generic) | Gitignored (personal) |
 |---|---|
 | `data/settings.example.json`, `data/people.example.json` | `data/settings.json`, `data/people.json` |
-| `data/aliases.json`, `data/units.json`, `data/drugs.json`, `data/analytes_extra.json` — medical knowledge, no identities | `data/analytes.json` — generated from the user's own sheet |
-| `src/`, `tests/`, `tools/` | `data/health.db`, `data/state/`, `secrets/` |
+| `data/analytes.json` (the codebook), `data/ignored_analytes.json`, `data/units.json`, `data/drugs.json` — medical knowledge, no identities | `data/settings.json`, `data/people.json`, `data/promoted.json` |
+| `src/`, `tests/`, `tools/` | `data/health.db`, `data/state/`, `secrets/`, `data/loinc.csv` (licensed) |
 | | `tests/fixtures/` — golden values, raw extractions, adjudicated errors |
 
 **Relationships are config, not code.** `data/people.json` carries each person's own aliases
@@ -195,12 +196,24 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
   quarantined, not committed. Copied from gajana's `StatementValidator`.
 - **Documents check themselves.** Cross-check the patient name printed on the report against the
   folder it came from. Mismatch → quarantine. (gajana's `reconcile_summary` trick.)
-- **`data/analytes.json` is the codebook**: 71–73 analytes, 20 segments, **per-person** reference
-  ranges chosen by the user (not the lab's). It was seeded once from a hand-curated Google Sheet
-  ("the master sheet"), which is now just a historical reference — **no longer authoritative and not
-  maintained**. The codebook is edited directly (and via the web UI's promote/reject path); do not
-  re-import from the Sheet. The Sheet's only lasting value was its hand-entered historical values,
-  already ingested into `health.db` and preserved as the extractor's golden test.
+- **`data/analytes.json` is the codebook**: one file, **keyed by LOINC id**, ~92 analytes, each with
+  its canonical `name`, `official_name` (LOINC long common name), `equivalents`, `aliases`, `segment`,
+  `ucum`, and per-sex `ranges`. Committed — it holds no identities, only generic medical knowledge.
+  It was consolidated from four earlier files (`analytes.json` + `analytes_extra.json` + `aliases.json`
+  + `loinc.json`) by `tools/merge_codebook.py`; codes were reviewed by hand against the licensed
+  `data/loinc.csv` (see `docs/loinc-coverage-review.md`, `tools/loinc_coverage.py`). `load_codebook()`
+  re-indexes it **by name** in memory — every consumer (the DB's `observations.analyte`, range
+  lookup, `match()`, the web UI) identifies an analyte by name, not by code, so nothing was re-keyed.
+- **Analytes we chose not to track live in `data/ignored_analytes.json`** (echo measurements — now
+  radiology; derived ratios; CPAP device metrics; qualitative urine; imaging buckets). A printed name
+  that matches one is dropped **silently** at ingest (`normalize.is_ignored`, domain-gated like the
+  matcher) instead of flooding the review queue. Baked into the image; the codebook is bind-mounted.
+- **The codebook is edited directly** (and via the web UI's promote/reject path). Promotions land in
+  `data/promoted.json` (name-keyed, machine-written, gitignored) **without a LOINC code** — a fast
+  allowlist. They **graduate** into `analytes.json` with a real code via the same review pass
+  (`tools/loinc_coverage.py` → assign against `loinc.csv` → fold in; see `tools/fold_promotions.py`
+  for the last batch). Do not re-import from the old master Sheet — its historical values are already
+  ingested into `health.db` and preserved as the extractor's golden test.
 - **`health.db` is the source of truth.** Opposite of gajana, where Sheets is primary. Corrections go
   through the Telegram review cards and the web review UI, not a spreadsheet.
 
@@ -211,7 +224,8 @@ All 470 PDFs classified **by content**: 168 prescription · 157 lab · 61 radiol
 15 discharge · 12 vaccination. Labs, discharges and prescriptions are extracted.
 
 **Radiology is stored as ONE verbatim text record per study, not per-parameter rows.** An imaging
-report is narrative (MRI/USG/CT prose; the echo measurements are the exception), and forcing it into
+report is narrative (MRI/USG/CT prose, **and echo — the 2D-Echo measurements were dropped from the
+codebook in the 2026-07 consolidation and are now radiology too**), and forcing it into
 the analyte-shaped `observations` table produced junk — one `IVS` analyte holding a septum finding,
 a septum:wall ratio and a thickening percent at once. Nobody trends a single radiology number over
 years; they read the report, and Paperless already full-text-searches the PDF. So `ingest_radiology`
@@ -219,6 +233,13 @@ now writes one row to `radiology_reports` (`study_type` bucket via `src/radiolog
 verbatim `report_text`, the radiologist's `impression`), keeping the patient-misfile guard. Browse
 it with `run_radiology_browse.py`, the web UI's Radiology tab, or the bot's `get_radiology`. Labs
 stay structured in `observations`; that split is the point.
+
+**Codebook consolidated (2026-07-23).** The four codebook files became one LOINC-keyed
+`data/analytes.json` (see the codebook bullet above and `tools/merge_codebook.py`). 53 analytes were
+dropped to `data/ignored_analytes.json` (echo, ratios, CPAP metrics, qualitative urine, imaging
+buckets) and their orphan rows purged; the 9 prod UI-promotions were graduated (7 folded with codes,
+`BP` split into BP High/Low, `LDL:HDL Ratio` dropped), leaving `promoted.json` empty. Prod `health.db`
+is authoritative (the repo `data/health.db` is a throwaway experiment copy, currently larger).
 
 A Telegram-filed document now extracts on-demand instead of waiting for the nightly pass — see
 `docs/telegram_ingest_queue.md`. Filing enqueues (`src/extract_queue.py`); `run_extract_queue.py`

@@ -7,9 +7,10 @@ data/settings.json
 data/people.json
 plugins/telegram_bot/settings.json
 
-# The codebook is generated from the user's own spreadsheet and encodes which
-# tests they track and the ranges they chose. Personal.
-data/analytes.json
+# The licensed LOINC master table (data/loinc.csv, ~82MB). Input to the offline
+# tools/merge_codebook.py and tools/loinc_coverage.py only; the codes we adopted
+# are baked into data/analytes.json. Licensed content, too big to commit.
+data/loinc.csv
 
 # Analytes promoted through the review UI. Machine-written from the family's own
 # reports, so treated like the generated codebook: not committed.

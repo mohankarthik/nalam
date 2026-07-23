@@ -27,12 +27,20 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
+# The codebook. One file, keyed by LOINC id; each entry carries its canonical
+# name, official (LOINC long common) name, unit/specimen equivalents, aliases,
+# segment, UCUM unit and per-sex ranges. Generic medical knowledge -- no names,
+# values or paths -- so committed. (Consolidated from the old analytes/
+# analytes_extra/aliases/loinc quartet; see tools/merge_codebook.py.)
 ANALYTES = "data/analytes.json"
-ANALYTES_EXTRA = "data/analytes_extra.json"
-ALIASES = "data/aliases.json"
-# Analytes promoted from the web review UI. Same role as analytes_extra.json +
-# aliases.json, but machine-written -- kept in its own file so a button press can
-# never reformat or clobber the hand-curated codebook. Generated, so gitignored.
+# Analytes deliberately removed from the codebook (echo -> radiology, ratios,
+# CPAP device metrics, qualitative urine, imaging buckets). Their printed names
+# are matched at ingest and dropped SILENTLY, so re-extraction never re-floods
+# the review queue with tests we chose not to track. See is_ignored().
+IGNORED = "data/ignored_analytes.json"
+# Analytes promoted from the web review UI. Same role as the codebook, but
+# machine-written -- kept in its own file so a button press can never reformat or
+# clobber the hand-curated codebook. Generated, so gitignored.
 PROMOTED = "data/promoted.json"
 
 # Words that genuinely carry no identity: assay method and filler.
@@ -211,39 +219,38 @@ def _domain_compatible(printed: str, section: str, entry: dict) -> bool:
 
 
 def load_codebook() -> dict[str, dict]:
-    """The codebook: three files, merged.
+    """The codebook, keyed by canonical analyte name for the rest of the system.
 
-      data/analytes.json        the analytes the master sheet once tracked --
-                                typically for only one or two people. Seeded
-                                from that sheet long ago; now curated directly
-                                (the sheet is a dead historical reference).
-      data/analytes_extra.json  analytes that reports contain
-                                but the sheet never did (RDW, MPV, urine
-                                microscopy, sleep-study AHI). Hand-curated.
-      data/aliases.json         what labs print -> the canonical name.
-                                Hand-curated.
+    On disk (data/analytes.json) it is keyed by LOINC id -- the analyte's standard
+    identity. But every consumer (the DB's ``observations.analyte`` column, range
+    lookup, matching, the web UI) identifies an analyte by its canonical NAME, so
+    this loader re-indexes to ``{name: entry}`` on the way in. The LOINC id, its
+    long common name, unit/specimen equivalents and UCUM unit ride along on each
+    entry, exactly as the old separate loinc.json used to attach them.
 
-    The split predates the sheet's retirement -- it kept a re-import from
-    clobbering the curated files; now nothing re-imports.
+    Promotions made through the review UI (data/promoted.json, machine-written)
+    are merged on top: their analytes seed the codebook, their aliases EXTEND
+    whatever the curated file already set. Kept in a separate file so a button
+    press can never reformat the hand-curated codebook.
     """
-    codebook = config.load(ANALYTES)
+    codebook: dict[str, dict] = {}
+    for code, e in config.load(ANALYTES).items():
+        name = e["name"]
+        if name in codebook:
+            raise ValueError(f"duplicate canonical name {name!r} in {ANALYTES}")
+        entry = {
+            "segment": e.get("segment"),
+            "aliases": list(e.get("aliases") or []),
+            "ranges": e.get("ranges") or {},
+            "loinc": code,
+            "loinc_name": e.get("official_name"),
+            "loinc_equivalents": list(e.get("equivalents") or []),
+            "ucum": e.get("ucum"),
+        }
+        if e.get("note"):
+            entry["note"] = e["note"]
+        codebook[name] = entry
 
-    if os.path.exists(ANALYTES_EXTRA):
-        for name, entry in config.load(ANALYTES_EXTRA).items():
-            codebook.setdefault(
-                name, {"segment": entry.get("segment"), "aliases": [], "ranges": {}}
-            )
-
-    aliases = config.load(ALIASES)
-    for canonical, names in aliases.items():
-        if canonical not in codebook:
-            logger.warning(f"alias for unknown analyte {canonical!r}; ignoring")
-            continue
-        codebook[canonical]["aliases"] = list(names)
-
-    # Promotions made through the review UI. Their analytes seed the codebook like
-    # analytes_extra; their aliases EXTEND whatever aliases.json already set (a
-    # promotion may add a printed variant to an analyte that already has some).
     promoted = _load_promoted()
     for name, entry in promoted["analytes"].items():
         codebook.setdefault(name, {"segment": entry.get("segment"), "aliases": [], "ranges": {}})
@@ -255,6 +262,28 @@ def load_codebook() -> dict[str, dict]:
         codebook[canonical]["aliases"] = list(existing) + [n for n in names if n not in existing]
 
     return codebook
+
+
+def load_ignored() -> dict[str, dict]:
+    """Analytes we deliberately dropped, shaped like a codebook so ``match()`` can
+    reuse its exact token/domain logic. ``{name: {aliases, segment}}``. Missing
+    file is not an error -- nothing is ignored yet."""
+    if not os.path.exists(IGNORED):
+        return {}
+    doc = config.load(IGNORED)
+    return doc.get("ignored", {})
+
+
+def is_ignored(printed: str, section: str = "", ignored: Optional[dict] = None) -> bool:
+    """Does a printed test name resolve to a deliberately-dropped analyte?
+
+    Only meaningful for a name that did NOT resolve to a live codebook analyte:
+    a live match always wins first (a urine 'RBC' still lands on Urine RBC). This
+    reuses ``match()`` against the ignore list, so the same domain gating applies
+    -- a dropped urine alias only fires inside a urine section, never swallowing an
+    unrelated blood result that merely failed to resolve."""
+    ignored = ignored if ignored is not None else load_ignored()
+    return bool(ignored) and match(printed, ignored, section) is not None
 
 
 def _load_promoted() -> dict:

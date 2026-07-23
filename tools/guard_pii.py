@@ -51,7 +51,10 @@ FORBIDDEN_PATHS = [
         r"^secrets/",
         r"^data/settings\.json$",
         r"^data/people\.json$",
-        r"^data/analytes\.json$",
+        # data/analytes.json is committed since the codebook consolidation: it is
+        # LOINC-keyed generic medical knowledge (per-sex ranges, no names/values/
+        # paths). It is no longer path-forbidden, but its CONTENT is still scanned
+        # against the deny-list below, so a real name landing in it is still caught.
         r"^data/pii_denylist\.txt$",
         r"^data/health\.db",
         r"^data/state/",

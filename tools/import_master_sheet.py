@@ -1,10 +1,12 @@
-"""Import the hand-curated master sheet. **DEPRECATED — do not run.**
+"""Import the hand-curated master sheet. **DEPRECATED — DISABLED, do not run.**
 
 The master sheet is no longer authoritative or maintained; it was a one-time
-seed. `data/analytes.json` is now the codebook, curated directly, and
-re-running this would clobber those edits. `tests/fixtures/golden.json` is
-already ingested and frozen. Kept only as the record of how both were first
-built.
+seed. `data/analytes.json` is now the codebook -- consolidated into a single
+LOINC-keyed file (see tools/merge_codebook.py) and curated directly. This
+importer still writes the OLD name-keyed schema, so running it would not just
+clobber the curated edits, it would write a file load_codebook() can no longer
+read. It now refuses to run; kept only as the record of how the codebook and
+golden fixture were first built.
 
 Produces two artefacts, both of which the rest of nalam depends on:
 
@@ -107,6 +109,12 @@ def to_number(text: str) -> float | None:
 
 
 def main() -> None:
+    raise SystemExit(
+        "DISABLED: import_master_sheet writes the old name-keyed analytes.json, which "
+        "load_codebook() can no longer read (the codebook is now LOINC-keyed; see "
+        "tools/merge_codebook.py). Refusing to run. Remove this guard only if you are "
+        "deliberately rebuilding the pre-consolidation schema."
+    )
     codebook: dict[str, dict[str, Any]] = {}
     golden: list[dict[str, Any]] = []
 

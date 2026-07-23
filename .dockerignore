@@ -10,6 +10,9 @@ data/state/
 data/llm/
 plugins/telegram_bot/settings.json
 
+# Licensed LOINC master table -- offline tool input only, ~82MB, never baked.
+data/loinc.csv
+
 # Dev / VCS / caches
 .git/
 venv/

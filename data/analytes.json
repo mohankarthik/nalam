@@ -1,0 +1,1572 @@
+{
+  "10501-5": {
+    "aliases": [
+      "LUTEINIZING HORMONE(LH)"
+    ],
+    "equivalents": [],
+    "name": "LUTEINIZING HORMONE",
+    "official_name": "Lutropin [Units/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Fertility",
+    "ucum": "m[IU]/mL"
+  },
+  "11572-5": {
+    "aliases": [
+      "RHEUMATOID FACTOR",
+      "RHEUMATOID FACTOR (RA), SERUM"
+    ],
+    "equivalents": [],
+    "name": "RA",
+    "official_name": "Rheumatoid factor [Units/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "RHEUMATOID",
+    "ucum": "[IU]/mL"
+  },
+  "13457-7": {
+    "aliases": [
+      "LDL Cholesterol"
+    ],
+    "equivalents": [
+      "2089-1"
+    ],
+    "name": "LDL",
+    "official_name": "Cholesterol in LDL [Mass/volume] in Serum or Plasma by calculation",
+    "ranges": {
+      "female": {
+        "high": 120.0,
+        "low": 30.0
+      },
+      "male": {
+        "high": 120.0,
+        "low": 30.0
+      }
+    },
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "13458-5": {
+    "aliases": [
+      "VLDL Cholesterol"
+    ],
+    "equivalents": [],
+    "name": "VLDL",
+    "official_name": "Cholesterol in VLDL [Mass/volume] in Serum or Plasma by calculation",
+    "ranges": {
+      "female": {
+        "high": 40.0,
+        "low": 10.0
+      },
+      "male": {
+        "high": 40.0,
+        "low": 10.0
+      }
+    },
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "15067-2": {
+    "aliases": [
+      "FOLLICLE STIMULATING HORMONE(FSH)"
+    ],
+    "equivalents": [],
+    "name": "FOLLICLE STIMULATING HORMONE",
+    "official_name": "Follitropin [Units/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Fertility",
+    "ucum": "m[IU]/mL"
+  },
+  "1521-4": {
+    "aliases": [
+      "Plasma Glucose PP",
+      "Glucose PP",
+      "PPBS",
+      "Post Prandial Blood Sugar",
+      "Plasma Glucose Post Prandial",
+      "GLUCOSE POSTPRANDIAL (GOD-POD)"
+    ],
+    "equivalents": [
+      "6689-4"
+    ],
+    "name": "PP Blood Sugar",
+    "note": "Was 6749-6 (2.5h post 75g GTT); corrected to generic 2h post-meal per Loinc.csv.",
+    "official_name": "Glucose [Mass/volume] in Serum or Plasma --2 hours post meal",
+    "ranges": {
+      "female": {
+        "high": 140.0,
+        "low": 74.0
+      },
+      "male": {
+        "high": 140.0,
+        "low": 74.0
+      }
+    },
+    "segment": "Glucose",
+    "ucum": "mg/dL"
+  },
+  "1558-6": {
+    "aliases": [
+      "Plasma Glucose Fasting",
+      "Glucose Fasting",
+      "FBS",
+      "Blood Sugar Fasting"
+    ],
+    "equivalents": [
+      "1554-5",
+      "14771-0"
+    ],
+    "name": "Fasting Blood Sugar",
+    "official_name": "Fasting glucose [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 110.0,
+        "low": 74.0
+      },
+      "male": {
+        "high": 110.0,
+        "low": 74.0
+      }
+    },
+    "segment": "Glucose",
+    "ucum": "mg/dL"
+  },
+  "1742-6": {
+    "aliases": [
+      "ALT",
+      "Alanine Aminotransferase"
+    ],
+    "equivalents": [],
+    "name": "SGPT",
+    "official_name": "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 40.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 40.0,
+        "low": 0.0
+      }
+    },
+    "segment": "LFT",
+    "ucum": "U/L"
+  },
+  "1751-7": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Albumin",
+    "official_name": "Albumin [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 5.2,
+        "low": 3.5
+      },
+      "male": {
+        "high": 5.2,
+        "low": 3.5
+      }
+    },
+    "segment": "LFT",
+    "ucum": "g/dL"
+  },
+  "17861-6": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Calcium",
+    "official_name": "Calcium [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 10.5,
+        "low": 8.0
+      },
+      "male": {
+        "high": 10.5,
+        "low": 8.0
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "18500-9": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Pap Smear",
+    "note": "nominal cytology identifier; no UCUM",
+    "official_name": "Microscopic observation [Identifier] in Cervix by Cyto stain.thin prep",
+    "ranges": {},
+    "segment": "Pap Smear",
+    "ucum": null
+  },
+  "19123-9": {
+    "aliases": [],
+    "equivalents": [
+      "2601-3"
+    ],
+    "name": "Magnesium",
+    "official_name": "Magnesium [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "1920-8": {
+    "aliases": [
+      "AST",
+      "Aspartate Aminotransferase"
+    ],
+    "equivalents": [],
+    "name": "SGOT",
+    "official_name": "Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 37.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 37.0,
+        "low": 0.0
+      }
+    },
+    "segment": "LFT",
+    "ucum": "U/L"
+  },
+  "1963-8": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Bicarbonate",
+    "official_name": "Bicarbonate [Moles/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "KFT",
+    "ucum": "mmol/L"
+  },
+  "1968-7": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Direct Bilirubin",
+    "official_name": "Bilirubin.direct [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 0.4,
+        "low": 0.0
+      },
+      "male": {
+        "high": 0.4,
+        "low": 0.0
+      }
+    },
+    "segment": "LFT",
+    "ucum": "mg/dL"
+  },
+  "1971-1": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Indirect Bilirubin",
+    "official_name": "Bilirubin.indirect [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "LFT",
+    "ucum": "mg/dL"
+  },
+  "1975-2": {
+    "aliases": [
+      "Total Bilirubin",
+      "Bilirubin Total"
+    ],
+    "equivalents": [],
+    "name": "Total Bilrubin",
+    "official_name": "Bilirubin.total [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 1.2,
+        "low": 0.1
+      },
+      "male": {
+        "high": 1.2,
+        "low": 0.1
+      }
+    },
+    "segment": "LFT",
+    "ucum": "mg/dL"
+  },
+  "1988-5": {
+    "aliases": [
+      "CRP",
+      "C-REACTIVE PROTIEN"
+    ],
+    "equivalents": [
+      "30522-7"
+    ],
+    "name": "C-Reactive Protein",
+    "note": "units.json has no CRP entry (passthrough); confirm mg/L vs mg/dL before adding a range.",
+    "official_name": "C reactive protein [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "mg/L"
+  },
+  "2075-0": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Chloride",
+    "official_name": "Chloride [Moles/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 105.0,
+        "low": 95.0
+      },
+      "male": {
+        "high": 105.0,
+        "low": 95.0
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mmol/L"
+  },
+  "2085-9": {
+    "aliases": [
+      "HDL Cholesterol"
+    ],
+    "equivalents": [],
+    "name": "HDL",
+    "official_name": "Cholesterol in HDL [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 60.0,
+        "low": 55.0
+      },
+      "male": {
+        "high": 60.0,
+        "low": 35.0
+      }
+    },
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "2093-3": {
+    "aliases": [
+      "Total Cholesterol",
+      "Lipid profile - TC",
+      "TC"
+    ],
+    "equivalents": [],
+    "name": "Cholesterol",
+    "official_name": "Cholesterol [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 200.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 200.0,
+        "low": 0.0
+      }
+    },
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "2132-9": {
+    "aliases": [
+      "Vitamin B-12",
+      "Cyanocobalamin"
+    ],
+    "equivalents": [],
+    "name": "Vitamin B12",
+    "official_name": "Cobalamin (Vitamin B12) [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 900.0,
+        "low": 201.0
+      },
+      "male": {
+        "high": 900.0,
+        "low": 201.0
+      }
+    },
+    "segment": "Vitamin",
+    "ucum": "pg/mL"
+  },
+  "2160-0": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Creatinine",
+    "official_name": "Creatinine [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 1.4,
+        "low": 0.5
+      },
+      "male": {
+        "high": 1.4,
+        "low": 0.7
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "2243-4": {
+    "aliases": [
+      "ESTRADIOL(E2)"
+    ],
+    "equivalents": [],
+    "name": "ESTRADIOL",
+    "official_name": "Estradiol (E2) [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Fertility",
+    "ucum": "pg/mL"
+  },
+  "2276-4": {
+    "aliases": [
+      "Ferritin"
+    ],
+    "equivalents": [],
+    "name": "Serum Ferritin",
+    "official_name": "Ferritin [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 420.0,
+        "low": 48.0
+      },
+      "male": {
+        "high": 420.0,
+        "low": 48.0
+      }
+    },
+    "segment": "Ferritin",
+    "ucum": "ng/mL"
+  },
+  "2324-2": {
+    "aliases": [
+      "GGT",
+      "Gamma GT",
+      "Gamma Glutamyl Transferase"
+    ],
+    "equivalents": [],
+    "name": "Gamma Glutamyl Transpeptidase (GGT)",
+    "official_name": "Gamma glutamyl transferase [Enzymatic activity/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 55.0,
+        "low": 1.0
+      },
+      "male": {
+        "high": 55.0,
+        "low": 1.0
+      }
+    },
+    "segment": "LFT",
+    "ucum": "U/L"
+  },
+  "2336-6": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Globulin",
+    "official_name": "Globulin [Mass/volume] in Serum",
+    "ranges": {
+      "female": {
+        "high": 3.4,
+        "low": 1.8
+      },
+      "male": {
+        "high": 3.4,
+        "low": 1.8
+      }
+    },
+    "segment": "LFT",
+    "ucum": "g/dL"
+  },
+  "2345-7": {
+    "aliases": [
+      "Glucose - Random (RBS) (Plasma-R/ GOD- POD)",
+      "GLUCOSE, RANDOM (R), PLASMA*",
+      "RANDOM GLUCOSE LEVELS",
+      "GRBS mg/dL"
+    ],
+    "equivalents": [],
+    "name": "RBS",
+    "official_name": "Glucose [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Glucose",
+    "ucum": "mg/dL"
+  },
+  "2498-4": {
+    "aliases": [
+      "Iron"
+    ],
+    "equivalents": [],
+    "name": "Iron (TPTZ)",
+    "official_name": "Iron [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 175.0,
+        "low": 65.0
+      },
+      "male": {
+        "high": 175.0,
+        "low": 65.0
+      }
+    },
+    "segment": "Iron",
+    "ucum": "ug/dL"
+  },
+  "2500-7": {
+    "aliases": [
+      "TIBC",
+      "Total Iron Binding Capacity"
+    ],
+    "equivalents": [],
+    "name": "Iron Binding Capacity (PSAP)",
+    "official_name": "Iron binding capacity [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 425.0,
+        "low": 250.0
+      },
+      "male": {
+        "high": 425.0,
+        "low": 250.0
+      }
+    },
+    "segment": "Iron",
+    "ucum": "ug/dL"
+  },
+  "2571-8": {
+    "aliases": [
+      "Triglycerides",
+      "Triglyceride",
+      "TG"
+    ],
+    "equivalents": [],
+    "name": "TGL",
+    "official_name": "Triglyceride [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 200.0,
+        "low": 30.0
+      },
+      "male": {
+        "high": 200.0,
+        "low": 30.0
+      }
+    },
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "27353-2": {
+    "aliases": [
+      "Average Blood Glucose",
+      "Average Glucose"
+    ],
+    "equivalents": [],
+    "name": "Estimated Average Glucose",
+    "official_name": "Glucose mean value [Mass/volume] in Blood Estimated from glycated hemoglobin",
+    "ranges": {},
+    "segment": "Glucose",
+    "ucum": "mg/dL"
+  },
+  "2777-1": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Phosphorus",
+    "official_name": "Phosphate [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 4.7,
+        "low": 2.3
+      },
+      "male": {
+        "high": 4.7,
+        "low": 2.3
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "2823-3": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Potassium",
+    "official_name": "Potassium [Moles/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 5.2,
+        "low": 3.5
+      },
+      "male": {
+        "high": 5.2,
+        "low": 3.5
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mmol/L"
+  },
+  "2842-3": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Prolactin",
+    "note": "units.json has no Prolactin entry (passthrough).",
+    "official_name": "Prolactin [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Prolactin",
+    "ucum": "ng/mL"
+  },
+  "2857-1": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "PSA",
+    "official_name": "Prostate specific Ag [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "male": {
+        "high": 2.0,
+        "low": 0.0
+      }
+    },
+    "segment": "PSA",
+    "ucum": "ng/mL"
+  },
+  "28711-0": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Vision",
+    "official_name": "Eye Visual acuity far.binocular by Phoropter",
+    "ranges": {},
+    "segment": "Opt",
+    "ucum": "[ft_us]/[ft_us]"
+  },
+  "28737-5": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Near Vision",
+    "official_name": "Eye Visual acuity N.binocular by Phoropter",
+    "ranges": {},
+    "segment": "Opt",
+    "ucum": "[ft_us]/[ft_us]"
+  },
+  "2885-2": {
+    "aliases": [
+      "Total Protein",
+      "Protein Total"
+    ],
+    "equivalents": [],
+    "name": "Total Protien",
+    "official_name": "Protein [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 8.3,
+        "low": 6.3
+      },
+      "male": {
+        "high": 8.3,
+        "low": 6.3
+      }
+    },
+    "segment": "LFT",
+    "ucum": "g/dL"
+  },
+  "2887-8": {
+    "aliases": [
+      "Protein",
+      "Albumin"
+    ],
+    "equivalents": [],
+    "name": "Urine Protein",
+    "note": "qualitative dipstick presence; no UCUM",
+    "official_name": "Protein [Presence] in Urine",
+    "ranges": {},
+    "segment": "Urine",
+    "ucum": null
+  },
+  "29463-7": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Weight",
+    "official_name": "Body weight",
+    "ranges": {
+      "female": {
+        "high": 65.0,
+        "low": 50.0
+      },
+      "male": {
+        "high": 68.0,
+        "low": 60.0
+      }
+    },
+    "segment": "Phys",
+    "ucum": "kg"
+  },
+  "2951-2": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Sodium",
+    "note": "units.json has no Sodium entry (passthrough).",
+    "official_name": "Sodium [Moles/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 145.0,
+        "low": 134.0
+      },
+      "male": {
+        "high": 145.0,
+        "low": 134.0
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mmol/L"
+  },
+  "3016-3": {
+    "aliases": [
+      "Thyroid Stimulating Hormone",
+      "hyroid Stimulating Hormone (CLIA)"
+    ],
+    "equivalents": [],
+    "name": "TSH",
+    "official_name": "Thyrotropin [Units/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 4.2,
+        "low": 0.4
+      },
+      "male": {
+        "high": 4.2,
+        "low": 0.4
+      }
+    },
+    "segment": "Thyroid",
+    "ucum": "u[IU]/mL"
+  },
+  "3026-2": {
+    "aliases": [
+      "Thyroxine"
+    ],
+    "equivalents": [],
+    "name": "T4",
+    "note": "UNIT DISCREPANCY: LOINC example unit is ug/dL (mass); codebook canonical is nmol/L (moles). units.json already converts ug/dL->nmol/L (x12.87); ucum here is the codebook's molar unit, so cross-check will differ by design.",
+    "official_name": "Thyroxine (T4) [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 181.0,
+        "low": 66.0
+      },
+      "male": {
+        "high": 181.0,
+        "low": 66.0
+      }
+    },
+    "segment": "Thyroid",
+    "ucum": "nmol/L"
+  },
+  "30391-7": {
+    "aliases": [
+      "RBC",
+      "Red Blood Cells",
+      "Red Cells"
+    ],
+    "equivalents": [],
+    "name": "Urine RBC",
+    "official_name": "Erythrocytes [#/volume] in Urine",
+    "ranges": {},
+    "segment": "Urine",
+    "ucum": "/uL"
+  },
+  "3053-6": {
+    "aliases": [
+      "Triiodothyronine"
+    ],
+    "equivalents": [],
+    "name": "T3",
+    "note": "UNIT DISCREPANCY: LOINC example unit is ng/dL; codebook canonical is ng/mL (100x apart). Confirm which the reports print before trusting a range.",
+    "official_name": "Triiodothyronine (T3) [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 2.04,
+        "low": 0.7
+      },
+      "male": {
+        "high": 2.04,
+        "low": 0.7
+      }
+    },
+    "segment": "Thyroid",
+    "ucum": "ng/mL"
+  },
+  "3084-1": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Uric Acid",
+    "official_name": "Urate [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 7.2,
+        "low": 2.4
+      },
+      "male": {
+        "high": 7.2,
+        "low": 3.5
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "3091-6": {
+    "aliases": [
+      "Blood Urea"
+    ],
+    "equivalents": [],
+    "name": "Urea",
+    "note": "Urea (mass/vol), NOT urea nitrogen -- distinct code from BUN 3094-0 below; urea ~= 2.14x urea nitrogen. Was 22664-7 (moles/vol); corrected per Loinc.csv.",
+    "official_name": "Urea [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 43.0,
+        "low": 13.0
+      },
+      "male": {
+        "high": 43.0,
+        "low": 13.0
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "3094-0": {
+    "aliases": [
+      "BUN",
+      "Blood Urea Nitrogen"
+    ],
+    "equivalents": [],
+    "name": "BUN (Urease/GLDH)",
+    "official_name": "Urea nitrogen [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 23.0,
+        "low": 8.0
+      },
+      "male": {
+        "high": 23.0,
+        "low": 8.0
+      }
+    },
+    "segment": "KFT",
+    "ucum": "mg/dL"
+  },
+  "32207-3": {
+    "aliases": [
+      "Platelet Distribution Width"
+    ],
+    "equivalents": [],
+    "name": "PDW",
+    "official_name": "Platelet distribution width [Entitic volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "fL"
+  },
+  "32623-1": {
+    "aliases": [
+      "Mean Platelet Volume"
+    ],
+    "equivalents": [],
+    "name": "MPV",
+    "official_name": "Platelet [Entitic mean volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "fL"
+  },
+  "38476-8": {
+    "aliases": [
+      "ANTI MULLERIAN HORMONE - Immunoenzymatic (\"Sandwich\") assay - Chemiluminescence"
+    ],
+    "equivalents": [],
+    "name": "ANTI-MULLERIAN HORMONE",
+    "official_name": "Mullerian inhibiting substance [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Fertility",
+    "ucum": "ng/mL"
+  },
+  "39156-5": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "BMI",
+    "official_name": "Body mass index (BMI) [Ratio]",
+    "ranges": {},
+    "segment": "Phys",
+    "ucum": "kg/m2"
+  },
+  "43396-1": {
+    "aliases": [
+      "Non HDL Cholesterolserum",
+      "NON HDL CHOLESTROL"
+    ],
+    "equivalents": [],
+    "name": "Non-HDL Cholesterol",
+    "official_name": "Cholesterol non HDL [Mass/volume] in Serum or Plasma",
+    "ranges": {},
+    "segment": "Lipid",
+    "ucum": "mg/dL"
+  },
+  "4537-7": {
+    "aliases": [
+      "ESR"
+    ],
+    "equivalents": [
+      "30341-2"
+    ],
+    "name": "Erythrocyte Sedimentation Rate",
+    "official_name": "Erythrocyte [Sedimentation Rate] in Blood by Westergren method",
+    "ranges": {
+      "female": {
+        "high": 14.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 14.0,
+        "low": 0.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "mm/h"
+  },
+  "4544-3": {
+    "aliases": [
+      "PCV",
+      "Hematocrit",
+      "Haematocrit",
+      "HCT"
+    ],
+    "equivalents": [
+      "20570-8"
+    ],
+    "name": "Packed cell volume",
+    "official_name": "Hematocrit [Volume Fraction] of Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 50.0,
+        "low": 40.0
+      },
+      "male": {
+        "high": 50.0,
+        "low": 40.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "4548-4": {
+    "aliases": [
+      "Glycosylated Hemoglobin",
+      "Glycosylated Haemoglobin",
+      "Glycated Hemoglobin",
+      "Glycated Haemoglobin",
+      "A1C",
+      "Glycosylated Hb"
+    ],
+    "equivalents": [
+      "17856-6",
+      "4549-2"
+    ],
+    "name": "HbA1c",
+    "official_name": "Hemoglobin A1c/Hemoglobin.total in Blood",
+    "ranges": {
+      "female": {
+        "high": 5.7,
+        "low": 0.0
+      },
+      "male": {
+        "high": 5.7,
+        "low": 0.0
+      }
+    },
+    "segment": "Glucose",
+    "ucum": "%"
+  },
+  "50555-2": {
+    "aliases": [
+      "Glucose",
+      "Sugar"
+    ],
+    "equivalents": [],
+    "name": "Urine Glucose",
+    "note": "qualitative dipstick presence; no UCUM",
+    "official_name": "Glucose [Presence] in Urine by Automated test strip",
+    "ranges": {},
+    "segment": "Urine",
+    "ucum": null
+  },
+  "50560-2": {
+    "aliases": [
+      "pH",
+      "PH",
+      "Reaction"
+    ],
+    "equivalents": [],
+    "name": "Urine pH",
+    "official_name": "pH of Urine by Automated test strip",
+    "ranges": {},
+    "segment": "Urine",
+    "ucum": "[pH]"
+  },
+  "51637-7": {
+    "aliases": [
+      "Platelet Crit"
+    ],
+    "equivalents": [],
+    "name": "Plateletcrit",
+    "official_name": "Plateletcrit [Volume Fraction] in Blood",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "5195-3": {
+    "aliases": [
+      "Hepatitis B surface Antigen",
+      "Hbs Ag (Rapid Card Test)"
+    ],
+    "equivalents": [],
+    "name": "HBsAg",
+    "note": "Qualitative presence; no unit.",
+    "official_name": "Hepatitis B virus surface Ag [Presence] in Serum",
+    "ranges": {},
+    "segment": "HBsAg",
+    "ucum": null
+  },
+  "5292-8": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "VDRL",
+    "note": "Qualitative presence; no unit.",
+    "official_name": "Reagin Ab [Presence] in Serum by VDRL",
+    "ranges": {
+      "female": {
+        "high": 0.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 0.0,
+        "low": 0.0
+      }
+    },
+    "segment": "VDRL",
+    "ucum": null
+  },
+  "5821-4": {
+    "aliases": [
+      "Pus Cells",
+      "Puscells",
+      "WBC",
+      "Pus Cell"
+    ],
+    "equivalents": [],
+    "name": "Urine Pus Cells",
+    "official_name": "Leukocytes [#/area] in Urine sediment by Microscopy high power field",
+    "ranges": {},
+    "segment": "Urine",
+    "ucum": "/[HPF]"
+  },
+  "5905-5": {
+    "aliases": [
+      "Monocytes"
+    ],
+    "equivalents": [],
+    "name": "Monocyte",
+    "official_name": "Monocytes/Leukocytes in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 10.0,
+        "low": 2.0
+      },
+      "male": {
+        "high": 10.0,
+        "low": 2.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "59408-5": {
+    "aliases": [],
+    "equivalents": [
+      "2708-6"
+    ],
+    "name": "SPO2",
+    "official_name": "Oxygen saturation in Arterial blood by Pulse oximetry",
+    "ranges": {
+      "female": {
+        "high": 100.0,
+        "low": 95.0
+      },
+      "male": {
+        "high": 100.0,
+        "low": 95.0
+      }
+    },
+    "segment": "Phys",
+    "ucum": "%"
+  },
+  "62238-1": {
+    "aliases": [],
+    "equivalents": [
+      "98979-8",
+      "77147-7"
+    ],
+    "name": "eGFR",
+    "note": "Primary was 33914-3 (MDRD), STATUS=DISCOURAGED; switched to active CKD-EPI. Equivalents: CKD-EPI 2021, MDRD active.",
+    "official_name": "Glomerular filtration rate [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (CKD-EPI)/1.73 sq M",
+    "ranges": {},
+    "segment": "KFT",
+    "ucum": "mL/min/{1.73_m2}"
+  },
+  "62292-8": {
+    "aliases": [
+      "25 Hydroxy Vitamin D",
+      "Vitamin D Total",
+      "Vitamin D-",
+      "Vit D"
+    ],
+    "equivalents": [
+      "1989-3"
+    ],
+    "name": "Vitamin D",
+    "official_name": "25-Hydroxyvitamin D3+25-Hydroxyvitamin D2 [Mass/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 80.0,
+        "low": 30.0
+      },
+      "male": {
+        "high": 80.0,
+        "low": 30.0
+      }
+    },
+    "segment": "Vitamin",
+    "ucum": "ng/mL"
+  },
+  "6690-2": {
+    "aliases": [
+      "Total Leukocyte Count",
+      "TLC",
+      "Leukocyte Count",
+      "Total WBC Count",
+      "Total Leucocyte Count"
+    ],
+    "equivalents": [
+      "26464-8"
+    ],
+    "name": "WBC",
+    "official_name": "Leukocytes [#/volume] in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 13000.0,
+        "low": 4000.0
+      },
+      "male": {
+        "high": 13000.0,
+        "low": 4000.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "6768-6": {
+    "aliases": [
+      "ALP"
+    ],
+    "equivalents": [],
+    "name": "Alkaline Phosphatase",
+    "official_name": "Alkaline phosphatase [Enzymatic activity/volume] in Serum or Plasma",
+    "ranges": {
+      "female": {
+        "high": 139.0,
+        "low": 40.0
+      },
+      "male": {
+        "high": 139.0,
+        "low": 40.0
+      }
+    },
+    "segment": "LFT",
+    "ucum": "U/L"
+  },
+  "704-7": {
+    "aliases": [
+      "Absolute Basophils",
+      "Absolute Basophils Count"
+    ],
+    "equivalents": [],
+    "name": "Absolute Basophil Count",
+    "official_name": "Basophils [#/volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "706-2": {
+    "aliases": [
+      "Basophils"
+    ],
+    "equivalents": [],
+    "name": "Basophil",
+    "official_name": "Basophils/Leukocytes in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 1.0,
+        "low": 0.0
+      },
+      "male": {
+        "high": 1.0,
+        "low": 0.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "70936-0": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Impression",
+    "note": "narrative optometry impression; no UCUM",
+    "official_name": "Vision testing Narrative",
+    "ranges": {},
+    "segment": "Opt",
+    "ucum": null
+  },
+  "711-2": {
+    "aliases": [
+      "Absolute Eosinophils",
+      "Absolute Eosinophils Count",
+      "AEC"
+    ],
+    "equivalents": [],
+    "name": "Absolute Eosinophil Count",
+    "official_name": "Eosinophils [#/volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "713-8": {
+    "aliases": [
+      "Eosinophils"
+    ],
+    "equivalents": [],
+    "name": "Eosinophil",
+    "official_name": "Eosinophils/Leukocytes in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 10.0,
+        "low": 1.0
+      },
+      "male": {
+        "high": 10.0,
+        "low": 1.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "718-7": {
+    "aliases": [
+      "Hemoglobin",
+      "HGB",
+      "CBC - Hb"
+    ],
+    "equivalents": [],
+    "name": "Haemoglobin",
+    "official_name": "Hemoglobin [Mass/volume] in Blood",
+    "ranges": {
+      "female": {
+        "high": 17.0,
+        "low": 13.0
+      },
+      "male": {
+        "high": 17.0,
+        "low": 13.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "g/dL"
+  },
+  "731-0": {
+    "aliases": [
+      "Absolute Lymphocytes",
+      "Absolute Lympocyte Count",
+      "ALC"
+    ],
+    "equivalents": [],
+    "name": "Absolute Lymphocyte Count",
+    "official_name": "Lymphocytes [#/volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "736-9": {
+    "aliases": [
+      "Lymphocytes"
+    ],
+    "equivalents": [],
+    "name": "Lymphocyte",
+    "official_name": "Lymphocytes/Leukocytes in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 45.0,
+        "low": 20.0
+      },
+      "male": {
+        "high": 45.0,
+        "low": 20.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "742-7": {
+    "aliases": [
+      "Absolute Monocytes",
+      "Absolute Monocytes Count"
+    ],
+    "equivalents": [],
+    "name": "Absolute Monocyte Count",
+    "official_name": "Monocytes [#/volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "751-8": {
+    "aliases": [
+      "Absolute Neutrophils",
+      "Absolute Neutrophils Count",
+      "Neutrophil Absolute",
+      "ANC"
+    ],
+    "equivalents": [],
+    "name": "Absolute Neutrophil Count",
+    "official_name": "Neutrophils [#/volume] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "770-8": {
+    "aliases": [
+      "Neutrophils"
+    ],
+    "equivalents": [],
+    "name": "Neutrophil",
+    "official_name": "Neutrophils/Leukocytes in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 80.0,
+        "low": 40.0
+      },
+      "male": {
+        "high": 80.0,
+        "low": 40.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "777-3": {
+    "aliases": [
+      "Platelet"
+    ],
+    "equivalents": [
+      "26515-7"
+    ],
+    "name": "Platelet Count",
+    "official_name": "Platelets [#/volume] in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 4100000.0,
+        "low": 150000.0
+      },
+      "male": {
+        "high": 4100000.0,
+        "low": 150000.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "/uL"
+  },
+  "785-6": {
+    "aliases": [
+      "Mean Corpuscular Haemoglobin",
+      "Mean Corpuscular Hemoglobin"
+    ],
+    "equivalents": [],
+    "name": "MCH",
+    "official_name": "MCH [Entitic mass] by Automated count",
+    "ranges": {
+      "female": {
+        "high": 32.0,
+        "low": 27.0
+      },
+      "male": {
+        "high": 32.0,
+        "low": 27.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "pg"
+  },
+  "786-4": {
+    "aliases": [
+      "Mean Corpuscular Haemoglobin Concentration",
+      "Mean Corpuscular Hemoglobin Concentration"
+    ],
+    "equivalents": [],
+    "name": "MCHC",
+    "official_name": "MCHC [Entitic Mass/volume] in Red Blood Cells by Automated count",
+    "ranges": {
+      "female": {
+        "high": 36.0,
+        "low": 31.5
+      },
+      "male": {
+        "high": 36.0,
+        "low": 31.5
+      }
+    },
+    "segment": "CBC",
+    "ucum": "g/dL"
+  },
+  "787-2": {
+    "aliases": [
+      "Mean Corpuscular Volume"
+    ],
+    "equivalents": [],
+    "name": "MCV",
+    "official_name": "MCV [Entitic mean volume] in Red Blood Cells by Automated count",
+    "ranges": {
+      "female": {
+        "high": 101.0,
+        "low": 80.0
+      },
+      "male": {
+        "high": 101.0,
+        "low": 80.0
+      }
+    },
+    "segment": "CBC",
+    "ucum": "fL"
+  },
+  "788-0": {
+    "aliases": [
+      "RDW",
+      "RDW CV",
+      "Red Cell Distribution Width"
+    ],
+    "equivalents": [],
+    "name": "RDW-CV",
+    "official_name": "Erythrocyte [DistWidth] in Blood by Automated count",
+    "ranges": {},
+    "segment": "CBC",
+    "ucum": "%"
+  },
+  "789-8": {
+    "aliases": [
+      "Erythrocyte Count",
+      "Red Blood Cell Count",
+      "Red Blood Cells",
+      "Total RBC Count"
+    ],
+    "equivalents": [
+      "26453-1"
+    ],
+    "name": "RBC",
+    "official_name": "Erythrocytes [#/volume] in Blood by Automated count",
+    "ranges": {
+      "female": {
+        "high": 5.9,
+        "low": 4.5
+      },
+      "male": {
+        "high": 5.9,
+        "low": 4.5
+      }
+    },
+    "segment": "CBC",
+    "ucum": "10*6/uL"
+  },
+  "8462-4": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "BP Low",
+    "official_name": "Diastolic blood pressure",
+    "ranges": {
+      "female": {
+        "high": 85.0,
+        "low": 75.0
+      },
+      "male": {
+        "high": 85.0,
+        "low": 75.0
+      }
+    },
+    "segment": "Phys",
+    "ucum": "mm[Hg]"
+  },
+  "8480-6": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "BP High",
+    "official_name": "Systolic blood pressure",
+    "ranges": {
+      "female": {
+        "high": 130.0,
+        "low": 115.0
+      },
+      "male": {
+        "high": 130.0,
+        "low": 115.0
+      }
+    },
+    "segment": "Phys",
+    "ucum": "mm[Hg]"
+  },
+  "8625-6": {
+    "aliases": [
+      "PR"
+    ],
+    "equivalents": [],
+    "name": "PR Interval",
+    "note": "Verified against Loinc.csv. LOINC example unit is s; ms is the codebook unit.",
+    "official_name": "P-R Interval",
+    "ranges": {},
+    "segment": "ECG",
+    "ucum": "ms"
+  },
+  "8633-0": {
+    "aliases": [
+      "QRS",
+      "QRSD"
+    ],
+    "equivalents": [],
+    "name": "QRS Duration",
+    "note": "Was 8632-2 (QRS axis, deg); corrected to 8633-0 (QRS duration) per Loinc.csv.",
+    "official_name": "QRS duration",
+    "ranges": {},
+    "segment": "ECG",
+    "ucum": "ms"
+  },
+  "8634-8": {
+    "aliases": [
+      "QT"
+    ],
+    "equivalents": [],
+    "name": "QT Interval",
+    "note": "Verified against Loinc.csv. LOINC example unit is s; ms is the codebook unit.",
+    "official_name": "Q-T interval",
+    "ranges": {},
+    "segment": "ECG",
+    "ucum": "ms"
+  },
+  "8867-4": {
+    "aliases": [],
+    "equivalents": [],
+    "name": "Pulse",
+    "official_name": "Heart rate",
+    "ranges": {
+      "female": {
+        "high": 110.0,
+        "low": 65.0
+      },
+      "male": {
+        "high": 110.0,
+        "low": 65.0
+      }
+    },
+    "segment": "Phys",
+    "ucum": "/min"
+  }
+}
