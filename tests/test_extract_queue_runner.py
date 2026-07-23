@@ -42,6 +42,10 @@ def stub_common(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     # _key() stats the real file on the Drive mount (used for sync-state
     # dedup elsewhere); irrelevant to routing/OCR-wait logic under test here.
     monkeypatch.setattr(rq, "_key", lambda path, rel: "fake-key")
+    # source_path() would resolve the item's rel through the real people.json;
+    # these items use bare test rels ("a.pdf") and the file is never opened
+    # (ingest_document is faked), so a passthrough is enough.
+    monkeypatch.setattr(rq, "source_path", lambda rel: rel)
     monkeypatch.setattr(
         rq, "send_message", lambda token, chat_id, text: calls["sent"].append((chat_id, text))
     )

@@ -17,10 +17,11 @@ looking perfectly plausible.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Optional
+
+from src import config
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +60,7 @@ def _fold(unit: str) -> str:
 
 
 def load_units() -> dict[str, dict]:
-    with open(UNITS, encoding="utf-8") as f:
-        return {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+    return config.load(UNITS)
 
 
 def convert(

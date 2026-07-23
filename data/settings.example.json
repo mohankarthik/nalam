@@ -1,6 +1,5 @@
 {
   "_comment": "Copy to data/settings.json and fill in. data/settings.json is gitignored: it names real people and real paths, and nothing personal belongs in the repository.",
-  "medical_root": "~/drive/Medical",
   "paperless_url": "http://localhost:8100",
   "_document_type": "The Paperless document_type every ingested file is filed under.",
   "document_type": "Medical",

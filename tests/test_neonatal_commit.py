@@ -36,6 +36,10 @@ def family(monkeypatch: pytest.MonkeyPatch):
     }
     monkeypatch.setattr("src.people.load_people", lambda: people)
     monkeypatch.setattr("src.people.shared_name_tokens", lambda: {"doe"})
+    # These folders live only in this invented family, not in the real
+    # people.json source_path() would consult; the fake_open below ignores the
+    # path anyway, so a passthrough is enough.
+    monkeypatch.setattr("src.ingest.source_path", lambda rel: rel)
     # ingest_*/resolve_patient still open() the real PDF before extract_* is faked.
     real_open = open
 

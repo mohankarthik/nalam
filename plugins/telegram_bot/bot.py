@@ -46,10 +46,10 @@ from typing import Any, Optional
 import requests
 
 from src import extract_queue, qa
-from src.constants import CONSUMABLE_EXT, DOCUMENT_TYPE, MAGIC, MEDICAL_ROOT, SPECIALTIES_CONFIG
+from src.constants import CONSUMABLE_EXT, DOCUMENT_TYPE, MAGIC, SPECIALTIES_CONFIG
 from src.drive_sync import _key, load_state, save_state
 from src.paperless import Paperless
-from src.people import resolve
+from src.people import resolve, source_path
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +333,7 @@ class TelegramDocBot:
         rel = os.path.join(
             parsed.folder, parsed.subfolder or "", f"{parsed.date} - {parsed.title}{suffix}"
         )
-        path = os.path.join(MEDICAL_ROOT, rel)
+        path = source_path(rel)
         if os.path.exists(path):
             self.send_message(chat_id, f"✗ Already have {rel} -- use a different title.")
             return False

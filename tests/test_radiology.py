@@ -451,7 +451,7 @@ class TestIngestWritesOneRecord:
         rel = "Ila/Scans/2023-03-20 - MRI Brain.pdf"
         (root / "Ila" / "Scans").mkdir(parents=True)
         (root / rel).write_bytes(b"%PDF-1.4 fake")
-        monkeypatch.setattr(ingest, "MEDICAL_ROOT", str(root))
+        monkeypatch.setattr(ingest, "source_path", lambda rel: str(root / rel))
 
         fake = Radiology(
             person="Ila",

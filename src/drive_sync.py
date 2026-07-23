@@ -1,12 +1,19 @@
-"""Walk the Drive Medical folder and file every document into Paperless.
+"""Walk each person's folder and file every document into Paperless.
 
 Path carries the metadata, so nothing has to be inferred from content:
 
-    Medical/{Person}/{Specialty}/{YYYY-MM-DD} - {Title}.pdf
-            |         |           |             `- title
-            |         |           `- document date
-            |         `- tag        (data/specialties.json)
-            `- correspondent = the patient  (data/people.json)
+    {directory}/{Specialty}/{YYYY-MM-DD} - {Title}.pdf
+        |         |           |             `- title
+        |         |           `- document date
+        |         `- tag        (data/specialties.json)
+        `- each person names their own folder EXPLICITLY in data/people.json
+           ("directory", a full path). The patient is that folder, not the
+           folder's *name* -- names drift (a rename, a trailing space, a
+           duplicate copy) and a document filed against the wrong family member
+           is the worst failure this system can have. We walk the exact paths
+           people.json lists and nothing else: there is no shared root, none is
+           assumed, and folders belonging to no listed person are simply not
+           looked at. A new family member is added by editing people.json.
 
 Idempotent two ways: a local state file skips what we already posted, and
 Paperless rejects a duplicate checksum server-side. Safe to re-run.
@@ -27,11 +34,11 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from src import config
 from src.constants import (
     CONSUMABLE_EXT,
     DOCUMENT_TYPE,
     MAGIC,
-    MEDICAL_ROOT,
     PEOPLE_CONFIG,
     SPECIALTIES_CONFIG,
     STATE_DIR,
@@ -121,95 +128,108 @@ def _key(path: str, rel: str) -> str:
     return f"{rel}|{st.st_size}|{int(st.st_mtime)}"
 
 
-def collect(root: str = MEDICAL_ROOT) -> tuple[list[Doc], list[str]]:
-    """Resolve every consumable file under root. Returns (docs, skipped)."""
-    with open(PEOPLE_CONFIG, encoding="utf-8") as f:
-        people = json.load(f)
-    with open(SPECIALTIES_CONFIG, encoding="utf-8") as f:
-        specialties = json.load(f)
+def collect() -> tuple[list[Doc], list[str]]:
+    """Resolve every consumable file for every person. Returns (docs, skipped).
 
-    folder_to_person: dict[str, str] = {
-        folder: entry["correspondent"] for folder, entry in people["people"].items()
+    Each person names the exact folder that holds their documents (`directory`
+    in people.json); we walk those folders and nothing else. There is no shared
+    root and none is assumed -- a person's folder can live anywhere on disk. The
+    flow is deliberately small: read the config, walk each listed folder, hand
+    back every consumable file. What is already in the database (and so skipped)
+    is decided downstream, by source_path, not here.
+
+    `rel` is the file's path within its person's folder, prefixed with the
+    person's people.json KEY (`Perumal/Cardiology/2024-... .pdf`), not the
+    folder's on-disk name. The key is the stable identity persisted as
+    documents.source_path and the sync state key; the `directory` only says
+    where to find the files today, so renaming the folder (Perumal -> "Perumal
+    M") never re-keys a document or re-triggers extraction. No common root is
+    used or assumed.
+    """
+    people = config.load(PEOPLE_CONFIG)
+    specialties = config.load(SPECIALTIES_CONFIG)
+
+    person_dirs: dict[str, str] = {
+        key: os.path.expanduser(entry["directory"]) for key, entry in people["people"].items()
     }
-    # A folder organised around an EVENT rather than a patient -- a pregnancy --
-    # collects the PARENTS' records under the child's name. Longest prefix wins.
+    correspondents: dict[str, str] = {
+        key: entry["correspondent"] for key, entry in people["people"].items()
+    }
+    # A sub-folder organised around an EVENT rather than a patient -- a
+    # pregnancy -- collects the PARENTS' records under the child's name. Keys are
+    # paths RELATIVE TO THE PERSON'S OWN directory ("Conception/...", not the
+    # top-level folder name), so they survive a rename of that folder too.
+    # Longest prefix wins.
     overrides: dict[str, str] = people.get("folder_overrides", {})
+    ordered_overrides = sorted(overrides.items(), key=lambda kv: -len(kv[0]))
     skip_folders: set[str] = set(people["skip_folders"])
     tag_map: dict[str, str] = specialties["tags"]
     default_tag: str = specialties["default_tag"]
 
     docs: list[Doc] = []
     skipped: list[str] = []
-    unmapped: set[str] = set()
 
-    for dirpath, dirnames, filenames in os.walk(root):
-        rel_dir = os.path.relpath(dirpath, root)
-        if rel_dir == ".":
-            dirnames[:] = [d for d in dirnames if d not in skip_folders]
-            continue
-
-        parts = rel_dir.split(os.sep)
-        folder = parts[0]
-        if folder in skip_folders:
-            continue
-
-        correspondent = folder_to_person.get(folder)
-        if correspondent is None:
-            unmapped.add(folder)
-            continue
-
-        dir_correspondent = correspondent
-        for prefix, who in sorted(overrides.items(), key=lambda kv: -len(kv[0])):
-            if rel_dir == prefix or rel_dir.startswith(prefix + os.sep):
-                dir_correspondent = who
-                break
-
-        # First path segment under the person that names a known specialty.
-        tag = default_tag
-        for part in parts[1:]:
-            if part.strip() in tag_map:
-                tag = tag_map[part.strip()]
-                break
-
-        for name in filenames:
-            path = os.path.join(dirpath, name)
-            suffix = sniff(path)
-            if suffix is None:
-                skipped.append(os.path.relpath(path, root))
-                continue
-            rel = os.path.relpath(path, root)
-
-            # An override may name an exact FILE, not just a folder: a handwritten
-            # form with a blank name field gives the document nothing to override
-            # the folder with, so the folder's default would silently take it.
-            correspondent = dir_correspondent
-            for prefix, who in sorted(overrides.items(), key=lambda kv: -len(kv[0])):
-                if rel == prefix:
-                    correspondent = who
-                    break
-
-            stem = os.path.splitext(name)[0]
-            title, created = parse_name(stem, os.path.basename(dirpath))
-            docs.append(
-                Doc(
-                    path=path,
-                    rel=rel,
-                    person=folder,
-                    correspondent=correspondent,
-                    tag=tag,
-                    title=title,
-                    created=created,
-                    suffix=suffix,
-                    key=_key(path, rel),
-                )
+    for key, person_dir in person_dirs.items():
+        if not os.path.isdir(person_dir):
+            raise RuntimeError(
+                f"Directory for {key} does not exist: {person_dir}. "
+                f'Fix its "directory" in {PEOPLE_CONFIG}.'
             )
 
-    if unmapped:
-        raise RuntimeError(
-            "Unmapped person folders (refusing to guess a patient): "
-            + ", ".join(sorted(unmapped))
-            + f". Add them to {PEOPLE_CONFIG}."
-        )
+        for dirpath, dirnames, filenames in os.walk(person_dir):
+            dirnames[:] = [d for d in dirnames if d not in skip_folders]
+
+            sub = os.path.relpath(dirpath, person_dir)  # "." at the person's root
+            sub = "" if sub == "." else sub
+            parts = sub.split(os.sep) if sub else []
+
+            dir_correspondent = correspondents[key]
+            for prefix, who in ordered_overrides:
+                if sub == prefix or sub.startswith(prefix + os.sep):
+                    dir_correspondent = who
+                    break
+
+            # First path segment under the person that names a known specialty.
+            tag = default_tag
+            for part in parts:
+                if part.strip() in tag_map:
+                    tag = tag_map[part.strip()]
+                    break
+
+            for name in filenames:
+                path = os.path.join(dirpath, name)
+                suffix = sniff(path)
+                file_sub = os.path.relpath(path, person_dir)
+                rel = os.path.join(key, file_sub)
+                if suffix is None:
+                    skipped.append(rel)
+                    continue
+
+                # An override may name an exact FILE, not just a folder: a
+                # handwritten form with a blank name field gives the document
+                # nothing to override the folder with, so the folder's default
+                # would silently take it. File override keys are person-relative.
+                correspondent = dir_correspondent
+                for prefix, who in ordered_overrides:
+                    if file_sub == prefix:
+                        correspondent = who
+                        break
+
+                stem = os.path.splitext(name)[0]
+                title, created = parse_name(stem, os.path.basename(dirpath))
+                docs.append(
+                    Doc(
+                        path=path,
+                        rel=rel,
+                        person=key,
+                        correspondent=correspondent,
+                        tag=tag,
+                        title=title,
+                        created=created,
+                        suffix=suffix,
+                        key=_key(path, rel),
+                    )
+                )
 
     return docs, skipped
 

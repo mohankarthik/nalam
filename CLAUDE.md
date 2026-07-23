@@ -62,8 +62,11 @@ prompts is a silent correctness trap.
 **The correspondent is the patient.** A document filed against the wrong family member is the worst
 failure this system can have — worse than not ingesting it at all. So:
 
-- `data/people.json` maps a Drive folder to a Paperless correspondent. An **unmapped folder aborts
-  the sync**; it is never guessed.
+- Each person in `data/people.json` names the **full path** to their own folder (`directory`) and a
+  Paperless correspondent. The sync walks exactly those folders and nothing else — there is no shared
+  root, none is assumed, and a folder belonging to no listed person is simply never looked at (not
+  guessed, not aborted on). A document's identity (`documents.source_path`, the sync state key) is the
+  person's people.json **key**, not the folder's on-disk name — so renaming a Drive folder never re-keys a document or re-triggers extraction. A new family member is added by editing `people.json`.
 - `Paperless.correspondent_id()` defaults to `create=False`. An unexpected person name means the map
   is wrong, not that a new patient appeared.
 - Nothing infers a patient from document *content* while the folder path is authoritative.

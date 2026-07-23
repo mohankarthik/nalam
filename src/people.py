@@ -18,10 +18,11 @@ Two rules it does hold:
 
 from __future__ import annotations
 
-import json
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+from src import config
 from src.constants import PEOPLE_CONFIG
 
 
@@ -43,8 +44,7 @@ class Person:
 
 def load_people() -> dict[str, Person]:
     """{correspondent -> Person}."""
-    with open(PEOPLE_CONFIG, encoding="utf-8") as f:
-        raw = json.load(f)["people"]
+    raw = config.load(PEOPLE_CONFIG)["people"]
     return {
         entry["correspondent"]: Person(
             folder=folder,
@@ -56,8 +56,34 @@ def load_people() -> dict[str, Person]:
             born=entry.get("born"),
         )
         for folder, entry in raw.items()
-        if not folder.startswith("_")
     }
+
+
+def person_directories() -> dict[str, str]:
+    """{people.json key -> the absolute folder that holds that person's files}.
+
+    Each person names their own folder explicitly; there is no shared root and
+    none is assumed. This is the one place that expands those paths.
+    """
+    raw = config.load(PEOPLE_CONFIG)["people"]
+    return {key: os.path.expanduser(entry["directory"]) for key, entry in raw.items()}
+
+
+def source_path(rel: str) -> str:
+    """Absolute path of a document from its `rel` ('{key}/{subpath}').
+
+    `rel`'s first segment is the owning person's people.json KEY -- the stable
+    identity persisted as documents.source_path -- and the rest is the path
+    within that person's directory. Resolving through the per-person directory
+    (not a global root, which no longer exists) is what lets a Drive folder be
+    renamed without stranding or re-keying the documents inside it.
+    """
+    parts = rel.replace("\\", "/").split("/")
+    key, sub = parts[0], parts[1:]
+    dirs = person_directories()
+    if key not in dirs:
+        raise KeyError(f"{rel}: no person keyed {key!r} in {PEOPLE_CONFIG}")
+    return os.path.join(dirs[key], *sub)
 
 
 def resolve(who: str) -> Optional[Person]:

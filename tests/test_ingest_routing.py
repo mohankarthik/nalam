@@ -36,22 +36,24 @@ def _doc(*, tag: str = "Medical/General", title: str = "Consultation", suffix: s
 def stub_extractors(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     calls: dict[str, Any] = {}
 
-    def fake_ingest_lab(con, rel_path, subject, doc_date=None, paperless_id=None):
+    def fake_ingest_lab(con, rel_path, subject, doc_date=None, paperless_id=None, abs_path=None):
         calls["branch"] = "lab"
         return 3, 1
 
-    def fake_ingest_discharge(con, rel_path, subject, doc_date=None, paperless_id=None):
+    def fake_ingest_discharge(
+        con, rel_path, subject, doc_date=None, paperless_id=None, abs_path=None
+    ):
         calls["branch"] = "discharge"
         return 2, 1, None
 
     def fake_ingest_prescription(
-        con, rel_path, subject, ocr_text=None, doc_date=None, paperless_id=None
+        con, rel_path, subject, ocr_text=None, doc_date=None, paperless_id=None, abs_path=None
     ):
         calls["branch"] = "prescription"
         return 4, 0, None
 
     def fake_ingest_radiology(
-        con, rel_path, subject, ocr_text=None, doc_date=None, paperless_id=None
+        con, rel_path, subject, ocr_text=None, doc_date=None, paperless_id=None, abs_path=None
     ):
         calls["branch"] = "radiology"
         return 1, 0, None
