@@ -522,10 +522,9 @@ def ingest_discharge(
     effective = discharged
 
     # Re-ingesting a document must REPLACE its medications, not add another copy.
-    # Without this, every re-run duplicated them -- one document was ingested six
-    # times today (re-attribution, folder overrides) and its two drugs became
-    # twelve rows. Human corrections are kept: a person's decision outranks a
-    # re-read, and re-extracting must never silently discard it.
+    # Without this, every re-run duplicated them. Human corrections are kept: a
+    # person's decision outranks a re-read, and re-extracting must never silently
+    # discard it.
     reviewed = {
         r["raw_text"]
         for r in con.execute(
@@ -767,10 +766,9 @@ def ingest_prescription(
         )
 
     # Re-ingesting a document must REPLACE its medications, not add another copy.
-    # Without this, every re-run duplicated them -- one document was ingested six
-    # times today (re-attribution, folder overrides) and its two drugs became
-    # twelve rows. Human corrections are kept: a person's decision outranks a
-    # re-read, and re-extracting must never silently discard it.
+    # Without this, every re-run duplicated them. Human corrections are kept: a
+    # person's decision outranks a re-read, and re-extracting must never silently
+    # discard it.
     reviewed = {
         r["raw_text"]
         for r in con.execute(

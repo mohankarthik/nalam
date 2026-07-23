@@ -46,9 +46,5 @@
     }
   },
   "_deceased": "Optional. A deceased person's record is history, not something to maintain: no reconciliation cards, no follow-up reminders, no review nags. The records themselves stay exactly as they are.",
-  "_folder_overrides": "Optional. Sub-folders whose documents belong to someone other than the folder's own person -- e.g. a pregnancy folder under a child's name that actually holds the mother's consultations. Keys are paths RELATIVE TO THAT PERSON'S directory ('Pregnancy', not 'Carol/Pregnancy'), so they survive a rename of the folder. The document's own printed name still overrides this.",
-  "folder_overrides": {
-    "Pregnancy": "Alice Example"
-  },
   "_born": "Optional, for children. A document dated before this date cannot be theirs."
 }
