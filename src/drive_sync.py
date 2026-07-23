@@ -155,13 +155,6 @@ def collect() -> tuple[list[Doc], list[str]]:
     correspondents: dict[str, str] = {
         key: entry["correspondent"] for key, entry in people["people"].items()
     }
-    # A sub-folder organised around an EVENT rather than a patient -- a
-    # pregnancy -- collects the PARENTS' records under the child's name. Keys are
-    # paths RELATIVE TO THE PERSON'S OWN directory ("Conception/...", not the
-    # top-level folder name), so they survive a rename of that folder too.
-    # Longest prefix wins.
-    overrides: dict[str, str] = people.get("folder_overrides", {})
-    ordered_overrides = sorted(overrides.items(), key=lambda kv: -len(kv[0]))
     tag_map: dict[str, str] = specialties["tags"]
     default_tag: str = specialties["default_tag"]
 
@@ -181,10 +174,6 @@ def collect() -> tuple[list[Doc], list[str]]:
             parts = sub.split(os.sep) if sub else []
 
             dir_correspondent = correspondents[key]
-            for prefix, who in ordered_overrides:
-                if sub == prefix or sub.startswith(prefix + os.sep):
-                    dir_correspondent = who
-                    break
 
             # First path segment under the person that names a known specialty.
             tag = default_tag
@@ -207,10 +196,6 @@ def collect() -> tuple[list[Doc], list[str]]:
                 # nothing to override the folder with, so the folder's default
                 # would silently take it. File override keys are person-relative.
                 correspondent = dir_correspondent
-                for prefix, who in ordered_overrides:
-                    if file_sub == prefix:
-                        correspondent = who
-                        break
 
                 stem = os.path.splitext(name)[0]
                 title, created = parse_name(stem, os.path.basename(dirpath))
