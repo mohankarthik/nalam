@@ -23,7 +23,7 @@ from typing import Optional
 
 from src import db
 from src.extractor import extract_lab
-from src.normalize import load_codebook, parse_value, resolve
+from src.normalize import is_ignored, load_codebook, load_ignored, parse_value, resolve
 from src.people import source_path
 from src.units import convert, load_units
 
@@ -245,6 +245,7 @@ def ingest_lab(
         return 0, 1
 
     codebook, units = load_codebook(), load_units()
+    ignored = load_ignored()
     resolved, _unmatched = resolve(extraction.passed, codebook)
 
     effective = _collection_date(extraction.patient, doc_date)
@@ -261,6 +262,18 @@ def ingest_lab(
         printed = r.get("name", "")
         reasons: list[str] = []
         status = "ok"
+
+        # A name that matched no live analyte but IS a deliberately-dropped test
+        # (echo measurement, ratio, CPAP metric, qualitative urine) is discarded
+        # silently -- not sent to review. A live match always wins first, and an
+        # ambiguous name still goes to review, so this only catches the tests we
+        # chose not to track. Without it, every re-extraction re-floods the queue.
+        if (
+            analyte is None
+            and not r.get("ambiguous")
+            and is_ignored(printed, r.get("section", ""), ignored)
+        ):
+            continue
 
         if r.get("unverifiable"):
             status = "review"
