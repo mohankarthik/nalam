@@ -8,9 +8,10 @@ code holds no names and no paths.
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
+
+from src import config
 
 DATA_DIR = "data"
 STATE_DIR = os.path.join(DATA_DIR, "state")
@@ -29,14 +30,10 @@ def _load_settings() -> dict[str, Any]:
             f"{SETTINGS_CONFIG} not found. Copy data/settings.example.json to it "
             "and fill in your document root and people."
         )
-    with open(SETTINGS_CONFIG, encoding="utf-8") as f:
-        return {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+    return config.load(SETTINGS_CONFIG)
 
 
 SETTINGS = _load_settings()
-
-# The Drive folder holding the scanned documents, one sub-folder per person.
-MEDICAL_ROOT = os.path.expanduser(os.environ.get("NALAM_MEDICAL_ROOT", SETTINGS["medical_root"]))
 
 PAPERLESS_URL = os.environ.get(
     "NALAM_PAPERLESS_URL", SETTINGS.get("paperless_url", "http://localhost:8100")

@@ -23,6 +23,8 @@ import logging
 import re
 from typing import Optional
 
+from src import config
+
 logger = logging.getLogger(__name__)
 
 ANALYTES = "data/analytes.json"
@@ -224,23 +226,16 @@ def load_codebook() -> dict[str, dict]:
     The split predates the sheet's retirement -- it kept a re-import from
     clobbering the curated files; now nothing re-imports.
     """
-    with open(ANALYTES, encoding="utf-8") as f:
-        codebook = json.load(f)
+    codebook = config.load(ANALYTES)
 
     if os.path.exists(ANALYTES_EXTRA):
-        with open(ANALYTES_EXTRA, encoding="utf-8") as f:
-            for name, entry in json.load(f).items():
-                if name.startswith("_"):
-                    continue
-                codebook.setdefault(
-                    name, {"segment": entry.get("segment"), "aliases": [], "ranges": {}}
-                )
+        for name, entry in config.load(ANALYTES_EXTRA).items():
+            codebook.setdefault(
+                name, {"segment": entry.get("segment"), "aliases": [], "ranges": {}}
+            )
 
-    with open(ALIASES, encoding="utf-8") as f:
-        aliases = json.load(f)
+    aliases = config.load(ALIASES)
     for canonical, names in aliases.items():
-        if canonical.startswith("_"):
-            continue
         if canonical not in codebook:
             logger.warning(f"alias for unknown analyte {canonical!r}; ignoring")
             continue

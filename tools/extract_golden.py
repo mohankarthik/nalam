@@ -17,8 +17,8 @@ import logging
 import os
 import re
 
-from src.constants import MEDICAL_ROOT
 from src.extractor import extract_lab
+from src.people import source_path
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 
@@ -55,7 +55,7 @@ def main() -> None:
             print(f"cached  {rel}")
             continue
 
-        path = os.path.join(MEDICAL_ROOT, rel)
+        path = source_path(rel)
         file_date = datetime.date.fromisoformat(os.path.basename(rel)[:10])
         try:
             ex = extract_lab(open(path, "rb").read(), person, rel, file_date)

@@ -124,7 +124,7 @@ class TestProcessMessageEnqueuesExtraction:
     """
 
     def _bot(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> bot.TelegramDocBot:
-        monkeypatch.setattr(bot, "MEDICAL_ROOT", str(tmp_path))
+        monkeypatch.setattr(bot, "source_path", lambda rel: str(tmp_path / rel))
         monkeypatch.setattr(bot, "Paperless", lambda: _FakePaperless())
         monkeypatch.setattr(bot, "load_state", lambda: {})
         monkeypatch.setattr(bot, "save_state", lambda state: None)

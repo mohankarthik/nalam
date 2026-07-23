@@ -22,9 +22,9 @@ import os
 from typing import Optional
 
 from src import db
-from src.constants import MEDICAL_ROOT
 from src.extractor import extract_lab
 from src.normalize import load_codebook, parse_value, resolve
+from src.people import source_path
 from src.units import convert, load_units
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ def ingest_document(
             subject=doc.correspondent,
             doc_date=doc_date,
             paperless_id=paperless_id,
+            abs_path=doc.path,
         )
         return {"doc_type": "lab", "committed": committed, "review": queued}
 
@@ -86,6 +87,7 @@ def ingest_document(
             subject=doc.correspondent,
             doc_date=doc_date,
             paperless_id=paperless_id,
+            abs_path=doc.path,
         )
         return {
             "doc_type": "discharge",
@@ -94,8 +96,7 @@ def ingest_document(
             "misfiled": misfiled,
         }
 
-    path = os.path.join(MEDICAL_ROOT, doc.rel)
-    pdf = open(path, "rb").read()
+    pdf = open(doc.path, "rb").read()
     if is_encrypted(pdf):
         return {"doc_type": "encrypted", "note": "password-protected, cannot extract"}
 
@@ -118,6 +119,7 @@ def ingest_document(
             ocr_text=ocr_text,
             doc_date=doc_date,
             paperless_id=paperless_id,
+            abs_path=doc.path,
         )
         return {
             "doc_type": "prescription",
@@ -133,6 +135,7 @@ def ingest_document(
             subject=doc.correspondent,
             doc_date=doc_date,
             paperless_id=paperless_id,
+            abs_path=doc.path,
         )
         return {
             "doc_type": "discharge",
@@ -148,6 +151,7 @@ def ingest_document(
             subject=doc.correspondent,
             doc_date=doc_date,
             paperless_id=paperless_id,
+            abs_path=doc.path,
         )
         return {"doc_type": "lab", "committed": committed, "review": queued}
 
@@ -171,6 +175,7 @@ def _radiology_result(con, doc, ocr_text, paperless_id, doc_date) -> dict:
         ocr_text=ocr_text,
         doc_date=doc_date,
         paperless_id=paperless_id,
+        abs_path=doc.path,
     )
     return {
         "doc_type": "radiology",
@@ -186,9 +191,10 @@ def ingest_lab(
     subject: str,
     doc_date: Optional[datetime.date] = None,
     paperless_id: Optional[int] = None,
+    abs_path: Optional[str] = None,
 ) -> tuple[int, int]:
     """Ingest one lab report. Returns (observations committed, items for review)."""
-    path = os.path.join(MEDICAL_ROOT, rel_path)
+    path = abs_path or source_path(rel_path)
     pdf = open(path, "rb").read()
 
     if doc_date is None:
@@ -402,6 +408,7 @@ def ingest_discharge(
     subject: str,
     doc_date: Optional[datetime.date] = None,
     paperless_id: Optional[int] = None,
+    abs_path: Optional[str] = None,
 ) -> tuple[int, int, Optional[str]]:
     """Ingest a discharge summary. Returns (medications, encounters, misfiled_to).
 
@@ -421,7 +428,7 @@ def ingest_discharge(
     """
     from src.extractor import extract_discharge
 
-    path = os.path.join(MEDICAL_ROOT, rel_path)
+    path = abs_path or source_path(rel_path)
     pdf = open(path, "rb").read()
 
     if doc_date is None:
@@ -669,6 +676,7 @@ def ingest_prescription(
     ocr_text: Optional[str] = None,
     doc_date: Optional[datetime.date] = None,
     paperless_id: Optional[int] = None,
+    abs_path: Optional[str] = None,
 ) -> tuple[int, int, Optional[str]]:
     """Ingest a consultation / prescription. Returns (meds, uncorroborated, misfiled_to).
 
@@ -682,7 +690,7 @@ def ingest_prescription(
     """
     from src.extractor import extract_prescription
 
-    path = os.path.join(MEDICAL_ROOT, rel_path)
+    path = abs_path or source_path(rel_path)
     pdf = open(path, "rb").read()
 
     if doc_date is None:
@@ -833,6 +841,7 @@ def ingest_radiology(
     ocr_text: Optional[str] = None,
     doc_date: Optional[datetime.date] = None,
     paperless_id: Optional[int] = None,
+    abs_path: Optional[str] = None,
 ) -> tuple[int, int, Optional[str]]:
     """Ingest an imaging report. Returns (reports_written, untrusted, misfiled_to).
 
@@ -881,7 +890,7 @@ def ingest_radiology(
         )
         return 0, 0, None
 
-    path = os.path.join(MEDICAL_ROOT, rel_path)
+    path = abs_path or source_path(rel_path)
     pdf = open(path, "rb").read()
 
     if doc_date is None:

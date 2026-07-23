@@ -21,10 +21,11 @@ review rather than acquiring a plausible-looking generic.
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Optional
+
+from src import config
 
 DRUGS = "data/drugs.json"
 
@@ -70,8 +71,7 @@ class Drug:
 
 
 def load_drugs() -> dict[str, dict]:
-    with open(DRUGS, encoding="utf-8") as f:
-        return {k: v for k, v in json.load(f)["drugs"].items() if not k.startswith("_")}
+    return config.load(DRUGS)["drugs"]
 
 
 def _key(printed: str) -> str:

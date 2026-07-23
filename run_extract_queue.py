@@ -42,10 +42,11 @@ logger = logging.getLogger("extract_queue")
 
 from plugins.telegram_bot.bot import _load_token, send_message  # noqa: E402
 from src import db, extract_queue, monitor  # noqa: E402
-from src.constants import MEDICAL_ROOT, STATE_DIR  # noqa: E402
+from src.constants import STATE_DIR  # noqa: E402
 from src.drive_sync import Doc, _key  # noqa: E402
 from src.ingest import ingest_document  # noqa: E402
 from src.paperless import Paperless, id_for, ocr_for  # noqa: E402
+from src.people import source_path  # noqa: E402
 
 LOCK_PATH = os.path.join(STATE_DIR, "extract_queue.lock")
 
@@ -61,7 +62,7 @@ MAX_ATTEMPTS = 3
 
 
 def _doc_from_item(item: dict) -> Doc:
-    path = os.path.join(MEDICAL_ROOT, item["rel"])
+    path = source_path(item["rel"])
     return Doc(
         path=path,
         rel=item["rel"],

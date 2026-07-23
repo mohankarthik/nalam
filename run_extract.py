@@ -89,9 +89,6 @@ def classified_type(rel: str) -> str | None:
 def run_classify(limit: int = 0) -> None:
     """Ask each document what it IS. Cached, so re-runs are free."""
     import collections
-    import os
-
-    from src.constants import MEDICAL_ROOT
 
     docs, _ = collect()
     pdfs = [d for d in docs if d.suffix == ".pdf"]
@@ -103,7 +100,7 @@ def run_classify(limit: int = 0) -> None:
     logger.info(f"{len(pdfs)} PDFs: {cached} already classified, {len(todo)} to do")
     for i, d in enumerate(todo, 1):
         try:
-            pdf = open(os.path.join(MEDICAL_ROOT, d.rel), "rb").read()
+            pdf = open(d.path, "rb").read()
             if is_encrypted(pdf):
                 # No model can read it, and no key is configured. Record the fact
                 # rather than burning two API calls to be told so.
@@ -243,6 +240,7 @@ def run_radiology(con, limit: int = 0, person: str | None = None) -> None:
                 d.correspondent,
                 ocr_text=ocr_for(ocr, d.correspondent, d.rel),
                 paperless_id=id_for(paperless_ids, d.correspondent, d.rel),
+                abs_path=d.path,
             )
         except Exception as e:
             logger.error(f"[{i}/{len(todo)}] {d.rel}: {e}")

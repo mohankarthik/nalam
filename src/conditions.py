@@ -15,18 +15,16 @@ against what a document actually says.
 
 from __future__ import annotations
 
-import json
 import re
 from functools import lru_cache
 
+from src import config
 from src.constants import CONDITIONS_CONFIG
 
 
 @lru_cache(maxsize=1)
 def load_conditions() -> dict[str, tuple[str, ...]]:
-    with open(CONDITIONS_CONFIG, encoding="utf-8") as f:
-        raw = json.load(f)
-    return {k: tuple(v) for k, v in raw.items() if not k.startswith("_")}
+    return {k: tuple(v) for k, v in config.load(CONDITIONS_CONFIG).items()}
 
 
 def _tokens(text: str) -> set[str]:
