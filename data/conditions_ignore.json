@@ -1,0 +1,28 @@
+{
+  "_comment": "Generic clinical findings we deliberately do NOT give a condition bucket -- the condition analogue of data/ignored_analytes.json. A printed diagnosis that matches one of these terms (whole-word token containment, same as the buckets) is dropped from the review queue instead of nagging forever. Committed and GENERIC ONLY: put a clinical term here (e.g. 'cholelithiasis', 'flat foot'), never a person's record-specific or garbled string -- those get FIXED against the PDF (tools/conditions_review.py) until they reduce to a generic term. Curated via the review worksheet.",
+  "ignore": [
+    "flat foot",
+    "arachnoid cyst",
+    "colic",
+    "peri apical infection",
+    "pedal edema",
+    "hypovolemia",
+    "pseudophakia",
+    "intraocular lens",
+    "nystagmus",
+    "trochlear nerve palsy",
+    "hyperbilirubinemia",
+    "mutation",
+    "NIHSS",
+    "BMI",
+    "vaccination",
+    "lv systolic function",
+    "appropriate for gestational age",
+    "NBS",
+    "cannulation",
+    "tubes patent",
+    "percutaneous cholecystotomy",
+    "PCD insertion",
+    "fundus"
+  ]
+}

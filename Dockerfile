@@ -23,7 +23,7 @@ COPY run_sync.py run_extract.py run_extract_queue.py run_meds.py run_telegram_bo
 COPY src/ ./src/
 COPY tools/ ./tools/
 COPY plugins/ ./plugins/
-COPY data/units.json data/drugs.json data/ignored_analytes.json data/specialties.json data/conditions.json ./data/
+COPY data/units.json data/drugs.json data/ignored_analytes.json data/specialties.json data/conditions.json data/conditions_ignore.json data/icd10_categories.json ./data/
 COPY data/configs/ ./data/configs/
 COPY crontab ./crontab
 COPY entrypoint.sh ./

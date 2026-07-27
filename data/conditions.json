@@ -1,134 +1,710 @@
 {
-  "_comment": "Colloquial <-> clinical condition names, for meds.for_condition(). A layperson asks 'what did she get for a cold' but a discharge summary says 'AURTI' or 'URTI' -- a literal substring search matches neither to the other. Hand-curated, generic medical terminology only: no names, no dates, no real diagnoses from anyone's record belong here (see CLAUDE.md, 'nothing personal in this repository'). Matching is token-containment against BOTH diagnoses and the free-text reason, same as the rest of the codebook aliasing (data/aliases.json).",
-  "cold": [
-    "URTI",
-    "AURTI",
-    "upper respiratory tract infection",
-    "upper respiratory infection",
-    "common cold",
-    "coryza",
-    "rhinitis",
-    "runny nose",
-    "cough and cold"
-  ],
-  "flu": [
-    "influenza",
-    "ILI",
-    "influenza like illness"
-  ],
-  "fever": [
-    "pyrexia",
-    "febrile",
-    "PUO",
-    "pyrexia of unknown origin"
-  ],
-  "cough": [
-    "bronchitis",
-    "productive cough",
-    "dry cough"
-  ],
-  "stomach bug": [
-    "gastroenteritis",
-    "loose stools",
-    "diarrhea",
-    "diarrhoea",
-    "vomiting",
-    "acute gastroenteritis"
-  ],
-  "diabetes": [
-    "T2DM",
-    "T1DM",
-    "DM",
-    "diabetes mellitus",
-    "type 2 diabetes",
-    "type 1 diabetes"
-  ],
-  "pulmonary hypertension": [
-    "pulmonary hypertension",
-    "PAH",
-    "cor pulmonale"
-  ],
-  "high blood pressure": [
-    "HTN",
-    "hypertension",
-    "K/C/O HTN"
-  ],
-  "high cholesterol": [
-    "dyslipidemia",
-    "dyslipidaemia",
-    "hyperlipidemia",
-    "hyperlipidaemia"
-  ],
-  "heart disease": [
-    "CAD",
-    "coronary artery disease",
-    "ACS",
-    "acute coronary syndrome",
-    "angina",
-    "MI",
-    "myocardial infarction"
-  ],
-  "kidney problem": [
-    "AKI",
-    "CKD",
-    "acute kidney injury",
-    "chronic kidney disease",
-    "renal failure"
-  ],
-  "asthma": [
-    "reactive airway disease",
-    "RAD",
-    "wheeze",
-    "bronchial asthma"
-  ],
-  "copd": [
-    "chronic obstructive pulmonary disease",
-    "emphysema"
-  ],
-  "back pain": [
-    "lumbago",
-    "spondyloarthritis",
-    "spondylosis",
-    "inflammatory back pain",
-    "sciatica"
-  ],
-  "joint pain": [
-    "arthralgia",
-    "rheumatoid arthritis",
-    "RA",
-    "osteoarthritis",
-    "OA"
-  ],
-  "allergy": [
-    "allergic rhinitis",
-    "atopy",
-    "hay fever"
-  ],
-  "skin rash": [
-    "dermatitis",
-    "eczema",
-    "folliculitis",
-    "urticaria"
-  ],
-  "ear infection": [
-    "otitis media",
-    "AOM",
-    "acute otitis media"
-  ],
-  "hand foot and mouth": [
-    "HFMD",
-    "hand-foot-and-mouth disease",
-    "hand foot mouth disease"
-  ],
-  "stroke": [
-    "CVA",
-    "cerebrovascular accident",
-    "infarct",
-    "MCA stroke"
-  ],
-  "anemia": [
-    "anaemia",
-    "low hemoglobin",
-    "low haemoglobin"
-  ]
+  "_comment": "Colloquial <-> clinical condition names, for meds.for_condition(). A layperson asks 'what did she get for a cold' but a discharge summary says 'AURTI' or 'URTI' -- a literal substring search matches neither to the other. Each bucket now carries a standard ICD-10-CM identity (icd10 = 3-char category list + icd10_title); the bucket KEY stays the runtime identity (consumers key on it, exactly as analytes key on name). Aliases are the fuzzy layer: token-containment against BOTH diagnoses and free-text reason. Buckets are 1:1 with an ICD-10-CM category; a colloquial umbrella phrase ('heart disease', 'stomach bug', 'skin rash') is repeated as an alias across the clinical children it spans, so expand() still widens across all of them. Hand-curated, generic medical terminology only: no names, no dates, no real diagnoses (see CLAUDE.md). Codes are ICD-10-CM (US public-domain), verified against data/icd10cm.csv by tools/conditions_coverage.py.",
+  "common cold": {
+    "icd10": [
+      "J00"
+    ],
+    "icd10_title": "Acute nasopharyngitis [common cold]",
+    "aliases": [
+      "cold",
+      "coryza",
+      "rhinitis",
+      "runny nose",
+      "cough and cold"
+    ]
+  },
+  "upper respiratory infection": {
+    "icd10": [
+      "J06"
+    ],
+    "icd10_title": "Acute upper respiratory infections of multiple and unspecified sites",
+    "aliases": [
+      "URTI",
+      "AURTI",
+      "upper respiratory tract infection",
+      "cold",
+      "cough and cold"
+    ]
+  },
+  "flu": {
+    "icd10": [
+      "J11"
+    ],
+    "icd10_title": "Influenza due to unidentified influenza virus",
+    "aliases": [
+      "influenza",
+      "ILI",
+      "influenza like illness"
+    ]
+  },
+  "fever": {
+    "icd10": [
+      "R50"
+    ],
+    "icd10_title": "Fever of other and unknown origin",
+    "aliases": [
+      "pyrexia",
+      "febrile",
+      "PUO",
+      "pyrexia of unknown origin"
+    ]
+  },
+  "cough": {
+    "icd10": [
+      "R05"
+    ],
+    "icd10_title": "Cough",
+    "aliases": [
+      "dry cough",
+      "productive cough"
+    ]
+  },
+  "bronchitis": {
+    "icd10": [
+      "J40"
+    ],
+    "icd10_title": "Bronchitis, not specified as acute or chronic",
+    "aliases": []
+  },
+  "gastroenteritis": {
+    "icd10": [
+      "A09"
+    ],
+    "icd10_title": "Infectious gastroenteritis and colitis, unspecified",
+    "aliases": [
+      "acute gastroenteritis",
+      "stomach bug"
+    ]
+  },
+  "diarrhea": {
+    "icd10": [
+      "R19"
+    ],
+    "icd10_title": "Other symptoms and signs involving the digestive system and abdomen",
+    "aliases": [
+      "diarrhoea",
+      "loose stools",
+      "stomach bug"
+    ]
+  },
+  "vomiting": {
+    "icd10": [
+      "R11"
+    ],
+    "icd10_title": "Nausea and vomiting",
+    "aliases": [
+      "nausea",
+      "stomach bug"
+    ]
+  },
+  "type 2 diabetes": {
+    "icd10": [
+      "E11"
+    ],
+    "icd10_title": "Type 2 diabetes mellitus",
+    "aliases": [
+      "T2DM",
+      "DM",
+      "diabetes mellitus",
+      "diabetes"
+    ]
+  },
+  "type 1 diabetes": {
+    "icd10": [
+      "E10"
+    ],
+    "icd10_title": "Type 1 diabetes mellitus",
+    "aliases": [
+      "T1DM",
+      "diabetes"
+    ]
+  },
+  "pulmonary hypertension": {
+    "icd10": [
+      "I27"
+    ],
+    "icd10_title": "Other pulmonary heart diseases",
+    "aliases": [
+      "PAH",
+      "cor pulmonale"
+    ]
+  },
+  "high blood pressure": {
+    "icd10": [
+      "I10"
+    ],
+    "icd10_title": "Essential (primary) hypertension",
+    "aliases": [
+      "HTN",
+      "hypertension",
+      "K/C/O HTN"
+    ]
+  },
+  "high cholesterol": {
+    "icd10": [
+      "E78"
+    ],
+    "icd10_title": "Disorders of lipoprotein metabolism and other lipidemias",
+    "aliases": [
+      "dyslipidemia",
+      "dyslipidaemia",
+      "hyperlipidemia",
+      "hyperlipidaemia"
+    ]
+  },
+  "coronary artery disease": {
+    "icd10": [
+      "I25"
+    ],
+    "icd10_title": "Chronic ischemic heart disease",
+    "aliases": [
+      "CAD",
+      "chronic ischemic heart disease",
+      "heart disease"
+    ]
+  },
+  "angina": {
+    "icd10": [
+      "I20"
+    ],
+    "icd10_title": "Angina pectoris",
+    "aliases": [
+      "angina pectoris",
+      "heart disease"
+    ]
+  },
+  "heart attack": {
+    "icd10": [
+      "I21"
+    ],
+    "icd10_title": "Acute myocardial infarction",
+    "aliases": [
+      "MI",
+      "myocardial infarction",
+      "ACS",
+      "acute coronary syndrome",
+      "heart disease"
+    ]
+  },
+  "chronic kidney disease": {
+    "icd10": [
+      "N18"
+    ],
+    "icd10_title": "Chronic kidney disease (CKD)",
+    "aliases": [
+      "CKD",
+      "renal failure",
+      "kidney problem"
+    ]
+  },
+  "acute kidney injury": {
+    "icd10": [
+      "N17"
+    ],
+    "icd10_title": "Acute kidney failure",
+    "aliases": [
+      "AKI",
+      "acute kidney injury",
+      "kidney problem"
+    ]
+  },
+  "asthma": {
+    "icd10": [
+      "J45"
+    ],
+    "icd10_title": "Asthma",
+    "aliases": [
+      "reactive airway disease",
+      "RAD",
+      "wheeze",
+      "bronchial asthma"
+    ]
+  },
+  "copd": {
+    "icd10": [
+      "J44"
+    ],
+    "icd10_title": "Other chronic obstructive pulmonary disease",
+    "aliases": [
+      "chronic obstructive pulmonary disease"
+    ]
+  },
+  "emphysema": {
+    "icd10": [
+      "J43"
+    ],
+    "icd10_title": "Emphysema",
+    "aliases": []
+  },
+  "back pain": {
+    "icd10": [
+      "M54"
+    ],
+    "icd10_title": "Dorsalgia",
+    "aliases": [
+      "lumbago",
+      "sciatica",
+      "inflammatory back pain"
+    ]
+  },
+  "spondylosis": {
+    "icd10": [
+      "M47"
+    ],
+    "icd10_title": "Spondylosis",
+    "aliases": []
+  },
+  "spondyloarthritis": {
+    "icd10": [
+      "M46"
+    ],
+    "icd10_title": "Other inflammatory spondylopathies",
+    "aliases": []
+  },
+  "joint pain": {
+    "icd10": [
+      "M25"
+    ],
+    "icd10_title": "Other joint disorder, not elsewhere classified",
+    "aliases": [
+      "arthralgia"
+    ]
+  },
+  "rheumatoid arthritis": {
+    "icd10": [
+      "M06"
+    ],
+    "icd10_title": "Other rheumatoid arthritis",
+    "aliases": [
+      "RA",
+      "joint pain",
+      "seronegative rheumatoid"
+    ]
+  },
+  "osteoarthritis": {
+    "icd10": [
+      "M19"
+    ],
+    "icd10_title": "Other and unspecified osteoarthritis",
+    "aliases": [
+      "OA",
+      "joint pain"
+    ]
+  },
+  "allergic rhinitis": {
+    "icd10": [
+      "J30"
+    ],
+    "icd10_title": "Vasomotor and allergic rhinitis",
+    "aliases": [
+      "allergy",
+      "atopy",
+      "hay fever"
+    ]
+  },
+  "skin rash": {
+    "icd10": [
+      "R21"
+    ],
+    "icd10_title": "Rash and other nonspecific skin eruption",
+    "aliases": [
+      "rash"
+    ]
+  },
+  "dermatitis": {
+    "icd10": [
+      "L30"
+    ],
+    "icd10_title": "Other and unspecified dermatitis",
+    "aliases": [
+      "skin rash"
+    ]
+  },
+  "eczema": {
+    "icd10": [
+      "L20"
+    ],
+    "icd10_title": "Atopic dermatitis",
+    "aliases": [
+      "atopic dermatitis",
+      "skin rash"
+    ]
+  },
+  "urticaria": {
+    "icd10": [
+      "L50"
+    ],
+    "icd10_title": "Urticaria",
+    "aliases": [
+      "hives",
+      "skin rash"
+    ]
+  },
+  "folliculitis": {
+    "icd10": [
+      "L73"
+    ],
+    "icd10_title": "Other follicular disorders",
+    "aliases": []
+  },
+  "ear infection": {
+    "icd10": [
+      "H66"
+    ],
+    "icd10_title": "Suppurative and unspecified otitis media",
+    "aliases": [
+      "otitis media",
+      "AOM",
+      "acute otitis media"
+    ]
+  },
+  "hand foot and mouth": {
+    "icd10": [
+      "B08"
+    ],
+    "icd10_title": "Other viral infections characterized by skin and mucous membrane lesions, not elsewhere classified",
+    "aliases": [
+      "HFMD",
+      "hand-foot-and-mouth disease",
+      "hand foot mouth disease"
+    ]
+  },
+  "stroke": {
+    "icd10": [
+      "I63"
+    ],
+    "icd10_title": "Cerebral infarction",
+    "aliases": [
+      "CVA",
+      "cerebrovascular accident",
+      "cerebral infarction",
+      "infarct",
+      "MCA stroke"
+    ]
+  },
+  "anemia": {
+    "icd10": [
+      "D64"
+    ],
+    "icd10_title": "Other anemias",
+    "aliases": [
+      "anaemia",
+      "low hemoglobin",
+      "low haemoglobin"
+    ]
+  },
+  "sepsis": {
+    "icd10": [
+      "A41"
+    ],
+    "icd10_title": "Other sepsis",
+    "aliases": []
+  },
+  "respiratory failure": {
+    "icd10": [
+      "J96"
+    ],
+    "icd10_title": "Respiratory failure, not elsewhere classified",
+    "aliases": [
+      "resp failure"
+    ]
+  },
+  "pcos": {
+    "icd10": [
+      "E28"
+    ],
+    "icd10_title": "Ovarian dysfunction",
+    "aliases": []
+  },
+  "gout": {
+    "icd10": [
+      "M10"
+    ],
+    "icd10_title": "Gout",
+    "aliases": []
+  },
+  "ibs": {
+    "icd10": [
+      "K58"
+    ],
+    "icd10_title": "Irritable bowel syndrome",
+    "aliases": []
+  },
+  "bronchiolitis": {
+    "icd10": [
+      "J21"
+    ],
+    "icd10_title": "Acute bronchiolitis",
+    "aliases": []
+  },
+  "uti": {
+    "icd10": [
+      "N39"
+    ],
+    "icd10_title": "Other disorders of urinary system",
+    "aliases": [
+      "urinary tract infection"
+    ]
+  },
+  "hyponatremia": {
+    "icd10": [
+      "E87"
+    ],
+    "icd10_title": "Other disorders of fluid, electrolyte and acid-base balance",
+    "aliases": [
+      "dyselectrolytemia"
+    ]
+  },
+  "bph": {
+    "icd10": [
+      "N40"
+    ],
+    "icd10_title": "Benign prostatic hyperplasia",
+    "aliases": [
+      "bladder outlet obstruction"
+    ]
+  },
+  "cataract": {
+    "icd10": [
+      "H25"
+    ],
+    "icd10_title": "Age-related cataract",
+    "aliases": []
+  },
+  "mds": {
+    "icd10": [
+      "D46"
+    ],
+    "icd10_title": "Myelodysplastic syndromes",
+    "aliases": []
+  },
+  "sinusitis": {
+    "icd10": [
+      "J01"
+    ],
+    "icd10_title": "Acute sinusitis",
+    "aliases": []
+  },
+  "thrombocytopenia": {
+    "icd10": [
+      "D69"
+    ],
+    "icd10_title": "Purpura and other hemorrhagic conditions",
+    "aliases": [
+      "low platelet",
+      "low platelets"
+    ]
+  },
+  "cholecystitis": {
+    "icd10": [
+      "K81"
+    ],
+    "icd10_title": "Cholecystitis",
+    "aliases": []
+  },
+  "diverticulitis": {
+    "icd10": [
+      "K57"
+    ],
+    "icd10_title": "Diverticular disease of intestine",
+    "aliases": []
+  },
+  "cholelithiasis": {
+    "icd10": [
+      "K80"
+    ],
+    "icd10_title": "Cholelithiasis",
+    "aliases": []
+  },
+  "peripheral arterial disease": {
+    "icd10": [
+      "I70"
+    ],
+    "icd10_title": "Atherosclerosis",
+    "aliases": [
+      "critical limb ischemia",
+      "tibial disease",
+      "peripheral angioplasty",
+      "calcified tibials"
+    ]
+  },
+  "inguinal hernia": {
+    "icd10": [
+      "K40"
+    ],
+    "icd10_title": "Inguinal hernia",
+    "aliases": []
+  },
+  "ovarian cyst": {
+    "icd10": [
+      "N83"
+    ],
+    "icd10_title": "Noninflammatory disorders of ovary, fallopian tube and broad ligament",
+    "aliases": [
+      "hemorrhagic cyst"
+    ]
+  },
+  "pilonidal sinus": {
+    "icd10": [
+      "L05"
+    ],
+    "icd10_title": "Pilonidal cyst and sinus",
+    "aliases": []
+  },
+  "anal abscess": {
+    "icd10": [
+      "K61"
+    ],
+    "icd10_title": "Abscess of anal and rectal regions",
+    "aliases": []
+  },
+  "dental caries": {
+    "icd10": [
+      "K02"
+    ],
+    "icd10_title": "Dental caries",
+    "aliases": []
+  },
+  "retinopathy of prematurity": {
+    "icd10": [
+      "H35"
+    ],
+    "icd10_title": "Other retinal disorders",
+    "aliases": [
+      "ROP"
+    ]
+  },
+  "fatty liver": {
+    "icd10": [
+      "K76"
+    ],
+    "icd10_title": "Other diseases of liver",
+    "aliases": []
+  },
+  "ankle sprain": {
+    "icd10": [
+      "S93"
+    ],
+    "icd10_title": "Dislocation and sprain of joints and ligaments at ankle, foot and toe level",
+    "aliases": []
+  },
+  "hyperuricemia": {
+    "icd10": [
+      "E79"
+    ],
+    "icd10_title": "Disorders of purine and pyrimidine metabolism",
+    "aliases": [
+      "uric acid"
+    ]
+  },
+  "gall bladder rupture": {
+    "icd10": [
+      "K82"
+    ],
+    "icd10_title": "Other diseases of gallbladder",
+    "aliases": []
+  },
+  "shock": {
+    "icd10": [
+      "R57"
+    ],
+    "icd10_title": "Shock, not elsewhere classified",
+    "aliases": []
+  },
+  "respiratory distress syndrome": {
+    "icd10": [
+      "P22"
+    ],
+    "icd10_title": "Respiratory distress of newborn",
+    "aliases": []
+  },
+  "breast cancer": {
+    "icd10": [
+      "C50"
+    ],
+    "icd10_title": "Malignant neoplasm of breast",
+    "aliases": [
+      "ca breast",
+      "mastectomy"
+    ]
+  },
+  "vitamin d deficiency": {
+    "icd10": [
+      "E55"
+    ],
+    "icd10_title": "Vitamin D deficiency",
+    "aliases": [
+      "vit d deficiency"
+    ]
+  },
+  "b12 deficiency": {
+    "icd10": [
+      "E53"
+    ],
+    "icd10_title": "Deficiency of other B group vitamins",
+    "aliases": [
+      "b12 low"
+    ]
+  },
+  "pregnancy": {
+    "icd10": [
+      "O80"
+    ],
+    "icd10_title": "Encounter for full-term uncomplicated delivery",
+    "aliases": [
+      "primigravida",
+      "gravida",
+      "safe confinement"
+    ]
+  },
+  "preterm labor": {
+    "icd10": [
+      "O60"
+    ],
+    "icd10_title": "Preterm labor",
+    "aliases": [
+      "preterm labour",
+      "preterm labor"
+    ]
+  },
+  "pprom": {
+    "icd10": [
+      "O42"
+    ],
+    "icd10_title": "Premature rupture of membranes",
+    "aliases": [
+      "pprom",
+      "premature rupture of membranes"
+    ]
+  },
+  "repetitive stress injury": {
+    "icd10": [
+      "M70"
+    ],
+    "icd10_title": "Soft tissue disorders related to use, overuse and pressure",
+    "aliases": [
+      "rsi"
+    ]
+  },
+  "prematurity": {
+    "icd10": [
+      "P07"
+    ],
+    "icd10_title": "Disorders of newborn related to short gestation and low birth weight, not elsewhere classified",
+    "aliases": [
+      "preterm"
+    ]
+  },
+  "infertility": {
+    "icd10": [
+      "N46",
+      "N97"
+    ],
+    "icd10_title": "Male (N46) and female (N97) infertility",
+    "aliases": [
+      "oligospermia",
+      "asthenoteratozoospermia",
+      "azoospermia"
+    ]
+  }
 }

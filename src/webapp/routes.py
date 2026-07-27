@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src import db, meds
-from src.conditions import canonical_labels
+from src.conditions import canonical_labels, is_undecided
 from src.drugs import load_drugs
 from src.normalize import load_codebook, match, promote
 from src.people import Person, flag_observation, load_people
@@ -374,8 +374,12 @@ def encounters_page(
     import json
 
     encounters = []
+    review_count = 0
     for r in rows:
         diagnoses = json.loads(r["diagnoses"] or "[]")
+        # Diagnoses that map to no bucket and match no ignore term -- the badge
+        # nudge to run tools/conditions_review. Distinct within a person.
+        review_count += sum(1 for dx in diagnoses if is_undecided(dx))
         encounters.append(
             {
                 "document_id": r["document_id"],
@@ -393,7 +397,7 @@ def encounters_page(
         )
 
     ctx = nav_context(request, who)
-    ctx.update(encounters=encounters)
+    ctx.update(encounters=encounters, review_count=review_count)
     return templates.TemplateResponse(request, "encounters.html", ctx)
 
 

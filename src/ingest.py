@@ -510,13 +510,21 @@ def ingest_discharge(
     if not admitted or (discharged and admitted > discharged):
         admitted = discharged
 
+    # ICD-10 codes the discharge summary PRINTED next to its diagnoses (some do,
+    # e.g. "... cataract, bilateral - H25.13"). Captured verbatim and validated
+    # against the ICD-10-CM category table, so a nutrition token like "B12" is
+    # never mistaken for a code. A printed code that CONTRADICTS the bucket its
+    # diagnosis maps to is data, not noise -- surfaced, never swallowed.
+    diagnoses = enc.get("diagnoses") or []
+    icd_codes = icd_from_diagnoses(diagnoses)
+
     n_enc = 0
     if enc.get("admitted") or enc.get("discharged") or enc.get("diagnoses"):
         con.execute(
             """INSERT OR IGNORE INTO encounters
                  (document_id, subject, hospital, admitted, discharged, reason,
-                  diagnoses, procedures, follow_up, follow_up_date)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                  diagnoses, icd_codes, procedures, follow_up, follow_up_date)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 document_id,
                 actual,
@@ -524,7 +532,8 @@ def ingest_discharge(
                 admitted,
                 discharged,
                 enc.get("reason"),
-                json.dumps(enc.get("diagnoses") or []),
+                json.dumps(diagnoses),
+                json.dumps(icd_codes),
                 json.dumps(enc.get("procedures") or []),
                 enc.get("follow_up"),
                 _iso(enc.get("follow_up_date")),
@@ -592,6 +601,24 @@ def _iso(text: Optional[str]) -> Optional[str]:
 
     d = _parse_date((text or "").strip())
     return d.isoformat() if d else None
+
+
+def icd_from_diagnoses(diagnoses: list[str]) -> list[str]:
+    """Every validated ICD-10 code printed across an encounter's diagnosis strings,
+    in order and de-duplicated. Logs (never swallows) any printed code that
+    contradicts the bucket its own diagnosis maps to -- a summary that says
+    "hypertension - E11" is a data conflict worth a human's eye."""
+    from src.conditions import reconcile
+
+    codes: list[str] = []
+    for dx in diagnoses:
+        printed, mismatches = reconcile(dx)
+        for c in printed:
+            if c not in codes:
+                codes.append(c)
+        for c in mismatches:
+            logger.warning("ICD-10 mismatch: %r prints %s, not the bucket's code", dx, c)
+    return codes
 
 
 def resolve_patient(

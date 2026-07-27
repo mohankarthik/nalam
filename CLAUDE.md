@@ -47,6 +47,13 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 ./venv/bin/python -m tools.import_master_sheet # DISABLED: seeded the codebook once; refuses to run (writes the old pre-consolidation schema)
 ./venv/bin/python -m tools.export_analytes     # codebook -> ~/nalam-analytes-review.md
 ./venv/bin/python -m tools.loinc_coverage      # codebook vs licensed LOINC table -> docs/loinc-coverage-review.md
+./venv/bin/python -m tools.conditions_coverage # conditions buckets vs ICD-10-CM table -> docs/conditions-coverage-review.md
+./venv/bin/python -m tools.migrate_icd_codes ~/docker-stacks/nalam/config/health.db  # add+backfill encounters.icd_codes
+
+# --- Condition review (triage unmapped encounter diagnoses) ---
+./venv/bin/python -m tools.conditions_review ~/docker-stacks/nalam/config/health.db        # worksheet -> ~/nalam-conditions-review.md
+./venv/bin/python -m tools.conditions_review_apply ~/docker-stacks/nalam/config/health.db  # apply filled worksheet
+#   ACTION column:  = Correct Text (fix OCR)   @bucket (map)   +key : CODE [: aliases] (new)   ignore: term   - (drop)
 ```
 
 **Gemini billing is enabled**, so set `NALAM_GEMINI_MIN_INTERVAL=0` for bulk runs — the default
@@ -204,6 +211,31 @@ Phase 1+ is specified in `/root/health_records/PLAN.md`. The load-bearing decisi
   `data/loinc.csv` (see `docs/loinc-coverage-review.md`, `tools/loinc_coverage.py`). `load_codebook()`
   re-indexes it **by name** in memory — every consumer (the DB's `observations.analyte`, range
   lookup, `match()`, the web UI) identifies an analyte by name, not by code, so nothing was re-keyed.
+- **`data/conditions.json` is the condition codebook** (Phase C, ICD-10). 77 buckets, each a colloquial
+  <-> clinical alias set given a standard **ICD-10-CM** identity (`icd10` 3-char category list +
+  `icd10_title`). Exactly like the analytes codebook, the **bucket KEY stays the runtime identity**
+  (`meds.for_condition`, `qa`, the webapp encounters filter key on it — never on the code, never
+  stored in `health.db`); the code is an added FIELD, no re-keying. Buckets are 1:1 with a category;
+  a colloquial umbrella that spans several (`heart disease`, `stomach bug`, `kidney problem`) is
+  repeated as an alias across its clinical children so `expand()` still widens across all of them.
+  Matching stays WHOLE-WORD token containment (a raw-substring bug once made `RA` match `library`) —
+  guarded by `tests/test_conditions.py`, do not regress it. Codes verified against the licensed
+  `data/icd10cm.csv` (gitignored) by `tools/conditions_coverage.py`. Discharge summaries that PRINT
+  an ICD-10 code land it in `encounters.icd_codes`, parsed at ingest and validated against the baked
+  `data/icd10_categories.json` (committed, generic) so a nutrition token like `B12` is refused, not
+  captured; a printed code that contradicts its diagnosis's bucket is logged (`conditions.reconcile`).
+- **A diagnosis that maps to no bucket is REVIEWED, not left raw forever.** `conditions.is_undecided`
+  (unmapped AND not in `data/conditions_ignore.json`) drives an amber badge on the encounters page and
+  `tools/conditions_review.py`'s worksheet (grouped by document, links to each Paperless scan). Settle
+  each with `tools/conditions_review_apply.py`: **`= text`** fixes the OCR in the DB (a human reading
+  handwriting beats re-running the model; `encounters` is `INSERT OR IGNORE` so re-ingest never clobbers
+  the fix; old→new logged to stderr; the Paperless scan + prod backups are the provenance),
+  **`@bucket`** maps, **`+key : CODE`** creates a
+  bucket, **`ignore: term`** adds a GENERIC term to `conditions_ignore.json` (committed, no PII —
+  the condition analogue of `ignored_analytes.json`), **`-`** drops unreadable garbage from the DB
+  (matched by value; better than hoarding junk in an ignore list). New buckets add an alias only when
+  the key doesn't already match AND it's digit-free, so a dated/record-specific string never reaches the
+  committed codebook. Prod is fully triaged: every diagnosis maps, is ignored, or was dropped.
 - **Analytes we chose not to track live in `data/ignored_analytes.json`** (echo measurements — now
   radiology; derived ratios; CPAP device metrics; qualitative urine; imaging buckets). A printed name
   that matches one is dropped **silently** at ingest (`normalize.is_ignored`, domain-gated like the
@@ -240,6 +272,24 @@ dropped to `data/ignored_analytes.json` (echo, ratios, CPAP metrics, qualitative
 buckets) and their orphan rows purged; the 9 prod UI-promotions were graduated (7 folded with codes,
 `BP` split into BP High/Low, `LDL:HDL Ratio` dropped), leaving `promoted.json` empty. Prod `health.db`
 is authoritative (the repo `data/health.db` is a throwaway experiment copy, currently larger).
+
+**Conditions → ICD-10 (Phase C, 2026-07-24).** `data/conditions.json` split from 21 colloquial
+buckets to 38, each with an ICD-10-CM identity (see the condition-codebook bullet above). New
+`encounters.icd_codes` column captures printed codes; backfill `tools/migrate_icd_codes.py` must be
+run against the prod db (additive, self-backing-up) before restarting the container. See the
+"Standard Vocabularies" design doc; Phase C is done, Phase A′ (UCUM) and Phase B (drugs → RxNorm)
+remain. **`conditions.json`, `conditions_ignore.json` and `icd10_categories.json` are all COPYed in
+the Dockerfile (baked, not bind-mounted) — a new committed data file must be added to that COPY line
+or it is silently absent in the image** (this bit us: the printed-code path crashed in-container until
+`icd10_categories.json` was added).
+
+**Condition review complete (2026-07-27, branch `phase-c-conditions-icd10`).** Every encounter
+diagnosis in prod is triaged — **116 distinct undecided → 0**. `data/conditions.json` grew 38 → **77
+buckets** across five passes (batch A, group C findings, group D cancer/deficiency/infertility/
+obstetric); measurement/marker noise and 17 unreadable OCR strings were dropped; 7 handwriting prints
+were OCR-fixed. Tooling is `tools/conditions_review.py` + `tools/conditions_review_apply.py` (see the
+review bullet above and the Commands section). Prod db backups from this work: `health.db.pre-icd.bak`,
+`health.db.pre-drop.bak`. **Branch not merged — the user reviews the PR first (never auto-merge).**
 
 A Telegram-filed document now extracts on-demand instead of waiting for the nightly pass — see
 `docs/telegram_ingest_queue.md`. Filing enqueues (`src/extract_queue.py`); `run_extract_queue.py`
