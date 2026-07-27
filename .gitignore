@@ -12,6 +12,12 @@ plugins/telegram_bot/settings.json
 # are baked into data/analytes.json. Licensed content, too big to commit.
 data/loinc.csv
 
+# The ICD-10-CM category master table (data/icd10cm.csv). Input to the offline
+# tools/conditions_coverage.py only; the codes we adopted are baked into
+# data/conditions.json. ICD-10-CM is US public-domain, but the full table is
+# large and generic reference data -- kept out of the repo like loinc.csv.
+data/icd10cm.csv
+
 # Analytes promoted through the review UI. Machine-written from the family's own
 # reports, so treated like the generated codebook: not committed.
 data/promoted.json
@@ -41,3 +47,6 @@ NOTES.local.md
 
 # Raw LLM responses. The expensive artefact -- backed up, never committed.
 data/llm/
+
+# Generated ICD-10 coverage review (regenerate: tools/conditions_coverage.py)
+docs/conditions-coverage-review.md

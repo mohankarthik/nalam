@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS encounters (
     discharged     TEXT,          -- ISO
     reason         TEXT,          -- presenting complaint, as written
     diagnoses      TEXT,          -- JSON array, verbatim
+    icd_codes      TEXT,          -- JSON array, ICD-10-CM codes PRINTED in diagnoses (validated)
     procedures     TEXT,          -- JSON array, verbatim
     follow_up      TEXT,          -- the instruction, verbatim
     follow_up_date TEXT,          -- ISO, when stated or derivable

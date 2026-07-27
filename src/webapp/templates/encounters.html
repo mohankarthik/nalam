@@ -5,6 +5,7 @@
 <div class="page-head">
   <h1 class="page-title">Encounters <span class="sub">· {{ person.correspondent }}</span></h1>
   <span class="count-pill">{{ encounters|length }} on file</span>
+  {% if review_count %}<span class="count-pill review-pill" title="Diagnoses that map to no condition bucket. Run tools/conditions_review to triage.">{{ review_count }} need review</span>{% endif %}
 </div>
 
 {% with cat_label="Diagnosis", text_placeholder="hospital, reason, diagnosis…" %}{% include "_filter_bar.html" %}{% endwith %}

@@ -226,6 +226,15 @@ main { padding: 2rem 0 4rem; }
   padding: .15rem .7rem;
 }
 
+/* Diagnoses awaiting condition review -- an amber nudge, not an alarm. */
+.review-pill {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+  margin-left: .4rem;
+  cursor: help;
+}
+
 .section-title {
   font-family: var(--serif);
   font-size: 1.2rem;
