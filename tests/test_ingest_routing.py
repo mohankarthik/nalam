@@ -123,6 +123,15 @@ class TestRouting:
         assert stub_extractors["branch"] == "radiology"
         assert result["doc_type"] == "radiology"
 
+    def test_radiology_urethrogram_beats_lab_tag(self, stub_extractors: dict[str, Any]) -> None:
+        """An ASU (ascending urethrogram) is a contrast imaging study filed under
+        Reports -- is_lab() would claim its tag and explode the prose into junk
+        analyte rows. The uroradiology title cluster routes it to radiology first."""
+        doc = _doc(tag="Medical/Reports", title="2026-07-27 - ASU")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "radiology"
+        assert result["doc_type"] == "radiology"
+
     def test_falls_through_to_classify_then_radiology(
         self, stub_extractors: dict[str, Any]
     ) -> None:

@@ -17,7 +17,8 @@
       "\\b(2d\\s*echo|echo|echocardiogram|echocardiograph\\w*)\\b",
       "\\b(ct|cect|hrct)\\b",
       "\\b(mri|mra)\\b",
-      "\\b(mammogram|mammograph\\w*)\\b"
+      "\\b(mammogram|mammograph\\w*)\\b",
+      "\\b(asu|rgu|mcug?|ivu|ivp|urethrogram|urethrograph\\w*|urogram|urograph\\w*|cystogram|pyelogram|pyelograph\\w*)\\b"
     ]
   },
 
