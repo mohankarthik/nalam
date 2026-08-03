@@ -13,6 +13,8 @@
 
 <div class="card">
   <dl class="detail-grid">
+    {% if encounter.doctor %}<dt>Doctor</dt><dd>{{ encounter.doctor }}</dd>{% endif %}
+    {% if encounter.speciality %}<dt>Speciality</dt><dd>{{ encounter.speciality }}</dd>{% endif %}
     <dt>Reason</dt><dd>{{ encounter.reason or '—' }}</dd>
     {% if encounter.diagnoses %}<dt>Diagnoses</dt><dd>{{ encounter.diagnoses|join('; ') }}</dd>{% endif %}
     {% if encounter.procedures %}<dt>Procedures</dt><dd>{{ encounter.procedures|join('; ') }}</dd>{% endif %}

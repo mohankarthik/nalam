@@ -384,6 +384,11 @@ tr.stale .when { color: var(--stale); }
 .val-high { color: var(--high); font-weight: 700; }
 .val-low  { color: var(--low);  font-weight: 700; }
 
+/* Encounter kind: an admission (discharge summary) vs a consultation. */
+.badge-admission    { color: var(--accent);   background: var(--surface-2); border: 1px solid var(--accent); }
+.badge-consultation { color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line-strong); }
+.encounter-card .kind-badge { float: right; margin-left: .4rem; }
+
 .muted { color: var(--ink-faint); }
 .unnamed-tag { color: var(--ink-faint); font-weight: 500; font-size: .85em; }
 

@@ -522,13 +522,15 @@ def ingest_discharge(
     if enc.get("admitted") or enc.get("discharged") or enc.get("diagnoses"):
         con.execute(
             """INSERT OR IGNORE INTO encounters
-                 (document_id, subject, hospital, admitted, discharged, reason,
-                  diagnoses, icd_codes, procedures, follow_up, follow_up_date)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                 (document_id, subject, hospital, doctor, speciality, admitted, discharged,
+                  reason, diagnoses, icd_codes, procedures, follow_up, follow_up_date)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 document_id,
                 actual,
                 enc.get("hospital"),
+                enc.get("doctor"),
+                enc.get("speciality"),
                 admitted,
                 discharged,
                 enc.get("reason"),
@@ -788,13 +790,15 @@ def ingest_prescription(
     if cons.get("diagnosis") or cons.get("follow_up") or cons.get("doctor"):
         con.execute(
             """INSERT OR IGNORE INTO encounters
-                 (document_id, subject, hospital, admitted, discharged, reason,
-                  diagnoses, procedures, follow_up, follow_up_date)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                 (document_id, subject, hospital, doctor, speciality, admitted, discharged,
+                  reason, diagnoses, procedures, follow_up, follow_up_date)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 document_id,
                 actual,
                 cons.get("facility"),
+                cons.get("doctor"),
+                cons.get("speciality"),
                 effective,
                 effective,
                 cons.get("complaints"),
