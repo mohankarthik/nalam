@@ -60,7 +60,10 @@ def stub_extractors(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def fake_classify(pdf_bytes, source="", models=None):
         calls["branch"] = "classify"
-        return {"doc_type": calls.get("classify_as", "radiology")}
+        return {
+            "doc_type": calls.get("classify_as", "radiology"),
+            "has_medications": calls.get("has_medications", False),
+        }
 
     monkeypatch.setattr(ingest, "ingest_lab", fake_ingest_lab)
     monkeypatch.setattr(ingest, "ingest_discharge", fake_ingest_discharge)
@@ -186,6 +189,33 @@ class TestRouting:
         result = ingest.ingest_document(None, doc)
         assert stub_extractors["branch"] == "lab"
         assert result == {"doc_type": "lab", "committed": 3, "review": 1}
+
+    def test_other_with_medications_routes_to_prescription(
+        self, stub_extractors: dict[str, Any]
+    ) -> None:
+        """A pre-anaesthetic evaluation FORM reads to the classifier as "a form"
+        (an "other" example) and was dropped with "no extractor", even though it
+        is a consultation note listing current medications. When classify() buckets
+        a doc "other" but flags has_medications, route it to the prescription
+        extractor -- which self-validates every drug against the text layer."""
+        stub_extractors["classify_as"] = "other"
+        stub_extractors["has_medications"] = True
+        doc = _doc(tag="Medical/General", title="Pre-Anaesthetic Evaluation")
+        result = ingest.ingest_document(None, doc)
+        assert stub_extractors["branch"] == "prescription"
+        assert result["doc_type"] == "prescription"
+
+    def test_other_without_medications_stays_unsupported(
+        self, stub_extractors: dict[str, Any]
+    ) -> None:
+        """The override is narrow: an "other" with no medications (an ID card, a
+        blank form) is still reported, not force-fed to the prescription extractor."""
+        stub_extractors["classify_as"] = "other"
+        stub_extractors["has_medications"] = False
+        doc = _doc(tag="Medical/General", title="Aadhaar Card")
+        result = ingest.ingest_document(None, doc)
+        assert result["doc_type"] == "other"
+        assert "no extractor" in result["note"]
 
     def test_classified_as_something_unsupported_is_reported_not_dropped(
         self, stub_extractors: dict[str, Any]
