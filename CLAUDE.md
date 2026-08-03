@@ -49,6 +49,7 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 ./venv/bin/python -m tools.loinc_coverage      # codebook vs licensed LOINC table -> docs/loinc-coverage-review.md
 ./venv/bin/python -m tools.conditions_coverage # conditions buckets vs ICD-10-CM table -> docs/conditions-coverage-review.md
 ./venv/bin/python -m tools.migrate_icd_codes ~/docker-stacks/nalam/config/health.db  # add+backfill encounters.icd_codes
+./venv/bin/python -m tools.migrate_encounter_key ~/docker-stacks/nalam/config/health.db  # re-key encounters + add doctor/speciality (rebuild)
 
 # --- Condition review (triage unmapped encounter diagnoses) ---
 ./venv/bin/python -m tools.conditions_review ~/docker-stacks/nalam/config/health.db        # worksheet -> ~/nalam-conditions-review.md
@@ -290,6 +291,21 @@ obstetric); measurement/marker noise and 17 unreadable OCR strings were dropped;
 were OCR-fixed. Tooling is `tools/conditions_review.py` + `tools/conditions_review_apply.py` (see the
 review bullet above and the Commands section). Prod db backups from this work: `health.db.pre-icd.bak`,
 `health.db.pre-drop.bak`. **Branch not merged — the user reviews the PR first (never auto-merge).**
+
+**Encounters re-keyed + doctor/speciality (2026-08-03).** Two consultations on the same day at the
+same hospital (a urology + a cardiology clinic visit) used to collapse into one: `encounters` was
+`UNIQUE (subject, admitted, hospital)` and every ingest path inserts `INSERT OR IGNORE`, so the
+second consult's encounter was silently dropped (its meds ingested, but no encounter — the bug that
+surfaced this). The key is now `UNIQUE (subject, admitted, hospital, document_id)` — a document, not
+the (person, day, hospital) triple, is the encounter identity, and re-ingesting the same document
+still dedups. Two new columns `encounters.doctor` and `encounters.speciality` are captured by BOTH
+ingest paths (the prescription and discharge prompts each print a `doctor`/`speciality` field) and
+shown in the web UI. Migration `tools/migrate_encounter_key.py` (a table REBUILD, not additive —
+SQLite can't ALTER a UNIQUE constraint) must run against prod before restarting the container; it
+self-backs-up to `health.db.pre-enckey.bak`. Prod was backfilled: 10 previously-dropped encounters
+recovered, and doctor/speciality re-extracted onto the historical consultation rows. **`INSERT OR
+IGNORE` never UPDATEs an existing encounter**, so a changed doctor/speciality on re-ingest needs the
+row cleared first (as the backfill did) — the same caveat the icd_codes column has.
 
 A Telegram-filed document now extracts on-demand instead of waiting for the nightly pass — see
 `docs/telegram_ingest_queue.md`. Filing enqueues (`src/extract_queue.py`); `run_extract_queue.py`

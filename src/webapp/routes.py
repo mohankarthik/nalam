@@ -366,12 +366,18 @@ def encounters_page(
     request: Request, person: Optional[str] = None, con: sqlite3.Connection = Depends(get_db)
 ):
     who = current_person(person)
+    # Join the source document for its type: a discharge summary is an ADMISSION,
+    # a prescription is a CONSULTATION. That split drives the Kind filter.
     rows = con.execute(
-        "SELECT * FROM encounters WHERE subject = ? ORDER BY admitted DESC",
+        "SELECT e.*, d.doc_type FROM encounters e "
+        "JOIN documents d ON e.document_id = d.id "
+        "WHERE e.subject = ? ORDER BY e.admitted DESC",
         (who.correspondent,),
     ).fetchall()
 
     import json
+
+    kinds = {"discharge": "Admission", "prescription": "Consultation"}
 
     encounters = []
     review_count = 0
@@ -383,7 +389,10 @@ def encounters_page(
         encounters.append(
             {
                 "document_id": r["document_id"],
+                "kind": kinds.get(r["doc_type"], "Other"),
                 "hospital": r["hospital"],
+                "doctor": r["doctor"],
+                "speciality": r["speciality"],
                 "admitted": r["admitted"],
                 "discharged": r["discharged"],
                 "reason": r["reason"],
@@ -463,6 +472,8 @@ def encounter_detail(
 
     encounter = {
         "hospital": row["hospital"],
+        "doctor": row["doctor"],
+        "speciality": row["speciality"],
         "admitted": row["admitted"],
         "discharged": row["discharged"],
         "reason": row["reason"],

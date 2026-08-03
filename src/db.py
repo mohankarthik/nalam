@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS encounters (
     document_id    INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     subject        TEXT COLLATE NOCASE NOT NULL,
     hospital       TEXT COLLATE NOCASE,
+    doctor         TEXT COLLATE NOCASE,   -- consulting doctor, verbatim (consultations)
+    speciality     TEXT COLLATE NOCASE,   -- department / speciality, verbatim (consultations)
     admitted       TEXT,          -- ISO
     discharged     TEXT,          -- ISO
     reason         TEXT,          -- presenting complaint, as written
@@ -117,7 +119,12 @@ CREATE TABLE IF NOT EXISTS encounters (
     procedures     TEXT,          -- JSON array, verbatim
     follow_up      TEXT,          -- the instruction, verbatim
     follow_up_date TEXT,          -- ISO, when stated or derivable
-    UNIQUE (subject, admitted, hospital)
+    -- The document, not the (person, day, hospital) triple, is the identity: two
+    -- consultations on the same day at the same hospital (a urology + a cardiology
+    -- clinic visit) are TWO encounters. Keying on the triple silently dropped the
+    -- second via INSERT OR IGNORE. document_id in the key keeps re-ingest idempotent
+    -- (same doc -> same key -> IGNORE) while letting distinct docs coexist.
+    UNIQUE (subject, admitted, hospital, document_id)
 );
 
 -- Radiology as a DOCUMENT, not a row of numbers.

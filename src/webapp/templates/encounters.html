@@ -8,17 +8,20 @@
   {% if review_count %}<span class="count-pill review-pill" title="Diagnoses that map to no condition bucket. Run tools/conditions_review to triage.">{{ review_count }} need review</span>{% endif %}
 </div>
 
-{% with cat_label="Diagnosis", text_placeholder="hospital, reason, diagnosis…" %}{% include "_filter_bar.html" %}{% endwith %}
+{% with cat_label="Diagnosis", kind_label="Kind", text_placeholder="hospital, doctor, reason, diagnosis…" %}{% include "_filter_bar.html" %}{% endwith %}
 
 {% for e in encounters %}
 <a class="card encounter-card" href="/encounters/{{ e.document_id }}?person={{ person.correspondent }}"
    data-filter
    data-filter-cat="{{ e.conditions | join('|') }}"
+   data-filter-kind="{{ e.kind }}"
    data-filter-date="{{ e.admitted or '' }}"
-   data-filter-text="{{ e.hospital or '' }} {{ e.reason or '' }} {{ e.diagnoses | join(' ') }}">
+   data-filter-text="{{ e.hospital or '' }} {{ e.doctor or '' }} {{ e.speciality or '' }} {{ e.reason or '' }} {{ e.diagnoses | join(' ') }}">
   <span class="chevron">›</span>
+  {% if e.kind == 'Admission' %}<span class="badge badge-admission kind-badge">Admission</span>
+  {% elif e.kind == 'Consultation' %}<span class="badge badge-consultation kind-badge">Consultation</span>{% endif %}
   <span class="when">{{ e.admitted or '?' }}{% if e.discharged and e.discharged != e.admitted %} → {{ e.discharged }}{% endif %}</span>
-  <span class="where"> · {{ e.hospital or 'unknown hospital' }}</span>
+  <span class="where"> · {{ e.hospital or 'unknown hospital' }}{% if e.speciality %} · {{ e.speciality }}{% endif %}{% if e.doctor %} · {{ e.doctor }}{% endif %}</span>
   <div class="dx">{{ (e.diagnoses|join('; ')) or e.reason or '—' }}</div>
   {% if e.follow_up %}
   <div class="followup">follow-up: {{ e.follow_up }}{% if e.follow_up_date %} (due {{ e.follow_up_date }}){% endif %}</div>
