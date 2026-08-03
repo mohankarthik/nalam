@@ -110,7 +110,19 @@ def ingest_document(
     # doc_type string this module doesn't actually populate crashed every
     # on-demand tick that touched one (KeyError in the caller's result
     # formatting), popped nothing, and the item never advanced.
-    kind = classify(pdf, source=doc.rel)["doc_type"]
+    verdict = classify(pdf, source=doc.rel)
+    kind = verdict["doc_type"]
+    # Safety net for the classifier's own uncertainty bucket. A document it drops
+    # into "other" but nonetheless says lists medications the patient is to take
+    # is, in practice, a consultation note it under-read -- a pre-anaesthetic
+    # evaluation FORM reads as "a form" (an "other" example) even though it is a
+    # clinical consult. Route it as a prescription: ingest_prescription validates
+    # every drug against the text layer and quarantines what it can't corroborate,
+    # so this can only surface a medication actually printed, never invent one. We
+    # only override "other" -- insurance/vaccination are deliberate buckets, not
+    # uncertainty, and a vaccination cert lists shots that are not prescriptions.
+    if kind == "other" and verdict.get("has_medications"):
+        kind = "prescription"
     if kind == "prescription":
         meds, bad, misfiled = ingest_prescription(
             con,
