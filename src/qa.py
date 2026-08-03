@@ -49,6 +49,15 @@ OBSERVATION_LIMIT = 10
 ENCOUNTER_LIMIT = 5
 RADIOLOGY_LIMIT = 10
 
+# The advisory path (advise(), the /advise command) gathers broadly then reasons,
+# so it gets a bigger tool budget and larger row caps than the short factual answer.
+# Because every get_* query orders by date DESC, a larger cap means the MOST-RECENT N
+# records, never an arbitrary slice.
+ADVISORY_MAX_TOOL_ROUNDS = 8
+ADVISORY_OBSERVATION_LIMIT = 60
+ADVISORY_ENCOUNTER_LIMIT = 20
+ADVISORY_RADIOLOGY_LIMIT = 20
+
 
 def doc_link(con: sqlite3.Connection, document_id: Optional[int]) -> Optional[str]:
     """The URL a human opens to see the scan behind a value. None if we have no
@@ -159,16 +168,21 @@ def get_observations(
 
 
 def get_encounters(
-    con: sqlite3.Connection, subject: str, since: Optional[str] = None
+    con: sqlite3.Connection,
+    subject: str,
+    since: Optional[str] = None,
+    limit: int = ENCOUNTER_LIMIT,
 ) -> list[dict[str, Any]]:
-    """Hospital stays / discharges, most recent first."""
+    """Hospital stays / discharges, most recent first. `limit` caps the rows to the
+    most-recent N (default ENCOUNTER_LIMIT, sized for a factual Q&A answer); the
+    advisory path passes a larger budget to gather broadly."""
     sql = "SELECT * FROM encounters WHERE subject = ?"
     params: list[Any] = [subject]
     if since:
         sql += " AND (admitted IS NULL OR admitted >= ?)"
         params.append(since)
     sql += " ORDER BY admitted DESC LIMIT ?"
-    params.append(ENCOUNTER_LIMIT)
+    params.append(limit)
 
     rows = con.execute(sql, params).fetchall()
     return [
@@ -187,12 +201,17 @@ def get_encounters(
 
 
 def get_radiology(
-    con: sqlite3.Connection, subject: str, since: Optional[str] = None
+    con: sqlite3.Connection,
+    subject: str,
+    since: Optional[str] = None,
+    limit: int = RADIOLOGY_LIMIT,
 ) -> list[dict[str, Any]]:
     """Imaging reports (echo, USG, MRI, CT, X-ray), most recent first. Each is one
     verbatim record -- radiology is read, not trended -- so the impression is the
-    line to quote, with the full report text available behind it."""
-    rows = db.radiology_for(con, subject, since)[:RADIOLOGY_LIMIT]
+    line to quote, with the full report text available behind it. `limit` caps the
+    rows to the most-recent N (default RADIOLOGY_LIMIT); the advisory path passes a
+    larger budget to gather broadly."""
+    rows = db.radiology_for(con, subject, since)[:limit]
     return [
         {
             "study_type": r["study_type"],
@@ -433,10 +452,17 @@ def _dispatch(con: sqlite3.Connection, subject: str) -> dict[str, Callable[..., 
     }
 
 
-def _log_exchange(question: str, subject: str, document_ids: set[int], answer: str) -> None:
+def _log_exchange(
+    question: str,
+    subject: str,
+    document_ids: set[int],
+    answer: str,
+    intent: str = "factual",
+) -> None:
     os.makedirs(STATE_DIR, exist_ok=True)
     entry = {
         "at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "intent": intent,
         "subject": subject,
         "question": question,
         "document_ids": sorted(document_ids),
@@ -447,9 +473,12 @@ def _log_exchange(question: str, subject: str, document_ids: set[int], answer: s
 
 
 def _run_loop(
-    model: str, messages: list[dict[str, Any]], dispatch: dict[str, Callable[..., Any]]
+    model: str,
+    messages: list[dict[str, Any]],
+    dispatch: dict[str, Callable[..., Any]],
+    max_rounds: int = MAX_TOOL_ROUNDS,
 ) -> str:
-    for _ in range(MAX_TOOL_ROUNDS):
+    for _ in range(max_rounds):
         resp = litellm.completion(
             model=model,
             messages=messages,
@@ -546,3 +575,176 @@ def _collecting(fn: Callable[..., Any], seen_docs: set[int]) -> Callable[..., An
         return rows
 
     return wrapper
+
+
+# --- Advisory / appointment-prep path ----------------------------------------
+#
+# A SEPARATE capability from answer_question, on purpose. The factual path above is
+# forbidden from reasoning beyond retrieved values -- that grounding rule protects the
+# golden-test guarantees and stays byte-for-byte unchanged. This path reasons over the
+# SAME records (no new data source) to draft questions to ask a doctor, suggest reading,
+# and explain findings in plain language -- then a deterministic guard (the advisory
+# analogue of the extractor's text-layer oracle) fences every number/date it emits.
+# Reached only by the explicit /advise command, never by a bare question.
+
+
+ADVISORY_SYSTEM_PROMPT = """You are helping a family member PREPARE for a medical \
+appointment about {person}. You are NOT a doctor and you give NO medical advice.
+
+Gather broadly first: call the tools to pull {person}'s relevant labs, medications, \
+encounters and imaging. Then reason ONLY over what the tools returned.
+
+Produce plain text (Telegram, no Markdown) in three short sections:
+
+1. Questions to ask the doctor -- each tied to a specific finding the tools handed you \
+(name the finding; do not invent one).
+2. Suggested reading / things to look up -- a treatment option or test that a record \
+MENTIONS, framed as "read about ..." or "ask whether ...", never "do this" or "take this".
+3. What this means -- a brief one-line, plain-language explanation of a finding or term \
+that APPEARS in the fetched records (e.g. what an ascending urethrogram is). One line each.
+
+Hard rules -- these keep this safe to send:
+- Every number, date, drug name and diagnosis you write MUST come from a tool result. \
+Never introduce one from your own knowledge. If you are unsure of a figure, refer to it \
+in words ("the recent HbA1c") rather than stating a number.
+- Never recommend a treatment, a dose, or a decision. Never state a diagnosis as fact. \
+Everything defers to the treating clinician -- you are framing questions, not answering them.
+- Repeat any caveat a tool gives verbatim: an unconfirmed or stale medicine is flagged \
+as such, not presented as certain.
+- Do not write document ids or links; those are appended automatically."""
+
+
+def _advisory_dispatch(con: sqlite3.Connection, subject: str) -> dict[str, Callable[..., Any]]:
+    """Same tools as _dispatch, but sized for the gather step: larger, most-recent-N
+    row caps. Person-scoped exactly like _dispatch -- subject is the correspondent, so
+    the correspondent-is-the-patient rule holds here too."""
+    return {
+        "list_medications": lambda: list_medications(con, subject),
+        "get_observations": lambda analyte=None, since=None: get_observations(
+            con, subject, analyte, since, limit=ADVISORY_OBSERVATION_LIMIT
+        ),
+        "get_encounters": lambda since=None: get_encounters(
+            con, subject, since, limit=ADVISORY_ENCOUNTER_LIMIT
+        ),
+        "get_radiology": lambda since=None: get_radiology(
+            con, subject, since, limit=ADVISORY_RADIOLOGY_LIMIT
+        ),
+        "get_medication_history": lambda drug=None: get_medication_history(con, subject, drug),
+        "get_medications_for_condition": lambda condition: get_medications_for_condition(
+            con, subject, condition
+        ),
+    }
+
+
+# High-risk fact tokens: ISO dates, 4-digit years, decimals, percentages. Bare integers
+# ("3 questions", "2 tests") are prose, not medical facts -- redacting them would mangle
+# ordinary sentences for no safety gain, so they are deliberately left alone.
+_GROUND_TOKEN_RE = re.compile(
+    r"""\d{4}-\d{2}-\d{2}     # ISO date
+      | \d+(?:\.\d+)?%         # percentage
+      | \d+\.\d+               # decimal
+      | (?:19|20)\d{2}         # 4-digit year
+    """,
+    re.VERBOSE,
+)
+
+
+def _ground_check(answer: str, corpus: str) -> tuple[str, list[str]]:
+    """Redact every high-risk number/date token in `answer` that does not literally
+    appear in `corpus` (the concatenated tool payloads the model was handed).
+
+    This is the advisory analogue of the extractor's text-layer oracle: a figure the
+    records did not give us is not allowed to reach the reader as if they had. Prose is
+    not checkable this way (that stays best-effort, on the prompt); numbers and dates
+    are, so those we verify deterministically. Returns (redacted_answer, ungrounded)."""
+    ungrounded: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        tok = m.group(0)
+        needle = tok.rstrip("%")  # a "7.1%" in the answer is grounded by "7.1" in a payload
+        if needle in corpus:
+            return tok
+        ungrounded.append(tok)
+        return "[unverified]"
+
+    return _GROUND_TOKEN_RE.sub(_sub, answer), ungrounded
+
+
+def _collecting_with_corpus(
+    fn: Callable[..., Any], seen_docs: set[int], corpus: list[str]
+) -> Callable[..., Any]:
+    """Like _collecting, but ALSO records each tool payload as JSON into `corpus` -- the
+    grounding oracle _ground_check checks the generated answer against."""
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        rows = fn(*args, **kwargs)
+        for row in rows:
+            if isinstance(row, dict) and row.get("document_id") is not None:
+                seen_docs.add(row["document_id"])
+        corpus.append(json.dumps(rows, default=str))
+        return rows
+
+    return wrapper
+
+
+def advise(command_text: str) -> str:
+    """The advisory path: resolve the subject, gather broadly over the existing tools,
+    reason into questions/reading/explanations, then deterministically fence every
+    number and date before returning labelled, plain-text appointment prep."""
+    person, clarify = extract_person(command_text)
+    if person is None:
+        return clarify
+
+    con = db.connect()
+    dispatch = _advisory_dispatch(con, person.correspondent)
+
+    seen_docs: set[int] = set()
+    corpus: list[str] = []
+    wrapped = {
+        name: _collecting_with_corpus(fn, seen_docs, corpus) for name, fn in dispatch.items()
+    }
+
+    def _fresh_messages() -> list[dict[str, Any]]:
+        # _run_loop mutates the list it's given, so each model attempt gets its own.
+        return [
+            {
+                "role": "system",
+                "content": ADVISORY_SYSTEM_PROMPT.format(person=person.correspondent),
+            },
+            {"role": "user", "content": command_text},
+        ]
+
+    configure_api_keys()
+    try:
+        answer = _run_loop(PRIMARY_MODEL, _fresh_messages(), wrapped, ADVISORY_MAX_TOOL_ROUNDS)
+    except Exception as e:
+        logger.warning(f"{PRIMARY_MODEL} failed ({e}); falling back to {FALLBACK_MODEL}")
+        try:
+            answer = _run_loop(FALLBACK_MODEL, _fresh_messages(), wrapped, ADVISORY_MAX_TOOL_ROUNDS)
+        except Exception as e2:
+            logger.error(f"{FALLBACK_MODEL} also failed ({e2}); giving up on this advisory")
+            return (
+                "Sorry, I couldn't put that together just now — the assistant hit an "
+                "error. Please try again."
+            )
+
+    answer, ungrounded = _ground_check(answer, "\n".join(corpus))
+
+    header = (
+        f"⚕️ Appointment prep for {person.correspondent} — questions, reading & "
+        "plain-language notes.\nReasoning over records, not medical advice.\n\n"
+    )
+    body = header + answer.strip()
+    if ungrounded:
+        n = len(ungrounded)
+        body += (
+            f"\n\n(!) {n} figure{'s' if n != 1 else ''} removed — not found in "
+            f"{person.correspondent}'s records."
+        )
+
+    links = sorted({link for d in seen_docs if (link := doc_link(con, d))})
+    if links:
+        body = body.rstrip() + "\n\nSource(s):\n" + "\n".join(links)
+
+    _log_exchange(command_text, person.correspondent, seen_docs, body, intent="advisory")
+    return body
