@@ -157,16 +157,39 @@ def _suffix(filename: str, content: bytes) -> Optional[str]:
     return None
 
 
-def send_message(token: str, chat_id: int, text: str) -> None:
-    """Plain text, no parse_mode -- error text often carries a file path or
-    exception message with underscores/parens/etc that break Telegram's
-    Markdown parser. A malformed-entity 400 doesn't raise (requests only
-    raises on connection errors), so an unchecked send silently vanishes.
+# Telegram rejects any sendMessage over 4096 characters with a 400 -- and since a
+# 400 doesn't raise (see send_message), an over-long reply vanishes silently. The
+# advisory path gathers broadly and can easily exceed this (a long answer plus dozens
+# of Source links), so replies are split into chunks under this limit. A margin below
+# 4096 leaves room and avoids off-by-one surprises around multi-byte characters.
+TELEGRAM_MAX_CHARS = 3900
 
-    A free function, not a method, so run_extract_queue.py's follow-up
-    messages (sent from a separate cron tick, with no TelegramDocBot instance
-    around) can reuse it too.
-    """
+
+def _chunk(text: str, limit: int = TELEGRAM_MAX_CHARS) -> list[str]:
+    """Split `text` into pieces no longer than `limit`, preferring line boundaries so a
+    question or a Source link is never cut mid-token. A single line longer than `limit`
+    (rare) is hard-split as a last resort."""
+    chunks: list[str] = []
+    current = ""
+    for line in text.split("\n"):
+        while len(line) > limit:  # one enormous line: hard-split it
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(line[:limit])
+            line = line[limit:]
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) > limit:
+            chunks.append(current)
+            current = line
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks or [""]
+
+
+def _post_message(token: str, chat_id: int, text: str) -> None:
     try:
         resp = requests.post(
             API_URL.format(token=token, method="sendMessage"),
@@ -177,6 +200,24 @@ def send_message(token: str, chat_id: int, text: str) -> None:
             logger.warning(f"Telegram reply rejected ({resp.status_code}): {resp.text[:200]}")
     except requests.RequestException as e:
         logger.warning(f"Failed to send Telegram reply: {e}")
+
+
+def send_message(token: str, chat_id: int, text: str) -> None:
+    """Plain text, no parse_mode -- error text often carries a file path or
+    exception message with underscores/parens/etc that break Telegram's
+    Markdown parser. A malformed-entity 400 doesn't raise (requests only
+    raises on connection errors), so an unchecked send silently vanishes.
+
+    Replies over Telegram's 4096-char limit are split into multiple messages;
+    without this an over-long answer (the advisory path routinely produces one)
+    is rejected with a 400 and never reaches the user.
+
+    A free function, not a method, so run_extract_queue.py's follow-up
+    messages (sent from a separate cron tick, with no TelegramDocBot instance
+    around) can reuse it too.
+    """
+    for piece in _chunk(text):
+        _post_message(token, chat_id, piece)
 
 
 def _load_token() -> str:
@@ -271,7 +312,10 @@ class TelegramDocBot:
             f"Names: {', '.join(names)}\n"
             f"Types: {', '.join(types)} (omit to file directly under the person)\n\n"
             'Or just ask a question, e.g. "What\'s Dad on for BP?" or '
-            '"Mom\'s latest HbA1c" -- name the person, it answers from health.db.'
+            '"Mom\'s latest HbA1c" -- name the person, it answers from health.db.\n'
+            "Or /advise <person> <what to prepare for> -- drafts questions to ask a "
+            "doctor, suggested reading and plain-language notes from that person's "
+            "records (reasoning, not medical advice)."
         )
 
     # --- Message handling ------------------------------------------------------
@@ -293,6 +337,28 @@ class TelegramDocBot:
         if cmd in ("/start", "/help"):
             tag_map, _ = _load_specialties()
             self.send_message(chat_id, self._help_text(tag_map))
+            return False
+
+        # /advise <person> <what to prepare for> -- the grounded advisory/synthesis
+        # path (src/qa.advise), distinct from a bare factual question below. Reached
+        # ONLY by this explicit command, so the factual path is never widened by a
+        # phrase heuristic misfiring.
+        first_token = raw_text.split(maxsplit=1)[0] if raw_text else ""
+        if first_token.lower().split("@")[0] == "/advise":
+            remainder = raw_text[len(first_token) :].strip()
+            if not remainder:
+                self.send_message(
+                    chat_id,
+                    "Usage: /advise <person> <what to prepare for> -- e.g. "
+                    "/advise Dad prepare for the cardiology follow-up.",
+                )
+                return False
+            try:
+                answer = qa.advise(remainder)
+            except Exception as e:
+                logger.error(f"Advisory failed: {e}", exc_info=True)
+                answer = f"✗ Could not put that together: {e}"
+            self.send_message(chat_id, answer)
             return False
 
         file_ref = self._file_ref(message)
