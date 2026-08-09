@@ -232,7 +232,7 @@ def ingest_lab(
         source_path=rel_path,
         doc_type="lab",
         doc_date=doc_date.isoformat() if doc_date else None,
-        lab=extraction.patient.get("lab"),
+        institution=extraction.patient.get("lab"),
         model=extraction.model,
         text_layer=bool(extraction.passed or extraction.quarantined),
     )
@@ -481,7 +481,7 @@ def ingest_discharge(
         source_path=rel_path,
         doc_type="discharge",
         doc_date=doc_date.isoformat() if doc_date else None,
-        lab=d.encounter.get("hospital"),
+        institution=d.encounter.get("hospital"),
         model=d.model,
         text_layer=d.text_layer,
     )
@@ -766,7 +766,7 @@ def ingest_prescription(
         source_path=rel_path,
         doc_type="prescription",
         doc_date=doc_date.isoformat() if doc_date else None,
-        lab=cons.get("facility"),
+        institution=cons.get("facility"),
         model=p.model,
         text_layer=p.oracle_source == "text_layer",
     )
@@ -967,7 +967,7 @@ def ingest_radiology(
         source_path=rel_path,
         doc_type="radiology",
         doc_date=doc_date.isoformat() if doc_date else None,
-        lab=r.patient.get("lab"),
+        institution=r.patient.get("lab"),
         model=r.model,
         text_layer=r.oracle_source == "text_layer",
     )
