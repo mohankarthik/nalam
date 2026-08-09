@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS documents (
     source_path   TEXT    NOT NULL UNIQUE, -- path under the Drive Medical root
     doc_type      TEXT COLLATE NOCASE    NOT NULL,        -- lab | prescription | radiology | ...
     doc_date      TEXT,                    -- ISO; from the filename
-    lab           TEXT COLLATE NOCASE,                    -- as printed on the document
+    institution   TEXT COLLATE NOCASE,                    -- as printed on the document
     model         TEXT,                    -- which LLM read it
     text_layer    INTEGER NOT NULL DEFAULT 0,  -- 1 = had extractable text
     extracted_at  TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -258,9 +258,9 @@ def upsert_document(con: sqlite3.Connection, **fields: Any) -> int:
 
     cur = con.execute(
         """INSERT INTO documents (paperless_id, subject, source_path, doc_type,
-                                  doc_date, lab, model, text_layer)
+                                  doc_date, institution, model, text_layer)
            VALUES (:paperless_id, :subject, :source_path, :doc_type,
-                   :doc_date, :lab, :model, :text_layer)
+                   :doc_date, :institution, :model, :text_layer)
            ON CONFLICT(source_path) DO UPDATE SET
                model = excluded.model,
                -- COALESCE, not a bare overwrite: a re-run before Paperless has
@@ -276,7 +276,7 @@ def upsert_document(con: sqlite3.Connection, **fields: Any) -> int:
             "source_path": fields["source_path"],
             "doc_type": fields["doc_type"],
             "doc_date": fields.get("doc_date"),
-            "lab": fields.get("lab"),
+            "institution": fields.get("institution"),
             "model": fields.get("model"),
             "text_layer": int(bool(fields.get("text_layer"))),
         },
