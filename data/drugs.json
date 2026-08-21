@@ -86,6 +86,14 @@
       "class": "antidiabetic",
       "confirmed": true
     },
+    "GLUCOMME": {
+      "generic": [
+        "Glimepiride",
+        "Metformin"
+      ],
+      "class": "antidiabetic. OCR/handwriting variant of GLUCONORM G2.",
+      "confirmed": true
+    },
     "JANUVIA": {
       "generic": [
         "Sitagliptin"
@@ -1408,6 +1416,22 @@
         "Metformin"
       ],
       "class": "DPP-4 inhibitor + biguanide (USV). 50/500. NB: JALRA DP ALSO contains vildagliptin.",
+      "confirmed": true
+    },
+    "JABRA DP": {
+      "generic": [
+        "Dapagliflozin",
+        "Vildagliptin"
+      ],
+      "class": "SGLT2 inhibitor + DPP-4 inhibitor. OCR/handwriting variant of JALRA DP.",
+      "confirmed": true
+    },
+    "JATRAM": {
+      "generic": [
+        "Vildagliptin",
+        "Metformin"
+      ],
+      "class": "DPP-4 inhibitor + biguanide. OCR/handwriting variant of JALRA M.",
       "confirmed": true
     },
     "ROSAVAS CP": {
