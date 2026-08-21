@@ -1458,6 +1458,42 @@
       "class": "PPI + prokinetic",
       "confirmed": true
     },
+    "SOMPRAZ": {
+      "generic": [
+        "Esomeprazole"
+      ],
+      "class": "PPI",
+      "confirmed": true
+    },
+    "DIAMICRON": {
+      "generic": [
+        "Gliclazide"
+      ],
+      "class": "sulfonylurea (antidiabetic)",
+      "confirmed": true
+    },
+    "HUMALOG": {
+      "generic": [
+        "Insulin lispro"
+      ],
+      "class": "rapid-acting insulin analog",
+      "confirmed": true
+    },
+    "TOUJEO": {
+      "generic": [
+        "Insulin glargine"
+      ],
+      "class": "long-acting insulin analog (U300)",
+      "confirmed": true
+    },
+    "EMANZEN D": {
+      "generic": [
+        "Serratiopeptidase",
+        "Diclofenac"
+      ],
+      "class": "anti-inflammatory enzyme + NSAID",
+      "confirmed": true
+    },
     "CIPLOX": {
       "generic": [
         "Ciprofloxacin"
@@ -1541,6 +1577,20 @@
         "Cefuroxime"
       ],
       "class": "antibiotic (cephalosporin)",
+      "confirmed": true
+    },
+    "CEFTUM": {
+      "generic": [
+        "Cefuroxime"
+      ],
+      "class": "antibiotic (cephalosporin)",
+      "confirmed": true
+    },
+    "CEFTTUM": {
+      "generic": [
+        "Cefuroxime"
+      ],
+      "class": "antibiotic (cephalosporin; OCR double-T of CEFTUM)",
       "confirmed": true
     },
     "CAP SR PEVESCA PLUS": {
