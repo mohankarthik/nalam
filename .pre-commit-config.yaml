@@ -36,13 +36,13 @@ repos:
 
       - id: black
         name: black
-        entry: ./venv/bin/black
+        entry: ./venv/bin/python -m black
         language: system
         types: [python]
 
       - id: flake8
         name: flake8
-        entry: ./venv/bin/flake8
+        entry: ./venv/bin/python -m flake8
         language: system
         types: [python]
 

@@ -31,11 +31,10 @@ import re
 import sqlite3
 from typing import Any, Callable, Optional
 
-import litellm
-
 from src import db, meds
 from src.constants import PAPERLESS_URL, SETTINGS, STATE_DIR
-from src.llm import FALLBACK_MODEL, PRIMARY_MODEL, configure_api_keys
+from src.llm import FALLBACK_MODEL, PRIMARY_MODEL, _model_to_family, configure_api_keys
+from src.llm_client import LLMClient, LLMToolLoopError
 from src.people import Person, load_people
 
 logger = logging.getLogger(__name__)
@@ -478,37 +477,19 @@ def _run_loop(
     dispatch: dict[str, Callable[..., Any]],
     max_rounds: int = MAX_TOOL_ROUNDS,
 ) -> str:
-    for _ in range(max_rounds):
-        resp = litellm.completion(
-            model=model,
+    try:
+        answer, _meta = LLMClient().run_tool_loop(
             messages=messages,
             tools=TOOLS,
-            tool_choice="auto",
-            # litellm.completion() unconditionally imports its MCP-gateway
-            # handler whenever `tools` is set, and that import chain drags in
-            # fastapi/orjson/etc -- proxy-only deps nalam never installs. We
-            # use plain OpenAI-style function calling, never the MCP gateway,
-            # so skip the import entirely rather than installing a proxy's
-            # worth of dependencies to satisfy an import nothing here needs.
-            _skip_mcp_handler=True,
+            dispatch=dispatch,
+            tier="fast",
+            family=_model_to_family(model),
+            max_rounds=max_rounds,
+            title="nalam_qa",
         )
-        msg = resp.choices[0].message
-        if not msg.tool_calls:
-            return msg.content or ""
-
-        messages.append(msg.model_dump())
-        for call in msg.tool_calls:
-            fn = dispatch.get(call.function.name)
-            args = json.loads(call.function.arguments or "{}")
-            result = fn(**args) if fn else {"error": f"no such tool: {call.function.name}"}
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": json.dumps(result, default=str),
-                }
-            )
-    return "That took too many steps to answer -- try asking something narrower."
+        return answer
+    except LLMToolLoopError:
+        return "That took too many steps to answer -- try asking something narrower."
 
 
 def answer_question(question: str) -> str:
@@ -537,6 +518,7 @@ def answer_question(question: str) -> str:
         answer = _run_loop(PRIMARY_MODEL, messages, wrapped)
     except Exception as e:
         logger.warning(f"{PRIMARY_MODEL} failed ({e}); falling back to {FALLBACK_MODEL}")
+        seen_docs.clear()
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT.format(person=person.correspondent)},
             {"role": "user", "content": question},
@@ -719,6 +701,8 @@ def advise(command_text: str) -> str:
         answer = _run_loop(PRIMARY_MODEL, _fresh_messages(), wrapped, ADVISORY_MAX_TOOL_ROUNDS)
     except Exception as e:
         logger.warning(f"{PRIMARY_MODEL} failed ({e}); falling back to {FALLBACK_MODEL}")
+        seen_docs.clear()
+        corpus.clear()
         try:
             answer = _run_loop(FALLBACK_MODEL, _fresh_messages(), wrapped, ADVISORY_MAX_TOOL_ROUNDS)
         except Exception as e2:

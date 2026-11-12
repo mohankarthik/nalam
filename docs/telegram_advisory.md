@@ -48,7 +48,7 @@ command is tolerated, like the existing `/help`).
 
 ## The gather step — broader, but most-recent
 
-`advise()` runs the same litellm tool-calling loop as the factual path, over the same tools,
+`advise()` runs the same gateway tool-calling loop as the factual path, over the same tools,
 but with a bigger budget so it can pull across topics before reasoning:
 
 | | factual | advisory |
@@ -131,4 +131,4 @@ followed by the three sections, the redaction note (if any), and the same
 
 `./venv/bin/python -m pytest tests/test_qa_advisory.py tests/test_qa.py` — offline and free
 (the LLM loop is monkeypatched, same treatment Gemini gets in the golden test). A live smoke
-needs `NALAM_GEMINI_MIN_INTERVAL=0` (billing is on).
+runs against the host `/run/agentic/llm.sock` gateway.

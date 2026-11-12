@@ -57,9 +57,8 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 #   ACTION column:  = Correct Text (fix OCR)   @bucket (map)   +key : CODE [: aliases] (new)   ignore: term   - (drop)
 ```
 
-**Gemini billing is enabled**, so set `NALAM_GEMINI_MIN_INTERVAL=0` for bulk runs — the default
-7s pacing exists for the free tier (~20 req/day) and is pure dead time on a paid key. The key is
-shared with gajana; a heavy nalam backfill used to starve gajana's 06:00 statement run.
+**LLM calls go through the host CLI gateway** (`/run/agentic/llm.sock`) via `src/llm_client.py`
+(with `gemini` primary and `claude` fallback), so zero LLM API keys live inside the container.
 
 **`pytest` is offline and costs nothing** — it reads cached extractions from
 `tests/fixtures/extracted/`. Only regenerate that cache when the prompt or the model

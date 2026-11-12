@@ -1,5 +1,4 @@
 # runtime
-litellm
 pypdf
 requests
 fastapi

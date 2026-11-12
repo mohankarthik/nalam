@@ -253,3 +253,125 @@ class TestGetMedicationsForCondition:
         assert len(episodes) == 1
         assert episodes[0]["medications"][0]["medicine"] == "Cetzine"
         assert episodes[0]["document_id"] == doc_id
+
+
+class TestRunLoopAndFailover:
+    def test_run_loop_executes_tools_and_returns_final_answer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        turns = [
+            {
+                "ok": True,
+                "turn": {
+                    "type": "tool_calls",
+                    "calls": [{"id": "c1", "name": "list_medications", "arguments": {}}],
+                },
+                "meta": {"model": "gemini-flash"},
+            },
+            {
+                "ok": True,
+                "turn": {"type": "final", "content": "Alice Example takes Metformin."},
+                "meta": {"model": "gemini-flash"},
+            },
+        ]
+        seen_families: list[str | None] = []
+
+        def _fake_complete(self, **kwargs):
+            seen_families.append(kwargs.get("family"))
+            return turns.pop(0)
+
+        monkeypatch.setattr(qa.LLMClient, "complete", _fake_complete)
+
+        called = []
+        dispatch = {"list_medications": lambda: called.append(True) or [{"medicine": "Metformin"}]}
+        messages = [{"role": "user", "content": "What is Alice Example taking?"}]
+
+        answer = qa._run_loop("gemini", messages, dispatch)
+        assert answer == "Alice Example takes Metformin."
+        assert called == [True]
+        assert seen_families == ["gemini", "gemini"]
+
+    def test_run_loop_catches_tool_loop_error_and_returns_narrower_prompt_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _exhaust(self, *args, **kwargs):
+            raise qa.LLMToolLoopError("exceeded max_rounds (4)")
+
+        monkeypatch.setattr(qa.LLMClient, "run_tool_loop", _exhaust)
+
+        out = qa._run_loop("gemini", [{"role": "user", "content": "q"}], {})
+        assert out == "That took too many steps to answer -- try asking something narrower."
+
+    def test_answer_question_failover_clears_seen_docs_from_failed_primary_attempt(
+        self, con, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        doc_stale = _doc(con, subject="Alice Example", paperless_id=101, source_path="s.pdf")
+        doc_good = _doc(con, subject="Alice Example", paperless_id=202, source_path="g.pdf")
+        directory = {
+            "Alice Example": Person("Alice", "Alice Example", "female", False, aliases=("mom",)),
+        }
+        monkeypatch.setattr(qa, "load_people", lambda: directory)
+        monkeypatch.setattr(qa.db, "connect", lambda *a, **k: con)
+        monkeypatch.setattr(qa, "_log_exchange", lambda *a, **k: None)
+
+        def _fake_dispatch(_con, _subject):
+            return {
+                "stale_tool": lambda: [{"document_id": doc_stale}],
+                "good_tool": lambda: [{"document_id": doc_good}],
+            }
+
+        monkeypatch.setattr(qa, "_dispatch", _fake_dispatch)
+
+        models_tried: list[str] = []
+
+        def _fake_run_loop(model, messages, dispatch, max_rounds=qa.MAX_TOOL_ROUNDS):
+            models_tried.append(model)
+            if model == qa.PRIMARY_MODEL:
+                dispatch["stale_tool"]()
+                raise RuntimeError("primary failed after partial tool call")
+            dispatch["good_tool"]()
+            return "Fallback answer."
+
+        monkeypatch.setattr(qa, "_run_loop", _fake_run_loop)
+
+        reply = qa.answer_question("what are mom's results?")
+        assert models_tried == [qa.PRIMARY_MODEL, qa.FALLBACK_MODEL]
+        assert "Fallback answer." in reply
+        assert "/documents/202/details" in reply
+        assert "/documents/101/details" not in reply
+
+    def test_advise_failover_clears_seen_docs_and_corpus_from_failed_primary_attempt(
+        self, con, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        doc_stale = _doc(con, subject="Alice Example", paperless_id=101, source_path="s.pdf")
+        doc_good = _doc(con, subject="Alice Example", paperless_id=202, source_path="g.pdf")
+        directory = {
+            "Alice Example": Person("Alice", "Alice Example", "female", False, aliases=("mom",)),
+        }
+        monkeypatch.setattr(qa, "load_people", lambda: directory)
+        monkeypatch.setattr(qa.db, "connect", lambda *a, **k: con)
+        monkeypatch.setattr(qa, "_log_exchange", lambda *a, **k: None)
+
+        def _fake_advisory_dispatch(_con, _subject):
+            return {
+                "stale_tool": lambda: [{"document_id": doc_stale, "value": 9.4}],
+                "good_tool": lambda: [{"document_id": doc_good, "value": 5.8}],
+            }
+
+        monkeypatch.setattr(qa, "_advisory_dispatch", _fake_advisory_dispatch)
+
+        def _fake_run_loop(model, messages, dispatch, max_rounds=qa.MAX_TOOL_ROUNDS):
+            if model == qa.PRIMARY_MODEL:
+                dispatch["stale_tool"]()
+                raise RuntimeError("primary failed halfway")
+            dispatch["good_tool"]()
+            return "Ask about 5.8 and 9.4."
+
+        monkeypatch.setattr(qa, "_run_loop", _fake_run_loop)
+
+        reply = qa.advise("mom prep for visit")
+        assert "5.8" in reply
+        assert "9.4" not in reply
+        assert "[unverified]" in reply
+        assert "/documents/202/details" in reply
+        assert "/documents/101/details" not in reply

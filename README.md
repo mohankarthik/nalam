@@ -42,7 +42,7 @@ database is a derived view and can be rebuilt from the cache offline, for nothin
 python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 cp data/settings.example.json data/settings.json   # your paths
 cp data/people.example.json  data/people.json      # your family
-# secrets/: paperless.json, gemini.json, anthropic.json
+# secrets/: paperless.json (LLM calls route via host /run/agentic/llm.sock)
 ```
 
 ## Use

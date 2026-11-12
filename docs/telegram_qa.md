@@ -30,7 +30,7 @@ src/qa.py :: answer_question(question, user_id) -> str
         │       not found / ambiguous → return a clarifying question, never guess
         │       (same rule as document filing: the subject of a query is not guessed)
         │
-        ├─ 2. litellm tool-calling loop (src/llm.py, Gemini flash primary / Claude fallback)
+        ├─ 2. LLM gateway tool-calling loop (src/llm.py + src/llm_client.py, Gemini primary / Claude fallback)
         │       tools offered: list_medications, get_observations, get_encounters,
         │       get_medication_history, get_medications_for_condition
         │       system prompt: verbatim discipline — model may only state what a tool
@@ -147,11 +147,9 @@ ways:
 
 ## Two gaps found after shipping v1 (both fixed, both worth naming)
 
-1. **litellm + `tools=` needs `_skip_mcp_handler=True`.** litellm 1.92's `completion()`
-   unconditionally imports its MCP-gateway handler whenever `tools` is set, and that import
-   chain needs `fastapi`/`orjson`/etc — proxy-only deps nalam never installs, for a gateway
-   this code never uses. Passing litellm's own `_skip_mcp_handler=True` kwarg skips the
-   import instead of installing a proxy's worth of dependencies to satisfy nothing.
+1. **Gateway tool loop keeps container dependencies minimal.** Tool calls run over the
+   stdlib Unix-socket client (`src/llm_client.py` → `/run/agentic/llm.sock`), avoiding heavy
+   third-party LLM SDK or proxy dependencies inside the container.
 
 2. **`list_medications` is not the whole medicine history.** The first version only exposed
    `list_medications`/`get_observations`/`get_encounters` as tools, so a question like "what
