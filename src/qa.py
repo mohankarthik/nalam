@@ -550,11 +550,15 @@ def _collecting(fn: Callable[..., Any], seen_docs: set[int]) -> Callable[..., An
     or not the model ends up mentioning it in the answer."""
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        rows = fn(*args, **kwargs)
-        for row in rows:
-            if row.get("document_id") is not None:
-                seen_docs.add(row["document_id"])
-        return rows
+        try:
+            rows = fn(*args, **kwargs)
+            for row in rows:
+                if row.get("document_id") is not None:
+                    seen_docs.add(row["document_id"])
+            return rows
+        except Exception:
+            logger.exception("qa tool failed")
+            raise
 
     return wrapper
 
@@ -659,12 +663,16 @@ def _collecting_with_corpus(
     grounding oracle _ground_check checks the generated answer against."""
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        rows = fn(*args, **kwargs)
-        for row in rows:
-            if isinstance(row, dict) and row.get("document_id") is not None:
-                seen_docs.add(row["document_id"])
-        corpus.append(json.dumps(rows, default=str))
-        return rows
+        try:
+            rows = fn(*args, **kwargs)
+            for row in rows:
+                if isinstance(row, dict) and row.get("document_id") is not None:
+                    seen_docs.add(row["document_id"])
+            corpus.append(json.dumps(rows, default=str))
+            return rows
+        except Exception:
+            logger.exception("qa tool failed")
+            raise
 
     return wrapper
 

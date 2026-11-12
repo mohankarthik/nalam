@@ -101,6 +101,7 @@ class TestCallWithPdf:
                 raise LLMUnavailableError("gemini pool exhausted")
             return {
                 "ok": True,
+                "text": '{"doc_type": "discharge"}',
                 "data": {"doc_type": "discharge"},
                 "meta": {"model": "claude-sonnet-4-6"},
             }
@@ -115,6 +116,51 @@ class TestCallWithPdf:
         assert families == ["gemini", "claude"]
         assert parsed == {"doc_type": "discharge"}
         assert served_model == "claude-sonnet-4-6"
+
+    def test_prose_preamble_rejected_without_cache_poisoning_and_fails_over(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(llm.cache, "load", lambda source, doc_type, prompt: None)
+        saved_calls: list[dict[str, Any]] = []
+
+        def _fake_save(**kwargs: Any) -> None:
+            saved_calls.append(kwargs)
+
+        monkeypatch.setattr(llm.cache, "save", _fake_save)
+
+        families: list[Any] = []
+
+        def _fake_complete(**kwargs: Any) -> dict[str, Any]:
+            families.append(kwargs.get("family"))
+            if kwargs.get("family") == "gemini":
+                return {
+                    "ok": True,
+                    "text": 'Here is the JSON:\n{"patient": "A"}',
+                    "data": {"patient": "A"},
+                    "meta": {"model": "gemini-fast"},
+                }
+            return {
+                "ok": True,
+                "text": '{"patient": "A"}',
+                "data": {"patient": "A"},
+                "meta": {"model": "claude-sonnet-4-6"},
+            }
+
+        monkeypatch.setattr(llm.llm_client, "complete", _fake_complete)
+
+        parsed, served_model = llm.call_with_pdf(
+            "extract patient",
+            b"%PDF-1.4 fake",
+            source="Alice Example/Reports/lab.pdf",
+            doc_type="lab",
+            use_cache=True,
+        )
+        assert families == ["gemini", "claude"]
+        assert parsed == {"patient": "A"}
+        assert served_model == "claude-sonnet-4-6"
+        assert len(saved_calls) == 1
+        assert saved_calls[0]["raw"] == '{"patient": "A"}'
+        assert saved_calls[0]["model"] == "claude-sonnet-4-6"
 
     def test_all_models_failed_raises_runtime_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def _always_fail(**kwargs: Any) -> dict[str, Any]:

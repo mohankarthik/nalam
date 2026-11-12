@@ -59,6 +59,9 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # first tim
 
 **LLM calls go through the host CLI gateway** (`/run/agentic/llm.sock`) via `src/llm_client.py`
 (with `gemini` primary and `claude` fallback), so zero LLM API keys live inside the container.
+In production, `homelab/services/nalam/docker-compose.yml` (`deploy_nalam.yml`) bind-mounts
+`/root/.local/state/agentic/gateway:/run/agentic:ro`, and the host `llm-gateway.service` stages
+PDF attachments in `0700` ephemeral temp dirs wiped in `finally:` blocks after each call.
 
 **`pytest` is offline and costs nothing** — it reads cached extractions from
 `tests/fixtures/extracted/`. Only regenerate that cache when the prompt or the model

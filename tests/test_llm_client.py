@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import atexit
 import base64
 import json
 import os
@@ -23,11 +22,33 @@ from src.llm_client import (
     LLMUnavailableError,
 )
 
-_BOOT_TMP = Path(tempfile.mkdtemp(prefix="agentic-llm-client-test-"))
-atexit.register(shutil.rmtree, _BOOT_TMP, ignore_errors=True)
-os.environ.setdefault("AGENTIC_STATE_DIR", str(_BOOT_TMP / "state"))
-os.environ.setdefault("AGENTIC_CONFIG_DIR", str(_BOOT_TMP / "config"))
-os.environ.setdefault("AGENTIC_AGY_HOME", str(_BOOT_TMP / "agy"))
+_MODULE_TMP: tempfile.TemporaryDirectory[str] | None = None
+_SAVED_ENV: dict[str, str | None] = {}
+_ENV_KEYS = ("AGENTIC_STATE_DIR", "AGENTIC_CONFIG_DIR", "AGENTIC_AGY_HOME")
+
+
+def setUpModule() -> None:
+    global _MODULE_TMP
+    _MODULE_TMP = tempfile.TemporaryDirectory(prefix="agentic-llm-client-test-")
+    base = Path(_MODULE_TMP.name)
+    for key in _ENV_KEYS:
+        _SAVED_ENV[key] = os.environ.get(key)
+    os.environ["AGENTIC_STATE_DIR"] = str(base / "state")
+    os.environ["AGENTIC_CONFIG_DIR"] = str(base / "config")
+    os.environ["AGENTIC_AGY_HOME"] = str(base / "agy")
+
+
+def tearDownModule() -> None:
+    global _MODULE_TMP
+    for key, val in _SAVED_ENV.items():
+        if val is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = val
+    _SAVED_ENV.clear()
+    if _MODULE_TMP is not None:
+        _MODULE_TMP.cleanup()
+        _MODULE_TMP = None
 
 
 class _MockGatewayServer:

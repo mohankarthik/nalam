@@ -91,10 +91,12 @@ def call_with_pdf(
                 family=_model_to_family(model),
                 title=f"nalam_{doc_type or 'pdf'}",
             )
-            parsed = resp["data"]
+            raw = resp.get("text")
+            if not isinstance(raw, str) or not raw.strip():
+                raise ValueError("Expected non-empty verbatim JSON text from gateway")
+            parsed = json.loads(_strip_fences(raw))
             if not isinstance(parsed, dict):
                 raise ValueError(f"Expected JSON object, got {type(parsed).__name__}")
-            raw = resp.get("text") or json.dumps(parsed)
             served_model = str((resp.get("meta") or {}).get("model") or model)
             if use_cache and source and doc_type:
                 # Verbatim, before anything is made of it. If our parsing and

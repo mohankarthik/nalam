@@ -375,3 +375,23 @@ class TestRunLoopAndFailover:
         assert "[unverified]" in reply
         assert "/documents/202/details" in reply
         assert "/documents/101/details" not in reply
+
+    def test_collecting_wrappers_log_exception_and_reraise(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def _boom() -> None:
+            raise RuntimeError("broken sqlite query")
+
+        seen: set[int] = set()
+        corpus: list[str] = []
+        wrapped_basic = qa._collecting(_boom, seen)
+        wrapped_corpus = qa._collecting_with_corpus(_boom, seen, corpus)
+
+        with pytest.raises(RuntimeError, match="broken sqlite query"):
+            wrapped_basic()
+        assert "qa tool failed" in caplog.text
+
+        caplog.clear()
+        with pytest.raises(RuntimeError, match="broken sqlite query"):
+            wrapped_corpus()
+        assert "qa tool failed" in caplog.text
