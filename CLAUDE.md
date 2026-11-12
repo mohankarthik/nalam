@@ -286,13 +286,13 @@ the Dockerfile (baked, not bind-mounted) — a new committed data file must be a
 or it is silently absent in the image** (this bit us: the printed-code path crashed in-container until
 `icd10_categories.json` was added).
 
-**Condition review complete (2026-07-27, branch `phase-c-conditions-icd10`).** Every encounter
+**Condition review complete (2026-07-27, landed in `91d7323`).** Every encounter
 diagnosis in prod is triaged — **116 distinct undecided → 0**. `data/conditions.json` grew 38 → **77
 buckets** across five passes (batch A, group C findings, group D cancer/deficiency/infertility/
 obstetric); measurement/marker noise and 17 unreadable OCR strings were dropped; 7 handwriting prints
 were OCR-fixed. Tooling is `tools/conditions_review.py` + `tools/conditions_review_apply.py` (see the
 review bullet above and the Commands section). Prod db backups from this work: `health.db.pre-icd.bak`,
-`health.db.pre-drop.bak`. **Branch not merged — the user reviews the PR first (never auto-merge).**
+`health.db.pre-drop.bak`.
 
 **Encounters re-keyed + doctor/speciality (2026-08-03).** Two consultations on the same day at the
 same hospital (a urology + a cardiology clinic visit) used to collapse into one: `encounters` was
