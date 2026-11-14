@@ -1,11 +1,15 @@
-"""Telegram document-ingest bot for nalam.
+"""Chat-bridged document-ingest and Q&A bot for nalam.
 
-Cron-polled (no webhook, no exposed port), same shape as gajana's cash bot:
-each run fetches new messages via ``getUpdates``, and any PDF/photo whose
-caption parses cleanly is filed onto the Drive mount, in the exact place
+Cron-polled via the host unified chat bridge Unix socket
+(``/run/agentic/chat.sock``, channel ``"medical"``), same shape as gajana's
+bot: each run pulls pre-authorized events via long polling, and any PDF/photo
+whose caption parses cleanly is filed onto the Drive mount in the exact place
 drive_sync.py expects to find it -- then uploaded to Paperless immediately
 (not left for the 6-hourly cron), and marked synced so that cron doesn't
 double-post it.
+
+Host ``chat-bridge`` owns bot credentials, ``allowed_chat_id``, and
+``allowed_users`` and spools inbound attachments before publishing events.
 
 This matters: Phase-1 extraction (run_extract.py) reads ONLY from the Drive
 mount (src.drive_sync.collect()), never from Paperless. A document that
@@ -43,9 +47,12 @@ import logging
 import os
 from typing import Any, Optional
 
-import requests
-
 from src import extract_queue, qa
+from src.chat_client import (
+    ChatGatewayUnavailableError,
+    ChatSocketClient,
+    ChatSocketError,
+)
 from src.constants import CONSUMABLE_EXT, DOCUMENT_TYPE, MAGIC, SPECIALTIES_CONFIG
 from src.drive_sync import _key, load_state, save_state
 from src.paperless import Paperless
@@ -53,20 +60,21 @@ from src.people import resolve, source_path
 
 logger = logging.getLogger(__name__)
 
-API_URL = "https://api.telegram.org/bot{token}/{method}"
-FILE_URL = "https://api.telegram.org/file/bot{token}/{file_path}"
-HTTP_TIMEOUT = 30
-DOWNLOAD_TIMEOUT = 120
+CHANNEL = "medical"
 
-# Long polling: Telegram holds the getUpdates connection open server-side for
-# up to this many seconds, returning the instant a message arrives instead of
-# an empty result -- so a message sent mid-tick gets answered in ~seconds, not
-# up to a minute later on the NEXT cron tick. Kept comfortably under the
-# 1-minute cron interval (see crontab) so a tick reliably finishes before the
-# next one fires; the client-side HTTP timeout adds a buffer on top for
-# network/serialization time, per Telegram's own recommendation.
+# Long polling: chat-bridge holds pull_events open server-side for up to this
+# many seconds, returning the instant an event arrives instead of an empty
+# result -- so a message sent mid-tick gets answered in ~seconds, not up to a
+# minute later on the NEXT cron tick. Kept comfortably under the 1-minute cron
+# interval (see crontab) so a tick reliably finishes before the next one fires.
 LONG_POLL_SECONDS = 45
-LONG_POLL_HTTP_TIMEOUT = LONG_POLL_SECONDS + 10
+
+_MIME_TO_EXT = {
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+}
 
 
 def _load_specialties() -> tuple[dict[str, str], str]:
@@ -143,12 +151,12 @@ def parse_caption(caption: str, tag_map: dict[str, str], default_tag: str) -> Pa
     )
 
 
-def _suffix(filename: str, content: bytes) -> Optional[str]:
+def _suffix(filename: Optional[str], content: bytes) -> Optional[str]:
     """The file's real extension, or None if Paperless can't consume it.
 
     Same logic as drive_sync.sniff(), but on in-memory bytes -- no re-download.
     """
-    ext = os.path.splitext(filename)[1].lower()
+    ext = os.path.splitext(filename or "")[1].lower()
     if ext in CONSUMABLE_EXT:
         return ext
     for magic, suffix in MAGIC.items():
@@ -157,11 +165,21 @@ def _suffix(filename: str, content: bytes) -> Optional[str]:
     return None
 
 
-# Telegram rejects any sendMessage over 4096 characters with a 400 -- and since a
-# 400 doesn't raise (see send_message), an over-long reply vanishes silently. The
-# advisory path gathers broadly and can easily exceed this (a long answer plus dozens
-# of Source links), so replies are split into chunks under this limit. A margin below
-# 4096 leaves room and avoids off-by-one surprises around multi-byte characters.
+def _candidate_suffix(attachment: dict[str, Any]) -> Optional[str]:
+    """Best-effort extension from event attachment metadata for pre-fetch collision checks."""
+    filename = attachment.get("filename") or ""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext in CONSUMABLE_EXT:
+        return ext
+    mime = str(attachment.get("mime_type") or "").lower().split(";")[0].strip()
+    return _MIME_TO_EXT.get(mime)
+
+
+# Telegram rejects any sendMessage over 4096 characters with a 400 -- and the
+# advisory path gathers broadly and can easily exceed this (a long answer plus
+# dozens of Source links), so replies are split into chunks under this limit. A
+# margin below 4096 leaves room and avoids off-by-one surprises around
+# multi-byte characters.
 TELEGRAM_MAX_CHARS = 3900
 
 
@@ -189,82 +207,55 @@ def _chunk(text: str, limit: int = TELEGRAM_MAX_CHARS) -> list[str]:
     return chunks or [""]
 
 
-def _post_message(token: str, chat_id: int, text: str) -> None:
-    try:
-        resp = requests.post(
-            API_URL.format(token=token, method="sendMessage"),
-            json={"chat_id": chat_id, "text": text},
-            timeout=HTTP_TIMEOUT,
-        )
-        if not resp.ok:
-            logger.warning(f"Telegram reply rejected ({resp.status_code}): {resp.text[:200]}")
-    except requests.RequestException as e:
-        logger.warning(f"Failed to send Telegram reply: {e}")
+def send_message(
+    text: str,
+    chat_client: Optional[ChatSocketClient] = None,
+    *,
+    reply_to: Optional[str | int] = None,
+) -> bool:
+    """Send plain text to the medical channel via ChatSocketClient, chunked under
+    TELEGRAM_MAX_CHARS.
 
+    Never raises on ChatSocketError or OSError: logs a warning and returns False.
+    In run_extract_queue.py, ingest_document() commits to health.db BEFORE calling
+    send_message() and extract_queue.commit_drain() -- raising here would skip
+    commit_drain() and re-ingest the same document on every subsequent cron tick.
 
-def send_message(token: str, chat_id: int, text: str) -> None:
-    """Plain text, no parse_mode -- error text often carries a file path or
-    exception message with underscores/parens/etc that break Telegram's
-    Markdown parser. A malformed-entity 400 doesn't raise (requests only
-    raises on connection errors), so an unchecked send silently vanishes.
-
-    Replies over Telegram's 4096-char limit are split into multiple messages;
-    without this an over-long answer (the advisory path routinely produces one)
-    is rejected with a 400 and never reaches the user.
-
-    A free function, not a method, so run_extract_queue.py's follow-up
+    A free function, not just a method, so run_extract_queue.py's follow-up
     messages (sent from a separate cron tick, with no TelegramDocBot instance
     around) can reuse it too.
     """
+    client = chat_client if chat_client is not None else ChatSocketClient()
     for piece in _chunk(text):
-        _post_message(token, chat_id, piece)
-
-
-def _load_token() -> str:
-    from src.constants import SECRETS_DIR
-
-    path = os.path.join(SECRETS_DIR, "telegram.json")
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        return str(data.get("token") or "").strip()
-    return os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        try:
+            if reply_to is not None:
+                client.send_message(CHANNEL, piece, reply_to=reply_to)
+            else:
+                client.send_message(CHANNEL, piece)
+        except (ChatSocketError, OSError) as e:
+            logger.warning(f"Failed to send chat bridge reply: {e}")
+            return False
+    return True
 
 
 class TelegramDocBot:
-    def __init__(self, settings: dict[str, Any], token: str, state_path: str) -> None:
-        self.token = token
+    def __init__(
+        self,
+        settings: dict[str, Any],
+        state_path: str,
+        chat_client: Optional[ChatSocketClient] = None,
+        paperless: Optional[Paperless] = None,
+    ) -> None:
+        self.settings = settings
+        self.transport = str(settings.get("transport") or "telegram")
         self.state_path = state_path
-        self.allowed_chat_id = settings.get("allowed_chat_id")
-        self.allowed_users = {int(k): v for k, v in settings.get("allowed_users", {}).items()}
+        self.chat_client = chat_client if chat_client is not None else ChatSocketClient()
         self.state = self._load_state()
-        self.paperless = Paperless()
+        self.paperless = paperless if paperless is not None else Paperless()
 
-    # --- Telegram transport --------------------------------------------------
-    def _api(self, method: str) -> str:
-        return API_URL.format(token=self.token, method=method)
-
-    def get_updates(self) -> list[dict[str, Any]]:
-        params: dict[str, Any] = {
-            "timeout": LONG_POLL_SECONDS,
-            "allowed_updates": json.dumps(["message"]),
-        }
-        if self.state.get("offset"):
-            params["offset"] = self.state["offset"]
-        resp = requests.get(self._api("getUpdates"), params=params, timeout=LONG_POLL_HTTP_TIMEOUT)
-        resp.raise_for_status()
-        return resp.json().get("result", [])
-
-    def send_message(self, chat_id: int, text: str) -> None:
-        send_message(self.token, chat_id, text)
-
-    def _download(self, file_id: str) -> tuple[bytes, str]:
-        resp = requests.get(self._api("getFile"), params={"file_id": file_id}, timeout=HTTP_TIMEOUT)
-        resp.raise_for_status()
-        file_path = resp.json()["result"]["file_path"]
-        url = FILE_URL.format(token=self.token, file_path=file_path)
-        content = requests.get(url, timeout=DOWNLOAD_TIMEOUT).content
-        return content, os.path.basename(file_path)
+    def send_message(self, text: str, reply_to: Optional[str | int] = None) -> bool:
+        client = getattr(self, "chat_client", None)
+        return send_message(text, client, reply_to=reply_to)
 
     # --- State ---------------------------------------------------------------
     def _load_state(self) -> dict[str, Any]:
@@ -280,19 +271,6 @@ class TelegramDocBot:
         os.makedirs(os.path.dirname(self.state_path) or ".", exist_ok=True)
         with open(self.state_path, "w", encoding="utf-8") as f:
             json.dump(self.state, f, indent=2)
-
-    # --- Authorization -------------------------------------------------------
-    def _authorized(self, message: dict[str, Any]) -> bool:
-        chat_id = message.get("chat", {}).get("id")
-        user_id = message.get("from", {}).get("id")
-        if self.allowed_chat_id in (None, 0, ""):
-            logger.info(
-                f"[setup] saw message in chat_id={chat_id} from user_id={user_id} "
-                f"({message.get('from', {}).get('first_name')}). Set allowed_chat_id "
-                "in settings to enable."
-            )
-            return False
-        return chat_id == self.allowed_chat_id and user_id in self.allowed_users
 
     # --- Help ------------------------------------------------------------------
     def _help_text(self, tag_map: dict[str, str]) -> str:
@@ -318,51 +296,52 @@ class TelegramDocBot:
             "records (reasoning, not medical advice)."
         )
 
-    # --- Message handling ------------------------------------------------------
-    def _file_ref(self, message: dict[str, Any]) -> Optional[tuple[str, str]]:
-        """(file_id, suggested filename) for a document or the largest photo."""
-        if "document" in message:
-            doc = message["document"]
-            return doc["file_id"], doc.get("file_name") or "document.pdf"
-        if "photo" in message:
-            largest = max(message["photo"], key=lambda p: p.get("file_size", 0))
-            return largest["file_id"], "photo.jpg"
-        return None
+    # --- Event handling ------------------------------------------------------
+    def process_event(self, event: dict[str, Any]) -> bool:
+        """Handle one pre-authorized bridge message event. Returns True if a document was filed."""
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        raw_text = str(
+            event.get("text")
+            or payload.get("text")
+            or event.get("caption")
+            or payload.get("caption")
+            or ""
+        ).strip()
+        attachments = event.get("attachments") or payload.get("attachments") or []
+        attachment_error = event.get("attachment_error") or payload.get("attachment_error")
 
-    def process_message(self, message: dict[str, Any]) -> bool:
-        """Handle one message. Returns True if a document was filed."""
-        chat_id = message["chat"]["id"]
-        raw_text = str(message.get("text", "")).strip()
-        cmd = raw_text.lower().split("@")[0]
-        if cmd in ("/start", "/help"):
-            tag_map, _ = _load_specialties()
-            self.send_message(chat_id, self._help_text(tag_map))
+        if attachment_error:
+            self.send_message(f"✗ Attachment could not be retrieved: {attachment_error}")
             return False
 
-        # /advise <person> <what to prepare for> -- the grounded advisory/synthesis
-        # path (src/qa.advise), distinct from a bare factual question below. Reached
-        # ONLY by this explicit command, so the factual path is never widened by a
-        # phrase heuristic misfiring.
-        first_token = raw_text.split(maxsplit=1)[0] if raw_text else ""
-        if first_token.lower().split("@")[0] == "/advise":
-            remainder = raw_text[len(first_token) :].strip()
-            if not remainder:
-                self.send_message(
-                    chat_id,
-                    "Usage: /advise <person> <what to prepare for> -- e.g. "
-                    "/advise Dad prepare for the cardiology follow-up.",
-                )
+        if not attachments:
+            cmd = raw_text.lower().split("@")[0]
+            if cmd in ("/start", "/help"):
+                tag_map, _ = _load_specialties()
+                self.send_message(self._help_text(tag_map))
                 return False
-            try:
-                answer = qa.advise(remainder)
-            except Exception as e:
-                logger.error(f"Advisory failed: {e}", exc_info=True)
-                answer = f"✗ Could not put that together: {e}"
-            self.send_message(chat_id, answer)
-            return False
 
-        file_ref = self._file_ref(message)
-        if file_ref is None:
+            # /advise <person> <what to prepare for> -- the grounded advisory/synthesis
+            # path (src/qa.advise), distinct from a bare factual question below. Reached
+            # ONLY by this explicit command, so the factual path is never widened by a
+            # phrase heuristic misfiring.
+            first_token = raw_text.split(maxsplit=1)[0] if raw_text else ""
+            if first_token.lower().split("@")[0] == "/advise":
+                remainder = raw_text[len(first_token) :].strip()
+                if not remainder:
+                    self.send_message(
+                        "Usage: /advise <person> <what to prepare for> -- e.g. "
+                        "/advise Dad prepare for the cardiology follow-up."
+                    )
+                    return False
+                try:
+                    answer = qa.advise(remainder)
+                except Exception as e:
+                    logger.error(f"Advisory failed: {e}", exc_info=True)
+                    answer = f"✗ Could not put that together: {e}"
+                self.send_message(answer)
+                return False
+
             # No attachment -> not an ingest. Plain text that isn't a slash
             # command is a question, e.g. "Dad's latest HbA1c" -- answer it
             # over health.db instead of staying silent.
@@ -372,28 +351,47 @@ class TelegramDocBot:
                 except Exception as e:
                     logger.error(f"Q&A failed: {e}", exc_info=True)
                     answer = f"✗ Could not answer that: {e}"
-                self.send_message(chat_id, answer)
+                self.send_message(answer)
             return False
 
-        caption = message.get("caption", "")
         tag_map, default_tag = _load_specialties()
         try:
-            parsed = parse_caption(caption, tag_map, default_tag)
+            parsed = parse_caption(raw_text, tag_map, default_tag)
         except CaptionError as e:
-            self.send_message(chat_id, f"✗ {e}")
+            self.send_message(f"✗ {e}")
             return False
 
-        file_id, filename = file_ref
+        att = attachments[0]
+        candidate_suffix = _candidate_suffix(att)
+        if candidate_suffix is not None:
+            candidate_rel = os.path.join(
+                parsed.folder,
+                parsed.subfolder or "",
+                f"{parsed.date} - {parsed.title}{candidate_suffix}",
+            )
+            if os.path.exists(source_path(candidate_rel)):
+                self.send_message(f"✗ Already have {candidate_rel} -- use a different title.")
+                return False
+
+        attachment_id = att.get("attachment_id")
+        if not attachment_id:
+            self.send_message("✗ Attachment metadata missing attachment_id.")
+            return False
+
         try:
-            content, _ = self._download(file_id)
+            att_resp = self.chat_client.fetch_attachment(CHANNEL, str(attachment_id))
+        except ChatGatewayUnavailableError:
+            raise
         except Exception as e:
             logger.error(f"Download failed: {e}", exc_info=True)
-            self.send_message(chat_id, f"✗ Download failed: {e}")
+            self.send_message(f"✗ Download failed: {e}")
             return False
 
+        content = att_resp["data"]
+        filename = att_resp.get("filename") or att.get("filename") or ""
         suffix = _suffix(filename, content)
         if suffix is None:
-            self.send_message(chat_id, "✗ Not a PDF or image Paperless can read.")
+            self.send_message("✗ Not a PDF or image Paperless can read.")
             return False
 
         rel = os.path.join(
@@ -401,7 +399,7 @@ class TelegramDocBot:
         )
         path = source_path(rel)
         if os.path.exists(path):
-            self.send_message(chat_id, f"✗ Already have {rel} -- use a different title.")
+            self.send_message(f"✗ Already have {rel} -- use a different title.")
             return False
 
         try:
@@ -410,7 +408,7 @@ class TelegramDocBot:
                 f.write(content)
         except OSError as e:
             logger.error(f"Write to Drive failed: {e}", exc_info=True)
-            self.send_message(chat_id, f"✗ Could not save to Drive: {e}")
+            self.send_message(f"✗ Could not save to Drive: {e}")
             return False
 
         # Same upload drive_sync.py would do on its next 6-hourly pass -- done
@@ -433,7 +431,6 @@ class TelegramDocBot:
             # up and retry, so this is a delay, not a loss.
             logger.error(f"Paperless upload failed: {e}", exc_info=True)
             self.send_message(
-                chat_id,
                 f"Saved to Drive as {rel}, but Paperless upload failed ({e}). "
                 "Will retry on the next sync.",
             )
@@ -452,34 +449,57 @@ class TelegramDocBot:
             tag=parsed.tag,
             title=parsed.title,
             date=parsed.date,
-            chat_id=chat_id,
         )
 
         self.send_message(
-            chat_id,
             f"✓ Filed: {parsed.correspondent} · {parsed.tag} · {parsed.date} ({task}). "
             "Extraction queued -- I'll follow up shortly.",
         )
         return True
 
-    # --- Orchestration -----------------------------------------------------
-    def run_once(self) -> int:
-        """Poll once, process authorized messages, persist state. Returns the
-        number of documents actually filed."""
-        updates = self.get_updates()
-        if not updates:
-            return 0
-        self.state["offset"] = max(u["update_id"] for u in updates) + 1
+    def process_message(self, message: dict[str, Any]) -> bool:
+        """Alias for process_event() for callers/tests passing an event dict."""
+        return self.process_event(message)
 
-        authorized = [
-            u["message"] for u in updates if "message" in u and self._authorized(u["message"])
-        ]
-        filed = 0
-        for message in authorized:
-            try:
-                if self.process_message(message):
-                    filed += 1
-            except Exception as e:  # never let one bad message wedge the loop
-                logger.error(f"Error processing message: {e}", exc_info=True)
+    # --- Orchestration -----------------------------------------------------
+    def _ack_and_save(self, seq: int) -> None:
+        try:
+            self.chat_client.ack_event(CHANNEL, seq)
+        except (ChatSocketError, OSError) as e:
+            logger.warning(f"Failed to ack event seq={seq}: {e}")
+        prev = int(self.state.get("last_seq", 0))
+        if seq > prev:
+            self.state["last_seq"] = seq
         self._save_state()
+
+    def run_once(self) -> int:
+        """Register channel, pull events, process each message, ack and persist state.
+
+        Returns the number of documents actually filed.
+        """
+        self.chat_client.register_channel(CHANNEL, transport=self.transport)
+        last_seq = int(self.state.get("last_seq", 0))
+        events = self.chat_client.pull_events(CHANNEL, after_seq=last_seq, wait_s=LONG_POLL_SECONDS)
+        if not events:
+            return 0
+
+        filed = 0
+        for event in events:
+            seq = event.get("seq")
+            event_type = event.get("type")
+            if event_type is not None and event_type != "message":
+                logger.debug(f"Skipping non-message event type={event_type!r} seq={seq}")
+                if seq is not None:
+                    self._ack_and_save(int(seq))
+                continue
+
+            try:
+                if self.process_event(event):
+                    filed += 1
+            except ChatGatewayUnavailableError:
+                raise
+            except Exception as e:  # never let one bad message wedge the loop
+                logger.error(f"Error processing event seq={seq}: {e}", exc_info=True)
+            if seq is not None:
+                self._ack_and_save(int(seq))
         return filed

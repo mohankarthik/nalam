@@ -63,6 +63,12 @@ In production, `homelab/services/nalam/docker-compose.yml` (`deploy_nalam.yml`) 
 `/root/.local/state/agentic/gateway:/run/agentic:ro`, and the host `llm-gateway.service` stages
 PDF attachments in `0700` ephemeral temp dirs wiped in `finally:` blocks after each call.
 
+**Bot chat events and replies go through the host unified chat bridge** (`/run/agentic/chat.sock`,
+channel `"medical"`) via `src/chat_client.py`. Bot credentials (`secrets/telegram.json` /
+`TELEGRAM_BOT_TOKEN`), `allowed_chat_id`, `allowed_users`, and attachment spooling live on the
+host bridge, not inside the container; `plugins/telegram_bot/settings.json` only holds optional
+`transport` (`"telegram"` or `"matrix"`, default `"telegram"`) and `enabled` settings.
+
 **`pytest` is offline and costs nothing** — it reads cached extractions from
 `tests/fixtures/extracted/`. Only regenerate that cache when the prompt or the model
 changes, and when you do, **clear it first**: a cache half-built from two different

@@ -16,7 +16,7 @@ import fcntl
 import json
 import logging
 import os
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 from src.constants import STATE_DIR
 
@@ -78,20 +78,21 @@ def enqueue(
     tag: str,
     title: str,
     date: str,
-    chat_id: int,
+    chat_id: Optional[int | str] = None,
 ) -> None:
     """Append one filed document to the queue, to be extracted on the next
     run_extract_queue.py tick."""
-    item = {
+    item: dict[str, Any] = {
         "rel": rel,
         "correspondent": correspondent,
         "tag": tag,
         "title": title,
         "date": date,
-        "chat_id": chat_id,
         "queued_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "attempts": 0,
     }
+    if chat_id is not None:
+        item["chat_id"] = chat_id
     with _locked():
         items = load()
         items.append(item)

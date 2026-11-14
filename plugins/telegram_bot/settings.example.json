@@ -1,8 +1,5 @@
 {
-  "_comment": "Copy to plugins/telegram_bot/settings.json and fill in. Gitignored: it names real Telegram chat/user ids.",
-  "allowed_chat_id": 0,
-  "allowed_users": {
-    "111111111": "Karti",
-    "222222222": "Mini"
-  }
+  "_comment": "Optional bot settings (plugins/telegram_bot/settings.json, gitignored). Auth and credentials live in the host chat-bridge.",
+  "enabled": true,
+  "transport": "telegram"
 }

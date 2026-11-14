@@ -40,8 +40,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("extract_queue")
 
-from plugins.telegram_bot.bot import _load_token, send_message  # noqa: E402
+from plugins.telegram_bot.bot import send_message  # noqa: E402
 from src import db, extract_queue, monitor  # noqa: E402
+from src.chat_client import ChatSocketClient  # noqa: E402
 from src.constants import STATE_DIR  # noqa: E402
 from src.drive_sync import Doc, _key  # noqa: E402
 from src.ingest import ingest_document  # noqa: E402
@@ -131,7 +132,7 @@ def run_once() -> None:
     if not items:
         return
 
-    token = _load_token()
+    chat_client = ChatSocketClient()
     paperless = Paperless()
     ocr_index = paperless.ocr_index()
     paperless_ids = paperless.document_id_index()
@@ -172,20 +173,17 @@ def run_once() -> None:
                 f"{item.get('rel')}: extraction failed (attempt {item['attempts']}): {e}",
                 exc_info=True,
             )
-            chat_id = item.get("chat_id")
             if item["attempts"] >= MAX_ATTEMPTS:
-                if chat_id is not None:
-                    send_message(
-                        token,
-                        chat_id,
-                        f"✗ Extraction failed for {item.get('title')} after "
-                        f"{MAX_ATTEMPTS} attempts: {e}",
-                    )
+                send_message(
+                    f"✗ Extraction failed for {item.get('title')} after "
+                    f"{MAX_ATTEMPTS} attempts: {e}",
+                    chat_client=chat_client,
+                )
             else:
                 remaining.append(item)
             continue
 
-        send_message(token, item["chat_id"], _result_text(result))
+        send_message(_result_text(result), chat_client=chat_client)
 
     # Preserve anything the bot enqueued while this drain was extracting.
     extract_queue.commit_drain(items, remaining)

@@ -1,17 +1,13 @@
-"""Cron entrypoint for the Telegram PDF-ingest + Q&A bot.
+"""Cron entrypoint for the chat-bridged PDF-ingest + Q&A bot.
 
-Poll Telegram once, file any authorized PDF/photo into Paperless (or answer a
-question over health.db). Runs on a 1-minute cron (see crontab), same shape as
-gajana's run_telegram_bot.py.
+Registers the ``medical`` channel on the host chat bridge Unix socket
+(``/run/agentic/chat.sock``), pulls pre-authorized events via long polling
+(see plugins.telegram_bot.bot.LONG_POLL_SECONDS), files any PDF/photo into
+Drive + Paperless (or answers a question over health.db), and acknowledges each
+event after processing. Runs on a 1-minute cron (see crontab).
 
-get_updates() now long-polls (see plugins.telegram_bot.bot.LONG_POLL_SECONDS),
-so a single invocation can legitimately run most of the 60s tick answering a
-message, instead of returning in well under a second like a short poll does.
-If a tick ever runs long (a slow LLM round-trip, a network hiccup), the NEXT
-cron tick must not start a second instance on top of it -- both would share
-one offset in telegram_bot_state.json and could double-process or double-reply
-to the same message. A non-blocking file lock makes that tick a clean skip
-instead of a race.
+A non-blocking file lock makes overlapping cron ticks skip cleanly instead of
+racing on ``telegram_bot_state.json``'s ``last_seq``.
 """
 
 from __future__ import annotations
@@ -26,7 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("telegram_bot")
 
-from plugins.telegram_bot.bot import TelegramDocBot, _load_token  # noqa: E402
+from plugins.telegram_bot.bot import TelegramDocBot  # noqa: E402
+from src.chat_client import ChatGatewayUnavailableError, ChatSocketError  # noqa: E402
 from src.constants import STATE_DIR  # noqa: E402
 
 SETTINGS_PATH = os.path.join(os.path.dirname(__file__), "plugins", "telegram_bot", "settings.json")
@@ -35,17 +32,13 @@ LOCK_PATH = os.path.join(STATE_DIR, "telegram_bot.lock")
 
 
 def main() -> None:
-    # Unconfigured is a clean no-op, not an error: the cron can ship before the
-    # bot is set up without spamming failures.
-    if not os.path.exists(SETTINGS_PATH):
-        logger.info(f"{SETTINGS_PATH} not found; telegram bot not configured yet.")
-        return
-    with open(SETTINGS_PATH, encoding="utf-8") as f:
-        settings = json.load(f)
+    settings: dict = {}
+    if os.path.exists(SETTINGS_PATH):
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            settings = json.load(f)
 
-    token = _load_token()
-    if not token:
-        logger.info("No Telegram bot token yet (secrets/telegram.json); skipping.")
+    if not settings.get("enabled", True):
+        logger.info("Chat bot disabled in settings; skipping.")
         return
 
     os.makedirs(STATE_DIR, exist_ok=True)
@@ -54,16 +47,20 @@ def main() -> None:
         fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         # The previous tick's long poll is still running -- skip, don't queue
-        # behind it. It already holds the current offset; a second instance
-        # here would race it, not help it.
+        # behind it. A second instance here would race on last_seq.
         logger.info("Previous telegram_bot tick still running; skipping this one.")
+        lock_file.close()
         return
 
     try:
-        bot = TelegramDocBot(settings, token, STATE_PATH)
+        bot = TelegramDocBot(settings, STATE_PATH)
         filed = bot.run_once()
         if filed:
-            logger.info(f"Telegram bot filed {filed} document(s).")
+            logger.info(f"Chat bot filed {filed} document(s).")
+    except ChatGatewayUnavailableError as e:
+        logger.warning(f"Chat bridge unavailable; skipping tick: {e}")
+    except ChatSocketError as e:
+        logger.error(f"Chat bridge error: {e}")
     finally:
         fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()

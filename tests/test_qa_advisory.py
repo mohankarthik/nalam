@@ -209,17 +209,22 @@ class TestMessageChunking:
         assert all(len(p) <= tgbot.TELEGRAM_MAX_CHARS for p in pieces)
         assert "".join(pieces) == line
 
-    def test_send_message_posts_each_chunk(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_send_message_posts_each_chunk(self) -> None:
         from plugins.telegram_bot import bot as tgbot
 
-        posted: list[str] = []
-        monkeypatch.setattr(
-            tgbot, "_post_message", lambda token, chat_id, text: posted.append(text)
-        )
+        posted: list[tuple[str, str]] = []
+
+        class _FakeClient:
+            def send_message(self, channel: str, text: str) -> dict[str, bool]:
+                posted.append((channel, text))
+                return {"ok": True}
+
         long_text = "\n".join("z" * 100 for _ in range(200))
-        tgbot.send_message("tok", 1, long_text)
+        ok = tgbot.send_message(long_text, chat_client=_FakeClient())  # type: ignore[arg-type]
+        assert ok is True
         assert len(posted) > 1
-        assert all(len(p) <= tgbot.TELEGRAM_MAX_CHARS for p in posted)
+        assert all(ch == "medical" for ch, _ in posted)
+        assert all(len(p) <= tgbot.TELEGRAM_MAX_CHARS for _, p in posted)
 
 
 # --- /advise command routing (plugins/telegram_bot/bot.py).
@@ -232,7 +237,9 @@ class TestBotRouting:
 
         instance = object.__new__(tgbot.TelegramDocBot)  # skip __init__ (Paperless/network)
         sent: list[str] = []
-        monkeypatch.setattr(instance, "send_message", lambda chat_id, text: sent.append(text))
+        monkeypatch.setattr(
+            instance, "send_message", lambda text, reply_to=None: sent.append(text) or True
+        )
         return instance, sent
 
     def test_advise_command_routes_to_advise(
