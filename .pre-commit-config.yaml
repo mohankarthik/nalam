@@ -7,6 +7,8 @@
 # The two guards come FIRST on purpose. If a commit is going to be refused for
 # publishing a patient's name or an API key, that should happen before anything
 # spends time reformatting it.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
 repos:
   - repo: local
     hooks:
@@ -52,5 +54,13 @@ repos:
         name: pytest
         entry: ./venv/bin/python -m pytest -q
         language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: live-llm-e2e
+        name: live LLM E2E
+        entry: bash tools/pre_push_e2e.sh
+        language: system
+        stages: [pre-push]
         pass_filenames: false
         always_run: true

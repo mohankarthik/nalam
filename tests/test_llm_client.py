@@ -120,6 +120,10 @@ class LLMClientTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"AGENTIC_LLM_SOCKET": "/custom/llm.sock"}, clear=False):
             self.assertEqual(lc.default_socket_path(), Path("/custom/llm.sock"))
 
+        with mock.patch.dict(os.environ, {"LLM_GATEWAY_SOCKET": "/legacy/llm.sock"}, clear=False):
+            os.environ.pop("AGENTIC_LLM_SOCKET", None)
+            self.assertEqual(lc.default_socket_path(), Path("/legacy/llm.sock"))
+
         with mock.patch.dict(os.environ, {"AGENTIC_STATE_DIR": str(self.tmp / "st")}, clear=False):
             os.environ.pop("AGENTIC_LLM_SOCKET", None)
             os.environ.pop("LLM_GATEWAY_SOCKET", None)
@@ -127,6 +131,41 @@ class LLMClientTest(unittest.TestCase):
                 self.assertEqual(lc.default_socket_path(), Path("/run/agentic/llm.sock"))
             with mock.patch.object(Path, "exists", return_value=False):
                 self.assertEqual(lc.default_socket_path(), self.tmp / "st" / "gateway" / "llm.sock")
+
+    def test_caller_resolution_and_forwarding(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENTIC_CALLER", None)
+            self.assertIsNone(lc.resolve_caller())
+            self.assertEqual(lc.resolve_caller("  nalam_01 "), "nalam_01")
+            self.assertIsNone(lc.resolve_caller("bad caller!"))
+
+        with mock.patch.dict(os.environ, {"AGENTIC_CALLER": "nalam"}, clear=False):
+            self.assertEqual(lc.resolve_caller(), "nalam")
+            self.assertEqual(lc.resolve_caller("override"), "override")
+
+        with mock.patch.dict(os.environ, {"AGENTIC_CALLER": "invalid tag"}, clear=False):
+            self.assertIsNone(lc.resolve_caller())
+
+        srv = self.start_server(
+            lambda req: {"ok": True, "text": "ok", "meta": {"caller": req.get("caller")}}
+        )
+        with mock.patch.dict(os.environ, {"AGENTIC_CALLER": "e2e-test"}, clear=False):
+            client = LLMClient(socket_path=self.sock_path)
+            client.complete_text("from env")
+            self.assertEqual(srv.requests[-1]["caller"], "e2e-test")
+
+            client_inst = LLMClient(socket_path=self.sock_path, caller="inst-tag")
+            client_inst.complete_text("from instance")
+            self.assertEqual(srv.requests[-1]["caller"], "inst-tag")
+
+            client_inst.complete_text("from call", caller="call-tag")
+            self.assertEqual(srv.requests[-1]["caller"], "call-tag")
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENTIC_CALLER", None)
+            client = LLMClient(socket_path=self.sock_path)
+            client.complete_text("no caller")
+            self.assertNotIn("caller", srv.requests[-1])
 
     def test_ping_availability_and_connect_errors(self):
         client = LLMClient(socket_path=self.sock_path)

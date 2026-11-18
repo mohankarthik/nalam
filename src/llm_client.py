@@ -3,6 +3,10 @@
 Uses only the Python standard library so both host automations and isolated
 Docker containers (with `/root/.local/state/agentic/gateway` bind-mounted at
 `/run/agentic`) can import or vendor this module directly.
+
+Each request carries an optional "caller" tag (the `caller` argument, else
+$AGENTIC_CALLER; [A-Za-z0-9_-]{1,32}); the gateway runs the session in the agy
+project auto-<caller>, or auto-gateway without one.
 """
 
 from __future__ import annotations
@@ -10,12 +14,17 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import socket
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 SOCKET_TIMEOUT_GRACE_S = 15.0
+# Caller tag sent with each request; the gateway runs the session in the agy
+# project auto-<caller> (e.g. AGENTIC_CALLER=nalam -> auto-nalam).
+CALLER_ENV = "AGENTIC_CALLER"
+CALLER_RE = re.compile(r"^[a-zA-Z0-9_-]{1,32}\Z")
 
 
 class LLMGatewayError(Exception):
@@ -59,6 +68,15 @@ def default_socket_path() -> Path:
     return state_dir / "gateway" / "llm.sock"
 
 
+def resolve_caller(caller: Optional[str] = None) -> Optional[str]:
+    """The explicit caller, else $AGENTIC_CALLER; None when neither is a valid tag
+    (the gateway then uses "gateway")."""
+    for cand in (caller, os.environ.get(CALLER_ENV)):
+        if isinstance(cand, str) and CALLER_RE.match(cand.strip()):
+            return cand.strip()
+    return None
+
+
 def _normalize_attachment(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("attachment must be a dict")
@@ -92,8 +110,10 @@ class LLMClient:
         socket_path: Optional[Path | str] = None,
         default_timeout_s: float = 300.0,
         max_response_bytes: int = MAX_RESPONSE_BYTES,
+        caller: Optional[str] = None,
     ):
         self._explicit_socket_path = Path(socket_path) if socket_path is not None else None
+        self.caller = caller
         self.default_timeout_s = float(default_timeout_s)
         self.max_response_bytes = int(max_response_bytes)
 
@@ -205,6 +225,7 @@ class LLMClient:
         family: Optional[str] = None,
         timeout_s: Optional[float] = None,
         title: str = "llm_gateway",
+        caller: Optional[str] = None,
     ) -> dict[str, Any]:
         eff_timeout = self.default_timeout_s if timeout_s is None else float(timeout_s)
         req: dict[str, Any] = {
@@ -229,6 +250,9 @@ class LLMClient:
             req["json_schema"] = json_schema
         if family is not None:
             req["family"] = family
+        eff_caller = resolve_caller(caller if caller is not None else self.caller)
+        if eff_caller is not None:
+            req["caller"] = eff_caller
         return self._request(req, timeout_s=eff_timeout + SOCKET_TIMEOUT_GRACE_S)
 
     def complete_text(
@@ -243,6 +267,7 @@ class LLMClient:
         family: Optional[str] = None,
         timeout_s: Optional[float] = None,
         title: str = "llm_gateway",
+        caller: Optional[str] = None,
     ) -> tuple[str, dict[str, Any]]:
         resp = self.complete(
             prompt=prompt,
@@ -255,6 +280,7 @@ class LLMClient:
             family=family,
             timeout_s=timeout_s,
             title=title,
+            caller=caller,
         )
         if "text" not in resp:
             raise LLMProtocolError("gateway response missing 'text'")
@@ -273,6 +299,7 @@ class LLMClient:
         family: Optional[str] = None,
         timeout_s: Optional[float] = None,
         title: str = "llm_gateway",
+        caller: Optional[str] = None,
     ) -> tuple[Any, dict[str, Any]]:
         resp = self.complete(
             prompt=prompt,
@@ -286,6 +313,7 @@ class LLMClient:
             family=family,
             timeout_s=timeout_s,
             title=title,
+            caller=caller,
         )
         if "data" not in resp:
             raise LLMProtocolError("gateway response missing 'data'")
@@ -305,6 +333,7 @@ class LLMClient:
         family: Optional[str] = None,
         timeout_s: Optional[float] = None,
         title: str = "pdf_extract",
+        caller: Optional[str] = None,
     ) -> tuple[Any, dict[str, Any]]:
         resp = self.complete(
             prompt=prompt,
@@ -319,6 +348,7 @@ class LLMClient:
             family=family,
             timeout_s=timeout_s,
             title=title,
+            caller=caller,
         )
         key = "data" if response_format == "json" else "text"
         if key not in resp:
@@ -336,6 +366,7 @@ class LLMClient:
         max_rounds: int = 4,
         timeout_s: Optional[float] = None,
         title: str = "tool_loop",
+        caller: Optional[str] = None,
     ) -> tuple[str, dict[str, Any]]:
         msgs: list[dict[str, Any]] = [dict(m) for m in messages]
         for _ in range(max_rounds):
@@ -346,6 +377,7 @@ class LLMClient:
                 family=family,
                 timeout_s=timeout_s,
                 title=title,
+                caller=caller,
             )
             turn = resp.get("turn")
             if not isinstance(turn, dict):

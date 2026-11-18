@@ -1,0 +1,46 @@
+{
+  "prompt_schema_sha256": "b5fac55993f36dcbaecd49f761db86d04974b528876d23fb102f110c0b0e2f10",
+  "recorded_models": {
+    "lab": "gemini-4-hydrogen-high",
+    "qa": "gemini-4-hydrogen-high"
+  },
+  "lab_extract_text": "```json\n{\n  \"patient\": {\n    \"name\": \"Alice Example\",\n    \"age\": \"34 Years\",\n    \"sex\": \"Female\",\n    \"collected_at\": \"2026-04-01\",\n    \"lab\": \"\"\n  },\n  \"results\": [\n    {\n      \"section\": \"COMPLETE BLOOD COUNT\",\n      \"name\": \"Hemoglobin\",\n      \"value\": \"13.4\",\n      \"unit\": \"g/dL\",\n      \"reference_range\": \"12.0 - 15.5\",\n      \"method\": \"\"\n    },\n    {\n      \"section\": \"COMPLETE BLOOD COUNT\",\n      \"name\": \"Platelet Count\",\n      \"value\": \"215\",\n      \"unit\": \"x10^3/uL\",\n      \"reference_range\": \"150 - 400\",\n      \"method\": \"\"\n    }\n  ]\n}\n```\n",
+  "qa_turns": [
+    {
+      "turn": {
+        "type": "tool_calls",
+        "calls": [
+          {
+            "id": "call_1",
+            "name": "get_observations",
+            "arguments": {}
+          }
+        ]
+      },
+      "meta": {
+        "family": "gemini",
+        "runtime": "antigravity",
+        "model": "gemini-4-hydrogen-high",
+        "served_by": [],
+        "fell_back": false,
+        "skipped": {},
+        "session_id": "b83699a3-35ff-43e1-8230-b28865111a50"
+      }
+    },
+    {
+      "turn": {
+        "type": "final",
+        "content": "From Alice's lab results dated 2026-04-01: Haemoglobin is 13.4 g/dL (reference range 12.0 to 15.5 g/dL), and Platelet Count is 215000.0 x10^3/uL (reference range 150.0 to 400.0 x10^3/uL)."
+      },
+      "meta": {
+        "family": "gemini",
+        "runtime": "antigravity",
+        "model": "gemini-4-hydrogen-high",
+        "served_by": [],
+        "fell_back": false,
+        "skipped": {},
+        "session_id": "37b1bae4-0e7b-4456-90e4-668cbce8d0c2"
+      }
+    }
+  ]
+}
