@@ -181,6 +181,76 @@ class TestGetObservations:
         assert rows[0]["ref_low"] == pytest.approx(150000.0)
         assert rows[0]["ref_high"] == pytest.approx(400000.0)
 
+    def test_reclassify_converts_numeric_units_and_quarantines_unknown_unit(self, con) -> None:
+        doc1 = _doc(con, paperless_id=5, source_path="reclass.pdf", doc_date="2026-04-01")
+        db.insert_observations(
+            con,
+            doc1,
+            [
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "PLT",
+                    "analyte": None,
+                    "effective": "2026-04-01",
+                    "value_num": 215.0,
+                    "raw_value": "215",
+                    "unit": "x10^3/uL",
+                    "ref_low": 150.0,
+                    "ref_high": 400.0,
+                    "status": "review",
+                    "review_reason": '["no codebook entry"]',
+                },
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "PLT_BAD_UNIT",
+                    "analyte": None,
+                    "effective": "2026-04-02",
+                    "value_num": 215.0,
+                    "raw_value": "215",
+                    "unit": "IU/mL",
+                    "ref_low": 150.0,
+                    "ref_high": 400.0,
+                    "status": "review",
+                    "review_reason": '["no codebook entry"]',
+                },
+            ],
+        )
+
+        def resolver(printed_name: str, _section: str) -> tuple[str | None, str | None]:
+            if printed_name in ("PLT", "PLT_BAD_UNIT"):
+                return "Platelet Count", "CBC"
+            return None, None
+
+        fixed = db.reclassify(con, resolver)
+        assert fixed == 1
+
+        good = con.execute(
+            "SELECT analyte, value_num, status, review_reason FROM observations "
+            "WHERE printed_name = 'PLT'"
+        ).fetchone()
+        assert good["analyte"] == "Platelet Count"
+        assert good["value_num"] == pytest.approx(215000.0)
+        assert good["status"] == "ok"
+        assert good["review_reason"] is None
+
+        bad = con.execute(
+            "SELECT analyte, value_num, status, review_reason FROM observations "
+            "WHERE printed_name = 'PLT_BAD_UNIT'"
+        ).fetchone()
+        assert bad["analyte"] == "Platelet Count"
+        assert bad["value_num"] is None
+        assert bad["status"] == "review"
+        assert "unknown unit" in bad["review_reason"]
+
+        rows = qa.get_observations(con, "Alice Example", analyte="Platelet Count")
+        by_date = {r["date"]: r for r in rows}
+        assert by_date["2026-04-01"]["value"] == pytest.approx(215000.0)
+        assert by_date["2026-04-01"]["unit"] == "/uL"
+        assert by_date["2026-04-01"]["ref_low"] == pytest.approx(150000.0)
+        assert by_date["2026-04-01"]["ref_high"] == pytest.approx(400000.0)
+        assert by_date["2026-04-02"]["value"] is None
+        assert by_date["2026-04-02"]["trusted"] is False
+
 
 class TestGetEncounters:
     def test_returns_document_id_for_citation(self, con) -> None:

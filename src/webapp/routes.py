@@ -209,7 +209,9 @@ def observations_page(
         flag, _source = flag_observation(
             who, name, r["raw_value"], r["value_num"], r["ref_low"], r["ref_high"], codebook
         )
-        disp_unit = display_unit_and_range(name, r["value_num"], r["unit"], table=units)[0]
+        disp_unit = display_unit_and_range(
+            name, r["value_num"], r["unit"], table=units, raw_value=r["raw_value"]
+        )[0]
         entry = {
             "analyte": name,
             "segment": r["segment"],

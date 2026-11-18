@@ -110,6 +110,7 @@ def display_unit_and_range(
     ref_low: Optional[float] = None,
     ref_high: Optional[float] = None,
     table: Optional[dict[str, dict]] = None,
+    raw_value: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[float], Optional[float]]:
     """Return (unit, ref_low, ref_high) matching the scale of stored `value_num`.
 
@@ -133,6 +134,16 @@ def display_unit_and_range(
     for u, factor in entry.get("convert", {}).items():
         if _fold(u) == _fold(printed_str):
             f = float(factor)
+            if raw_value is not None and f != 1.0:
+                from src.normalize import parse_value
+
+                raw_num, _ = parse_value(raw_value)
+                if (
+                    raw_num is not None
+                    and raw_num != 0.0
+                    and abs(value_num - raw_num) <= 1e-9 * max(1.0, abs(raw_num))
+                ):
+                    return printed_unit, ref_low, ref_high
             return (
                 canonical,
                 ref_low * f if ref_low is not None else None,

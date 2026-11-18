@@ -107,10 +107,10 @@ def build_cbc_pdf_bytes() -> bytes:
 
 
 def prompt_schema_sha256() -> str:
-    """Hash the lab extraction prompt and Q&A prompt/tool schemas."""
+    """Hash the lab extraction config and Q&A prompt/tool schemas."""
     lab_cfg = json.loads(LAB_CONFIG_PATH.read_text(encoding="utf-8"))
     payload = {
-        "lab_prompt": lab_cfg["prompt"],
+        "lab_config": lab_cfg,
         "qa_system_prompt": qa.SYSTEM_PROMPT,
         "qa_tools": qa.TOOLS,
     }
@@ -190,6 +190,8 @@ class _UnixJsonServer:
         except OSError:
             pass
         self._thread.join(timeout=2.0)
+
+    def assert_no_errors(self) -> None:
         if self.errors:
             raise self.errors[0]
 
@@ -409,6 +411,7 @@ def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_Fak
 
         # Step (c): QA tool loop queries health.db via llm.sock and returns answer + citation.
         reply = qa.answer_question("What are Alice's hemoglobin and platelet count?")
+        chat_bridge._server.assert_no_errors()
 
     # Step (d): Verify ground truth in health.db and QA reply.
     hb_name, hb_unit, plt_name, plt_unit, plt_factor = _ground_truth_expectations()
@@ -502,6 +505,7 @@ def test_e2e_pipeline_offline(tmp_path: Path) -> None:
     srv = _UnixJsonServer(llm_sock, handle_llm)
     try:
         _run_pipeline(tmp_path, llm_socket_path=llm_sock)
+        srv.assert_no_errors()
     finally:
         srv.close()
 
@@ -567,6 +571,7 @@ def _record_llm() -> None:
         srv = _UnixJsonServer(proxy_sock, proxy_handler)
         try:
             _run_pipeline(tmp_path, llm_socket_path=proxy_sock)
+            srv.assert_no_errors()
         finally:
             srv.close()
 

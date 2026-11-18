@@ -95,3 +95,10 @@ class TestDisplayUnitAndRange:
             10.0,
             50.0,
         )
+
+    def test_legacy_unscaled_reclassified_row_keeps_printed_unit_and_range(
+        self, units: dict
+    ) -> None:
+        assert display_unit_and_range(
+            "Platelet Count", 215.0, "x10^3/uL", 150.0, 400.0, units, raw_value="215"
+        ) == ("x10^3/uL", 150.0, 400.0)

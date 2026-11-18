@@ -155,7 +155,13 @@ def get_observations(
     out: list[dict[str, Any]] = []
     for r in rows:
         disp_unit, disp_low, disp_high = display_unit_and_range(
-            r["analyte"], r["value_num"], r["unit"], r["ref_low"], r["ref_high"], units
+            r["analyte"],
+            r["value_num"],
+            r["unit"],
+            r["ref_low"],
+            r["ref_high"],
+            units,
+            raw_value=r["raw_value"],
         )
         out.append(
             {

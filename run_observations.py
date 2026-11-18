@@ -94,7 +94,9 @@ def show_list(con, who: str, since: str | None) -> None:
     for r in latest:
         name = r["analyte"] or f"{r['printed_name']} (unnamed)"
         value = r["value_num"] if r["value_num"] is not None else r["value_text"]
-        unit = display_unit_and_range(r["analyte"], r["value_num"], r["unit"], table=units)[0]
+        unit = display_unit_and_range(
+            r["analyte"], r["value_num"], r["unit"], table=units, raw_value=r["raw_value"]
+        )[0]
         mark = "" if r["status"] == "ok" else "  [unconfirmed]"
         print(
             f"  {name[:32]:<32} {str(value)[:12]:<12} {(unit or '-'):<10} "
@@ -123,7 +125,9 @@ def show_history(con, who: str, analyte: str) -> None:
     print(f"  {'DATE':<12} {'VALUE':<12} {'UNIT':<10} {'FLAG':<6} SOURCE")
     for r in rows:
         value = r["value_num"] if r["value_num"] is not None else r["value_text"]
-        unit = display_unit_and_range(r["analyte"], r["value_num"], r["unit"], table=units)[0]
+        unit = display_unit_and_range(
+            r["analyte"], r["value_num"], r["unit"], table=units, raw_value=r["raw_value"]
+        )[0]
         mark = "" if r["status"] == "ok" else " [unconfirmed]"
         link = doc_link(con, r["document_id"]) or ""
         print(

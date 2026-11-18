@@ -1,5 +1,5 @@
 {
-  "prompt_schema_sha256": "b5fac55993f36dcbaecd49f761db86d04974b528876d23fb102f110c0b0e2f10",
+  "prompt_schema_sha256": "dc68aec991916132b28e6d21381ee6a684a0eb377ad6ddd6d51478d4eb267e4d",
   "recorded_models": {
     "lab": "gemini-4-hydrogen-high",
     "qa": "gemini-4-hydrogen-high"

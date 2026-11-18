@@ -27,6 +27,7 @@ Two decisions worth knowing:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
@@ -326,14 +327,45 @@ def reclassify(con: sqlite3.Connection, resolver) -> int:
     an alias redeems every past value that alias covers without touching the LLM.
     This is the whole reason unnamed results are kept as observations rather than
     diverted to a lossy queue.
+
+    Numeric rows are also unit-converted once named (matching ingest_lab): if the
+    unit is missing or unknown, the analyte is recorded with value_num=NULL and
+    status='review' rather than silently marking an unscaled number 'ok'.
     """
+    from src.normalize import parse_value
+    from src.units import convert, load_units
+
+    units = load_units()
     rows = con.execute(
-        "SELECT id, printed_name, section FROM observations WHERE analyte IS NULL"
+        "SELECT id, printed_name, section, raw_value, value_num, unit "
+        "FROM observations WHERE analyte IS NULL"
     ).fetchall()
     fixed = 0
     for r in rows:
         analyte, segment = resolver(r["printed_name"], r["section"] or "")
-        if analyte:
+        if not analyte:
+            continue
+        number, _ = parse_value(r["raw_value"])
+        if number is not None:
+            converted, _canonical, reason = convert(analyte, number, r["unit"] or "", units)
+            if reason:
+                con.execute(
+                    """UPDATE observations
+                       SET analyte = ?, segment = ?, value_num = NULL,
+                           status = 'review', review_reason = ?
+                       WHERE id = ?""",
+                    (analyte, segment, json.dumps([reason]), r["id"]),
+                )
+            else:
+                con.execute(
+                    """UPDATE observations
+                       SET analyte = ?, segment = ?, value_num = ?,
+                           status = 'ok', review_reason = NULL
+                       WHERE id = ?""",
+                    (analyte, segment, converted, r["id"]),
+                )
+                fixed += 1
+        else:
             con.execute(
                 """UPDATE observations
                    SET analyte = ?, segment = ?, status = 'ok', review_reason = NULL
