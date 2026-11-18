@@ -101,3 +101,42 @@ def convert(
         canonical,
         f"{analyte}: unknown unit {printed_unit!r} (codebook uses {canonical!r})",
     )
+
+
+def display_unit_and_range(
+    analyte: Optional[str],
+    value_num: Optional[float],
+    printed_unit: Optional[str],
+    ref_low: Optional[float] = None,
+    ref_high: Optional[float] = None,
+    table: Optional[dict[str, dict]] = None,
+) -> tuple[Optional[str], Optional[float], Optional[float]]:
+    """Return (unit, ref_low, ref_high) matching the scale of stored `value_num`.
+
+    `observations` stores converted `value_num` alongside the verbatim printed
+    `unit`/`ref_low`/`ref_high`. Read surfaces pair `value_num` with the canonical
+    unit and scaled reference bounds so a converted count is shown in its true unit.
+    """
+    if value_num is None or not analyte:
+        return printed_unit, ref_low, ref_high
+
+    table = table if table is not None else load_units()
+    entry = table.get(analyte)
+    printed_str = printed_unit or ""
+    if entry is None or not printed_str.strip():
+        return printed_unit, ref_low, ref_high
+
+    canonical = entry["canonical"]
+    if _fold(printed_str) == _fold(canonical):
+        return canonical, ref_low, ref_high
+
+    for u, factor in entry.get("convert", {}).items():
+        if _fold(u) == _fold(printed_str):
+            f = float(factor)
+            return (
+                canonical,
+                ref_low * f if ref_low is not None else None,
+                ref_high * f if ref_high is not None else None,
+            )
+
+    return printed_unit, ref_low, ref_high

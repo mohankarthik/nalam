@@ -32,6 +32,7 @@ from src import db
 from src.normalize import load_codebook
 from src.people import Person, flag_observation, load_people, resolve
 from src.qa import doc_link
+from src.units import display_unit_and_range, load_units
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def _flag(con, person: Person, codebook: dict, row) -> str:
 def show_list(con, who: str, since: str | None) -> None:
     person = resolve_person(who)
     codebook = load_codebook()
+    units = load_units()
 
     sql = "SELECT * FROM observations WHERE subject = ? AND effective IS NOT NULL"
     params = [person.correspondent]
@@ -92,9 +94,10 @@ def show_list(con, who: str, since: str | None) -> None:
     for r in latest:
         name = r["analyte"] or f"{r['printed_name']} (unnamed)"
         value = r["value_num"] if r["value_num"] is not None else r["value_text"]
+        unit = display_unit_and_range(r["analyte"], r["value_num"], r["unit"], table=units)[0]
         mark = "" if r["status"] == "ok" else "  [unconfirmed]"
         print(
-            f"  {name[:32]:<32} {str(value)[:12]:<12} {(r['unit'] or '-'):<10} "
+            f"  {name[:32]:<32} {str(value)[:12]:<12} {(unit or '-'):<10} "
             f"{(r['effective'] or '?'):<12} {_flag(con, person, codebook, r)}{mark}"
         )
 
@@ -102,6 +105,7 @@ def show_list(con, who: str, since: str | None) -> None:
 def show_history(con, who: str, analyte: str) -> None:
     person = resolve_person(who)
     codebook = load_codebook()
+    units = load_units()
 
     rows = con.execute(
         """SELECT * FROM observations
@@ -119,10 +123,11 @@ def show_history(con, who: str, analyte: str) -> None:
     print(f"  {'DATE':<12} {'VALUE':<12} {'UNIT':<10} {'FLAG':<6} SOURCE")
     for r in rows:
         value = r["value_num"] if r["value_num"] is not None else r["value_text"]
+        unit = display_unit_and_range(r["analyte"], r["value_num"], r["unit"], table=units)[0]
         mark = "" if r["status"] == "ok" else " [unconfirmed]"
         link = doc_link(con, r["document_id"]) or ""
         print(
-            f"  {(r['effective'] or '?'):<12} {str(value)[:12]:<12} {(r['unit'] or '-'):<10} "
+            f"  {(r['effective'] or '?'):<12} {str(value)[:12]:<12} {(unit or '-'):<10} "
             f"{_flag(con, person, codebook, r):<6}{mark} {link}"
         )
 

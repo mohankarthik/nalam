@@ -155,6 +155,32 @@ class TestGetObservations:
         rows = qa.get_observations(con, "Alice Example", analyte="HbA1c", since="2024-01-01")
         assert rows == []
 
+    def test_converted_row_displays_canonical_unit_and_scaled_range(self, con) -> None:
+        doc1 = _doc(con, paperless_id=4, source_path="d-plt.pdf", doc_date="2026-04-01")
+        db.insert_observations(
+            con,
+            doc1,
+            [
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "Platelet Count",
+                    "analyte": "Platelet Count",
+                    "effective": "2026-04-01",
+                    "value_num": 215000.0,
+                    "raw_value": "215",
+                    "unit": "x10^3/uL",
+                    "ref_low": 150.0,
+                    "ref_high": 400.0,
+                }
+            ],
+        )
+        rows = qa.get_observations(con, "Alice Example", analyte="Platelet Count")
+        assert len(rows) == 1
+        assert rows[0]["value"] == pytest.approx(215000.0)
+        assert rows[0]["unit"] == "/uL"
+        assert rows[0]["ref_low"] == pytest.approx(150000.0)
+        assert rows[0]["ref_high"] == pytest.approx(400000.0)
+
 
 class TestGetEncounters:
     def test_returns_document_id_for_citation(self, con) -> None:

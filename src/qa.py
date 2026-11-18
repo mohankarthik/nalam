@@ -36,6 +36,7 @@ from src.constants import PAPERLESS_URL, SETTINGS, STATE_DIR
 from src.llm import FALLBACK_MODEL, PRIMARY_MODEL, _model_to_family, configure_api_keys
 from src.llm_client import LLMClient, LLMToolLoopError
 from src.people import Person, load_people
+from src.units import display_unit_and_range, load_units
 
 logger = logging.getLogger(__name__)
 
@@ -150,20 +151,26 @@ def get_observations(
         params.append(limit)
 
     rows = con.execute(sql, params).fetchall()
-    return [
-        {
-            "analyte": r["analyte"] or r["printed_name"],
-            "value": r["value_num"] if r["value_num"] is not None else r["value_text"],
-            "unit": r["unit"],
-            "date": r["effective"],
-            "ref_low": r["ref_low"],
-            "ref_high": r["ref_high"],
-            "source_quality": r["source_quality"],
-            "trusted": r["status"] == "ok",
-            "document_id": r["document_id"],
-        }
-        for r in rows
-    ]
+    units = load_units()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        disp_unit, disp_low, disp_high = display_unit_and_range(
+            r["analyte"], r["value_num"], r["unit"], r["ref_low"], r["ref_high"], units
+        )
+        out.append(
+            {
+                "analyte": r["analyte"] or r["printed_name"],
+                "value": r["value_num"] if r["value_num"] is not None else r["value_text"],
+                "unit": disp_unit,
+                "date": r["effective"],
+                "ref_low": disp_low,
+                "ref_high": disp_high,
+                "source_quality": r["source_quality"],
+                "trusted": r["status"] == "ok",
+                "document_id": r["document_id"],
+            }
+        )
+    return out
 
 
 def get_encounters(

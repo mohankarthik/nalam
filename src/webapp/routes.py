@@ -22,6 +22,7 @@ from src.drugs import load_drugs
 from src.normalize import load_codebook, match, promote
 from src.people import Person, flag_observation, load_people
 from src.qa import doc_link, get_observations
+from src.units import display_unit_and_range, load_units
 from src.webapp.charts import sparkline_svg
 
 logger = logging.getLogger(__name__)
@@ -198,6 +199,7 @@ def observations_page(
 ):
     who = current_person(person)
     codebook = load_codebook()
+    units = load_units()
     latest = _latest_per_analyte(con, who.correspondent)
 
     rows = []
@@ -207,11 +209,12 @@ def observations_page(
         flag, _source = flag_observation(
             who, name, r["raw_value"], r["value_num"], r["ref_low"], r["ref_high"], codebook
         )
+        disp_unit = display_unit_and_range(name, r["value_num"], r["unit"], table=units)[0]
         entry = {
             "analyte": name,
             "segment": r["segment"],
             "value": r["value_num"] if r["value_num"] is not None else r["value_text"],
-            "unit": r["unit"],
+            "unit": disp_unit,
             "date": r["effective"],
             "flag": flag,
             "trusted": r["status"] == "ok",

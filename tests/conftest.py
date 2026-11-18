@@ -9,9 +9,15 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _isolate_llm_gateway_socket(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def _isolate_llm_gateway_socket(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, request: pytest.FixtureRequest
+) -> None:
     """Prevent offline pytest runs from ever touching the live host gateway sockets."""
-    if os.environ.get("AGENTIC_LIVE_LLM_E2E") != "1":
+    allow_live = (
+        os.environ.get("AGENTIC_LIVE_LLM_E2E") == "1"
+        and Path(str(request.node.path)).name == "test_e2e_pipeline.py"
+    )
+    if not allow_live:
         nonexistent = str(tmp_path / "nonexistent.sock")
         monkeypatch.setenv("LLM_GATEWAY_SOCKET", nonexistent)
         monkeypatch.setenv("AGENTIC_LLM_SOCKET", nonexistent)

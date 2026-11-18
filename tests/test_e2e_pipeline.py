@@ -127,6 +127,7 @@ class _UnixJsonServer:
         self.sock_path = sock_path
         self.handler = handler
         self.requests: list[dict[str, Any]] = []
+        self.errors: list[BaseException] = []
         self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._srv.bind(str(sock_path))
         self._srv.listen(16)
@@ -144,25 +145,36 @@ class _UnixJsonServer:
                 conn.close()
                 break
             with conn:
-                chunks: list[bytes] = []
-                while True:
-                    chunk = conn.recv(65536)
-                    if not chunk:
-                        break
-                    nl = chunk.find(b"\n")
-                    if nl != -1:
-                        chunks.append(chunk[: nl + 1])
-                        break
-                    chunks.append(chunk)
-                raw = b"".join(chunks).decode("utf-8").strip()
-                if not raw:
-                    continue
-                req = json.loads(raw)
-                self.requests.append(req)
                 try:
+                    chunks: list[bytes] = []
+                    while True:
+                        chunk = conn.recv(65536)
+                        if not chunk:
+                            break
+                        nl = chunk.find(b"\n")
+                        if nl != -1:
+                            chunks.append(chunk[: nl + 1])
+                            break
+                        chunks.append(chunk)
+                    raw = b"".join(chunks).decode("utf-8").strip()
+                    if not raw:
+                        continue
+                    req = json.loads(raw)
+                    self.requests.append(req)
                     resp = self.handler(req)
+                except AssertionError as exc:
+                    self.errors.append(exc)
+                    resp = {
+                        "ok": False,
+                        "error": f"AssertionError: {exc}",
+                        "error_code": "invalid_request",
+                    }
                 except Exception as exc:  # pragma: no cover - defensive mock server guard
-                    resp = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+                    resp = {
+                        "ok": False,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "error_code": "protocol",
+                    }
                 conn.sendall((json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8"))
 
     def close(self) -> None:
@@ -178,6 +190,8 @@ class _UnixJsonServer:
         except OSError:
             pass
         self._thread.join(timeout=2.0)
+        if self.errors:
+            raise self.errors[0]
 
 
 class _FakeChatBridge:
@@ -270,7 +284,7 @@ class _FakePaperless:
         }
 
 
-def _ground_truth_expectations() -> tuple[str, str, str, float]:
+def _ground_truth_expectations() -> tuple[str, str, str, str, float]:
     """Read canonical names, units, and conversion factor from analytes.json and units.json."""
     analytes = json.loads(ANALYTES_PATH.read_text(encoding="utf-8"))
     units = json.loads(UNITS_PATH.read_text(encoding="utf-8"))
@@ -278,8 +292,9 @@ def _ground_truth_expectations() -> tuple[str, str, str, float]:
     hb_name = analytes["718-7"]["name"]
     plt_name = analytes["777-3"]["name"]
     hb_unit = units[hb_name]["canonical"]
+    plt_unit = units[plt_name]["canonical"]
     plt_factor = float(units[plt_name]["convert"]["x10^3/uL"])
-    return hb_name, hb_unit, plt_name, plt_factor
+    return hb_name, hb_unit, plt_name, plt_unit, plt_factor
 
 
 def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_FakeChatBridge, str]:
@@ -396,12 +411,12 @@ def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_Fak
         reply = qa.answer_question("What are Alice's hemoglobin and platelet count?")
 
     # Step (d): Verify ground truth in health.db and QA reply.
-    hb_name, hb_unit, plt_name, plt_factor = _ground_truth_expectations()
+    hb_name, hb_unit, plt_name, plt_unit, plt_factor = _ground_truth_expectations()
     con = orig_connect(str(db_path))
     try:
         obs_rows = con.execute(
             """SELECT o.subject, o.analyte, o.effective, o.value_num, o.raw_value,
-                      o.unit, o.status, d.paperless_id
+                      o.unit, o.ref_low, o.ref_high, o.status, d.paperless_id
                FROM observations o
                JOIN documents d ON d.id = o.document_id
                ORDER BY o.analyte"""
@@ -423,8 +438,17 @@ def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_Fak
         assert plt["effective"] == "2026-04-01"
         assert plt["value_num"] == pytest.approx(215.0 * plt_factor)
         assert plt["raw_value"] == "215"
+        assert plt["unit"] == "x10^3/uL"
+        assert plt["ref_low"] == pytest.approx(150.0)
+        assert plt["ref_high"] == pytest.approx(400.0)
         assert plt["status"] == "ok"
         assert plt["paperless_id"] == 77
+
+        qa_obs = {r["analyte"]: r for r in qa.get_observations(con, "Alice Example")}
+        qa_plt = qa_obs[plt_name]
+        assert qa_plt["unit"] == plt_unit
+        assert qa_plt["ref_low"] == pytest.approx(150000.0)
+        assert qa_plt["ref_high"] == pytest.approx(400000.0)
 
         review_count = con.execute("SELECT COUNT(*) FROM review_queue").fetchone()[0]
         assert review_count == 0
@@ -432,7 +456,9 @@ def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_Fak
         con.close()
 
     assert "13.4" in reply
-    assert "215" in reply
+    assert any(tok in reply for tok in ("215000", "215,000", "2,15,000"))
+    assert "/ul" in reply.lower()
+    assert "x10^3" not in reply.lower()
     assert "/documents/77/details" in reply
     return chat_bridge, reply
 
@@ -505,15 +531,14 @@ def _record_llm() -> None:
     recorded_models: dict[str, str] = {}
     lab_extract_text: Optional[str] = None
     qa_turns: list[dict[str, Any]] = []
-    qa_family_seen: Optional[str] = None
 
     with tempfile.TemporaryDirectory(prefix="nalam-e2e-record-") as td:
         tmp_path = Path(td)
         proxy_sock = tmp_path / "record_llm.sock"
 
         def proxy_handler(req: dict[str, Any]) -> dict[str, Any]:
-            nonlocal lab_extract_text, qa_family_seen
-            if req.get("caller") != "e2e-test":
+            nonlocal lab_extract_text
+            if req.get("op") != "ping" and req.get("caller") != "e2e-test":
                 raise AssertionError(f"Expected caller='e2e-test', got {req.get('caller')!r}")
             try:
                 resp = live_client._request(
@@ -531,14 +556,12 @@ def _record_llm() -> None:
                 lab_extract_text = str(resp["text"])
                 recorded_models["lab"] = str(meta.get("model") or req.get("family") or "unknown")
             elif title == "nalam_qa":
-                req_family = req.get("family")
-                if qa_family_seen is not None and req_family != qa_family_seen:
-                    # Fallback model started a fresh loop; keep only the winning loop's turns.
+                if len(req.get("messages") or []) <= 2:
+                    # Fresh tool loop start (or fallback retry): reset recorded turns.
                     qa_turns.clear()
-                qa_family_seen = str(req_family)
                 qa_turns.append({"turn": resp["turn"], "meta": meta})
                 if (resp.get("turn") or {}).get("type") == "final":
-                    recorded_models["qa"] = str(meta.get("model") or req_family or "unknown")
+                    recorded_models["qa"] = str(meta.get("model") or req.get("family") or "unknown")
             return resp
 
         srv = _UnixJsonServer(proxy_sock, proxy_handler)

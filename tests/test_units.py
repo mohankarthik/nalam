@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.units import convert, load_units
+from src.units import convert, display_unit_and_range, load_units
 
 
 @pytest.fixture(scope="module")
@@ -64,3 +64,34 @@ class TestRefusal:
         # convert means nothing to get wrong.
         got, _canonical, reason = convert("EF", 60.0, "%", units)
         assert got == 60.0 and reason is None
+
+
+class TestDisplayUnitAndRange:
+    def test_converted_unit_and_scaled_range(self, units: dict) -> None:
+        assert display_unit_and_range(
+            "Platelet Count", 215000.0, "x10^3/uL", 150.0, 400.0, units
+        ) == ("/uL", 150000.0, 400000.0)
+
+    def test_canonical_unit_passes_through_unscaled(self, units: dict) -> None:
+        assert display_unit_and_range("Haemoglobin", 13.4, "g/dL", 12.0, 15.5, units) == (
+            "g/dL",
+            12.0,
+            15.5,
+        )
+
+    def test_qualitative_and_unnamed_and_unknown_unit_passthrough(self, units: dict) -> None:
+        assert display_unit_and_range("Platelet Count", None, "x10^3/uL", 150.0, 400.0, units) == (
+            "x10^3/uL",
+            150.0,
+            400.0,
+        )
+        assert display_unit_and_range(None, 215.0, "x10^3/uL", 150.0, 400.0, units) == (
+            "x10^3/uL",
+            150.0,
+            400.0,
+        )
+        assert display_unit_and_range("Vitamin D", 31.29, "IU/mL", 10.0, 50.0, units) == (
+            "IU/mL",
+            10.0,
+            50.0,
+        )
