@@ -336,15 +336,24 @@ def reclassify(con: sqlite3.Connection, resolver) -> int:
     from src.units import convert, load_units
 
     units = load_units()
-    rows = con.execute(
-        "SELECT id, printed_name, section, raw_value, value_num, unit "
-        "FROM observations WHERE analyte IS NULL"
-    ).fetchall()
+    rows = con.execute("""SELECT id, printed_name, section, raw_value, value_num, unit,
+                  analyte, segment, review_reason, source_quality
+           FROM observations
+           WHERE IFNULL(source_quality, 'text') != 'image'
+             AND (
+                 (analyte IS NULL AND IFNULL(review_reason, '') LIKE '%no codebook entry%')
+                 OR (analyte IS NOT NULL AND value_num IS NULL AND status = 'review'
+                     AND (IFNULL(review_reason, '') LIKE '%unknown unit%'
+                          OR IFNULL(review_reason, '') LIKE '%no unit printed%'))
+             )""").fetchall()
     fixed = 0
     for r in rows:
-        analyte, segment = resolver(r["printed_name"], r["section"] or "")
-        if not analyte:
-            continue
+        if r["analyte"]:
+            analyte, segment = r["analyte"], r["segment"]
+        else:
+            analyte, segment = resolver(r["printed_name"], r["section"] or "")
+            if not analyte:
+                continue
         number, _ = parse_value(r["raw_value"])
         if number is not None:
             converted, _canonical, reason = convert(analyte, number, r["unit"] or "", units)

@@ -5,7 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import pytest
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if not (_REPO_ROOT / "data" / "settings.json").exists():
+    os.environ.setdefault("NALAM_SETTINGS_FILE", str(_REPO_ROOT / "data" / "settings.example.json"))
+if not (_REPO_ROOT / "data" / "people.json").exists():
+    os.environ.setdefault("NALAM_PEOPLE_FILE", str(_REPO_ROOT / "data" / "people.example.json"))
+
+import pytest  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

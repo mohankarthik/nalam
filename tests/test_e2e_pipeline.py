@@ -29,14 +29,17 @@ from unittest import mock
 import pytest
 from pypdf import PdfReader
 
-import run_extract_queue
-from plugins.telegram_bot import bot
-from src import cache, constants, db, drive_sync, extract_queue, llm, people, qa
-from src.chat_client import ChatSocketClient
-from src.llm_client import LLMClient, LLMGatewayError, default_socket_path
-from src.paperless import fold_filename
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
+os.environ.setdefault("NALAM_SETTINGS_FILE", str(REPO_ROOT / "data" / "settings.example.json"))
+os.environ.setdefault("NALAM_PEOPLE_FILE", str(REPO_ROOT / "data" / "people.example.json"))
+
+import run_extract_queue  # noqa: E402
+from plugins.telegram_bot import bot  # noqa: E402
+from src import cache, constants, db, drive_sync, extract_queue, llm, people, qa  # noqa: E402
+from src.chat_client import ChatSocketClient  # noqa: E402
+from src.llm_client import LLMClient, LLMGatewayError, default_socket_path  # noqa: E402
+from src.paperless import fold_filename  # noqa: E402
+
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "e2e_recorded_llm.json"
 LAB_CONFIG_PATH = REPO_ROOT / "data" / "configs" / "lab.json"
 ANALYTES_PATH = REPO_ROOT / "data" / "analytes.json"

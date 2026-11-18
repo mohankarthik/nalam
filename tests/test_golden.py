@@ -80,6 +80,10 @@ def compare() -> tuple[list[str], list[str], list[str], int]:
 
     Returns (mismatches, uncovered, sheet_errors_hit, agreed).
     """
+    docs = _cached()
+    if not os.path.exists(GOLDEN) or not os.path.exists(SHEET_ERRORS):
+        pytest.skip("Golden fixtures absent in clean checkout")
+
     codebook = load_codebook()
     units = load_units()
     hand = _hand_typed()
@@ -89,7 +93,7 @@ def compare() -> tuple[list[str], list[str], list[str], int]:
     sheet_errors: list[str] = []
     agreed = 0
 
-    for doc in _cached():
+    for doc in docs:
         key = (doc["person"], doc["sheet_date"])
         expected = hand.get(key, {})
         if not expected:

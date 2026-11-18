@@ -8,12 +8,19 @@ elsewhere (see docs/telegram_qa.md).
 
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 import sqlite3
+import stat
+import subprocess
+import sys
 
 import pytest
 
-from src import db, meds, qa
+from src import db, meds, qa, units
 from src.people import Person
+from tools import migrate_reclassified_units
 
 
 @pytest.fixture()
@@ -491,3 +498,288 @@ class TestRunLoopAndFailover:
         with pytest.raises(RuntimeError, match="broken sqlite query"):
             wrapped_corpus()
         assert "qa tool failed" in caplog.text
+
+
+class TestReclassifyHardening:
+    def test_reclassify_leaves_ambiguous_and_image_rows_in_review(self, con) -> None:
+        doc1 = _doc(con, paperless_id=301, source_path="ambig-img.pdf", doc_date="2026-04-01")
+        db.insert_observations(
+            con,
+            doc1,
+            [
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "PLT_AMBIG",
+                    "analyte": None,
+                    "effective": "2026-04-01",
+                    "value_num": 215.0,
+                    "raw_value": "215",
+                    "unit": "x10^3/uL",
+                    "source_quality": "text",
+                    "status": "review",
+                    "review_reason": '["ambiguous: two results in this report claim this analyte"]',
+                },
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "PLT_IMG",
+                    "analyte": None,
+                    "effective": "2026-04-02",
+                    "value_num": 220.0,
+                    "raw_value": "220",
+                    "unit": "x10^3/uL",
+                    "source_quality": "image",
+                    "status": "review",
+                    "review_reason": '["no codebook entry"]',
+                },
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "PLT_IMG_UNIT",
+                    "analyte": "Platelet Count",
+                    "segment": "CBC",
+                    "effective": "2026-04-03",
+                    "value_num": None,
+                    "raw_value": "230",
+                    "unit": "x10^3/uL",
+                    "source_quality": "image",
+                    "status": "review",
+                    "review_reason": "[\"Platelet Count: unknown unit 'foo'\"]",
+                },
+            ],
+        )
+
+        def resolver(printed_name: str, _section: str) -> tuple[str | None, str | None]:
+            if printed_name in ("PLT_AMBIG", "PLT_IMG"):
+                return "Platelet Count", "CBC"
+            return None, None
+
+        fixed = db.reclassify(con, resolver)
+        assert fixed == 0
+
+        rows = {
+            r["printed_name"]: dict(r)
+            for r in con.execute(
+                "SELECT printed_name, analyte, value_num, status, review_reason FROM observations"
+            ).fetchall()
+        }
+        assert rows["PLT_AMBIG"]["analyte"] is None
+        assert rows["PLT_AMBIG"]["status"] == "review"
+        assert "ambiguous" in rows["PLT_AMBIG"]["review_reason"]
+
+        assert rows["PLT_IMG"]["analyte"] is None
+        assert rows["PLT_IMG"]["status"] == "review"
+        assert "no codebook entry" in rows["PLT_IMG"]["review_reason"]
+
+        assert rows["PLT_IMG_UNIT"]["analyte"] == "Platelet Count"
+        assert rows["PLT_IMG_UNIT"]["value_num"] is None
+        assert rows["PLT_IMG_UNIT"]["status"] == "review"
+
+    def test_reclassify_retries_and_redeems_unit_refused_row(
+        self, con, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        doc1 = _doc(con, paperless_id=302, source_path="unit-retry.pdf", doc_date="2026-04-01")
+        db.insert_observations(
+            con,
+            doc1,
+            [
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "Platelet Count",
+                    "analyte": "Platelet Count",
+                    "segment": "CBC",
+                    "effective": "2026-04-01",
+                    "value_num": None,
+                    "raw_value": "215",
+                    "unit": "custom_k/uL",
+                    "source_quality": "text",
+                    "status": "review",
+                    "review_reason": (
+                        "[\"Platelet Count: unknown unit 'custom_k/uL' " "(codebook uses '/uL')\"]"
+                    ),
+                },
+                {
+                    "subject": "Alice Example",
+                    "printed_name": "Platelet Count",
+                    "analyte": "Platelet Count",
+                    "segment": "CBC",
+                    "effective": "2026-04-02",
+                    "value_num": None,
+                    "raw_value": "210",
+                    "unit": "",
+                    "source_quality": "text",
+                    "status": "review",
+                    "review_reason": '["Platelet Count: numeric result with no unit printed"]',
+                },
+            ],
+        )
+
+        extended_units = units.load_units()
+        extended_units["Platelet Count"] = {
+            "canonical": "/uL",
+            "convert": {
+                **extended_units["Platelet Count"]["convert"],
+                "custom_k/uL": 1000,
+            },
+        }
+        monkeypatch.setattr(units, "load_units", lambda: extended_units)
+
+        fixed = db.reclassify(con, lambda *_a: (None, None))
+        assert fixed == 1
+
+        redeemed = con.execute(
+            "SELECT analyte, segment, value_num, status, review_reason "
+            "FROM observations WHERE effective = '2026-04-01'"
+        ).fetchone()
+        assert redeemed["analyte"] == "Platelet Count"
+        assert redeemed["segment"] == "CBC"
+        assert redeemed["value_num"] == pytest.approx(215000.0)
+        assert redeemed["status"] == "ok"
+        assert redeemed["review_reason"] is None
+
+        still_missing = con.execute(
+            "SELECT value_num, status, review_reason "
+            "FROM observations WHERE effective = '2026-04-02'"
+        ).fetchone()
+        assert still_missing["value_num"] is None
+        assert still_missing["status"] == "review"
+        assert "no unit printed" in still_missing["review_reason"]
+
+    def test_migrate_reclassified_units_dry_run_apply_and_idempotency(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        db_path = tmp_path / "health.db"
+        con = db.connect(str(db_path))
+        try:
+            doc1 = _doc(
+                con,
+                subject="Alice Example",
+                paperless_id=303,
+                source_path="mig.pdf",
+                doc_date="2026-04-01",
+            )
+            db.insert_observations(
+                con,
+                doc1,
+                [
+                    {
+                        "subject": "Alice Example",
+                        "printed_name": "PLT",
+                        "analyte": "Platelet Count",
+                        "segment": "CBC",
+                        "effective": "2026-04-01",
+                        "value_num": 215.0,
+                        "raw_value": "215",
+                        "unit": "x10^3/uL",
+                        "status": "ok",
+                    },
+                    {
+                        "subject": "Alice Example",
+                        "printed_name": "Platelet Count",
+                        "analyte": "Platelet Count",
+                        "segment": "CBC",
+                        "effective": "2026-04-02",
+                        "value_num": 215000.0,
+                        "raw_value": "215",
+                        "unit": "x10^3/uL",
+                        "status": "ok",
+                    },
+                ],
+            )
+            con.commit()
+        finally:
+            con.close()
+
+        migrate_reclassified_units.main([str(db_path), "--dry-run"])
+        dry_out = capsys.readouterr().out
+        assert "Alice Example" not in dry_out
+        assert "1 would convert" in dry_out
+        assert "Platelet Count: x10^3/uL -> /uL (1)" in dry_out
+        backup_path = tmp_path / "health.db.pre-reclassify-units.bak"
+        assert not backup_path.exists()
+
+        con = db.connect(str(db_path))
+        try:
+            val = con.execute(
+                "SELECT value_num FROM observations WHERE effective = '2026-04-01'"
+            ).fetchone()["value_num"]
+            assert val == pytest.approx(215.0)
+        finally:
+            con.close()
+
+        migrate_reclassified_units.main([str(db_path)])
+        apply_out = capsys.readouterr().out
+        assert "Alice Example" not in apply_out
+        assert "1 converted" in apply_out
+        assert "integrity:   ok" in apply_out
+        assert backup_path.exists()
+        assert stat.S_IMODE(os.stat(backup_path).st_mode) == 0o600
+
+        con = db.connect(str(db_path))
+        try:
+            rows = {
+                r["effective"]: r["value_num"]
+                for r in con.execute("SELECT effective, value_num FROM observations").fetchall()
+            }
+            assert rows["2026-04-01"] == pytest.approx(215000.0)
+            assert rows["2026-04-02"] == pytest.approx(215000.0)
+        finally:
+            con.close()
+
+        second = migrate_reclassified_units.migrate(str(db_path), dry_run=False)
+        second_out = capsys.readouterr().out
+        assert "Alice Example" not in second_out
+        assert second["converted"] == 0
+        assert second["would_convert"] == 0
+
+    def test_nalam_settings_file_override_and_detached_e2e_import(self, tmp_path: Path) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        custom_settings = tmp_path / "settings.json"
+        custom_settings.write_text(
+            json.dumps(
+                {
+                    "paperless_url": "http://127.0.0.1:9999",
+                    "document_type": "CustomMedical",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        env = os.environ.copy()
+        env["NALAM_SETTINGS_FILE"] = str(custom_settings)
+        res = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import json, src.constants as c; "
+                "print(json.dumps({'cfg': c.SETTINGS_CONFIG, 'url': c.PAPERLESS_URL, "
+                "'dt': c.DOCUMENT_TYPE}))",
+            ],
+            cwd=repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        data = json.loads(res.stdout)
+        assert data["cfg"] == str(custom_settings)
+        assert data["url"] == "http://127.0.0.1:9999"
+        assert data["dt"] == "CustomMedical"
+
+        detached_env = os.environ.copy()
+        detached_env.pop("NALAM_SETTINGS_FILE", None)
+        detached_env.pop("NALAM_PEOPLE_FILE", None)
+        res_e2e = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import os, tests.test_e2e_pipeline, src.constants as c; "
+                "print(os.environ['NALAM_SETTINGS_FILE'] + '|' + c.SETTINGS_CONFIG)",
+            ],
+            cwd=repo_root,
+            env=detached_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        env_path, const_path = res_e2e.stdout.strip().split("|", 1)
+        assert env_path.endswith("data/settings.example.json")
+        assert const_path.endswith("data/settings.example.json")

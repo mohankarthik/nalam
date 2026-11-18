@@ -17,8 +17,8 @@ DATA_DIR = "data"
 STATE_DIR = os.path.join(DATA_DIR, "state")
 SECRETS_DIR = "secrets"
 
-SETTINGS_CONFIG = os.path.join(DATA_DIR, "settings.json")
-PEOPLE_CONFIG = os.path.join(DATA_DIR, "people.json")
+SETTINGS_CONFIG = os.environ.get("NALAM_SETTINGS_FILE") or os.path.join(DATA_DIR, "settings.json")
+PEOPLE_CONFIG = os.environ.get("NALAM_PEOPLE_FILE") or os.path.join(DATA_DIR, "people.json")
 SPECIALTIES_CONFIG = os.path.join(DATA_DIR, "specialties.json")
 CONDITIONS_CONFIG = os.path.join(DATA_DIR, "conditions.json")
 ICD10_CATEGORIES_CONFIG = os.path.join(DATA_DIR, "icd10_categories.json")
