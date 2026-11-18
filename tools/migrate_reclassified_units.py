@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import os
+from pathlib import Path
+import sqlite3
 import sys
 from typing import Any
 
@@ -34,12 +36,60 @@ def _has_non_unit_factor(entry: dict[str, Any], printed_unit: str) -> bool:
     return False
 
 
+def _scan_rows(
+    con: sqlite3.Connection, units: dict[str, dict[str, Any]]
+) -> tuple[int, Counter[tuple[str, str, str]], list[tuple[float, int]]]:
+    rows = con.execute(
+        "SELECT id, analyte, value_num, raw_value, unit "
+        "FROM observations "
+        "WHERE analyte IS NOT NULL AND value_num IS NOT NULL"
+    ).fetchall()
+
+    counts: Counter[tuple[str, str, str]] = Counter()
+    updates: list[tuple[float, int]] = []
+
+    for r in rows:
+        analyte = r["analyte"]
+        entry = units.get(analyte)
+        if entry is None:
+            continue
+        printed_unit = r["unit"] or ""
+        if not _has_non_unit_factor(entry, printed_unit):
+            continue
+
+        raw_num, _ = parse_value(r["raw_value"] or "")
+        current_num = float(r["value_num"])
+        if (
+            raw_num is not None
+            and raw_num != 0.0
+            and abs(current_num - raw_num) <= 1e-9 * max(1.0, abs(raw_num))
+        ):
+            converted, canonical, reason = convert(analyte, raw_num, printed_unit, units)
+            if reason is None and converted is not None and converted != current_num:
+                counts[(analyte, printed_unit, canonical)] += 1
+                updates.append((converted, r["id"]))
+
+    return len(rows), counts, updates
+
+
 def migrate(path: str, *, dry_run: bool = False) -> dict[str, Any]:
     """Scan and convert unscaled numeric observations whose unit factor != 1.0."""
-    con = db.connect(path)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"database not found: {path}")
+
+    units = load_units()
+    backup: str | None = None
+
+    if dry_run:
+        con = sqlite3.connect(f"file:{Path(path).resolve()}?mode=ro", uri=True)
+        con.row_factory = sqlite3.Row
+    else:
+        con = db.connect(path)
+
     try:
-        backup: str | None = None
-        if not dry_run:
+        if dry_run:
+            scanned, counts, updates = _scan_rows(con, units)
+        else:
             backup = f"{path}.pre-reclassify-units.bak"
             if not os.path.exists(backup):
                 con.execute("VACUUM INTO ?", (backup,))
@@ -48,44 +98,21 @@ def migrate(path: str, *, dry_run: bool = False) -> dict[str, Any]:
             else:
                 print(f"  backup:      {backup} (exists, kept)")
 
-        units = load_units()
-        rows = con.execute(
-            "SELECT id, analyte, value_num, raw_value, unit "
-            "FROM observations "
-            "WHERE analyte IS NOT NULL AND value_num IS NOT NULL"
-        ).fetchall()
-
-        counts: Counter[tuple[str, str, str]] = Counter()
-        updates: list[tuple[float, int]] = []
-
-        for r in rows:
-            analyte = r["analyte"]
-            entry = units.get(analyte)
-            if entry is None:
-                continue
-            printed_unit = r["unit"] or ""
-            if not _has_non_unit_factor(entry, printed_unit):
-                continue
-
-            raw_num, _ = parse_value(r["raw_value"] or "")
-            current_num = float(r["value_num"])
-            if (
-                raw_num is not None
-                and raw_num != 0.0
-                and abs(current_num - raw_num) <= 1e-9 * max(1.0, abs(raw_num))
-            ):
-                converted, canonical, reason = convert(analyte, raw_num, printed_unit, units)
-                if reason is None and converted is not None and converted != current_num:
-                    counts[(analyte, printed_unit, canonical)] += 1
-                    updates.append((converted, r["id"]))
-
-        if not dry_run and updates:
-            con.executemany("UPDATE observations SET value_num = ? WHERE id = ?", updates)
-            con.commit()
+            con.isolation_level = None
+            con.execute("BEGIN IMMEDIATE")
+            try:
+                scanned, counts, updates = _scan_rows(con, units)
+                if updates:
+                    con.executemany("UPDATE observations SET value_num = ? WHERE id = ?", updates)
+                con.execute("COMMIT")
+            except Exception:
+                if con.in_transaction:
+                    con.execute("ROLLBACK")
+                raise
 
         integrity = con.execute("PRAGMA integrity_check").fetchone()[0]
         action = "would convert" if dry_run else "converted"
-        print(f"  observations: {len(rows)} scanned, {len(updates)} {action}")
+        print(f"  observations: {scanned} scanned, {len(updates)} {action}")
         for (analyte, unit, canonical), count in sorted(counts.items()):
             print(f"    {analyte}: {unit} -> {canonical} ({count})")
         print(f"  integrity:   {integrity}")
@@ -97,7 +124,7 @@ def migrate(path: str, *, dry_run: bool = False) -> dict[str, Any]:
             "path": path,
             "dry_run": dry_run,
             "backup": backup,
-            "scanned": len(rows),
+            "scanned": scanned,
             "would_convert": len(updates),
             "converted": 0 if dry_run else len(updates),
             "by_unit": dict(counts),
@@ -125,7 +152,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     try:
         migrate(args.db_path, dry_run=args.dry_run)
-    except RuntimeError as exc:
+    except (FileNotFoundError, OSError, sqlite3.Error, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 

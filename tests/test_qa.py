@@ -730,6 +730,21 @@ class TestReclassifyHardening:
         assert second["converted"] == 0
         assert second["would_convert"] == 0
 
+    def test_migrate_reclassified_units_nonexistent_db_fails_without_creating_file(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        missing = tmp_path / "does_not_exist.db"
+        with pytest.raises(FileNotFoundError):
+            migrate_reclassified_units.migrate(str(missing))
+        assert not missing.exists()
+
+        with pytest.raises(SystemExit) as exc:
+            migrate_reclassified_units.main([str(missing)])
+        assert exc.value.code == 1
+        err_out = capsys.readouterr().err
+        assert "database not found" in err_out
+        assert not missing.exists()
+
     def test_nalam_settings_file_override_and_detached_e2e_import(self, tmp_path: Path) -> None:
         repo_root = Path(__file__).resolve().parent.parent
         custom_settings = tmp_path / "settings.json"

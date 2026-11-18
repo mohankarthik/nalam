@@ -347,6 +347,23 @@ def _run_pipeline(tmp_path: Path, llm_socket_path: Optional[Path]) -> tuple[_Fak
     with contextlib.ExitStack() as stack:
         stack.callback(chat_bridge.close)
         stack.enter_context(mock.patch.dict(os.environ, env_updates, clear=False))
+        stack.enter_context(
+            mock.patch.object(
+                constants, "SETTINGS_CONFIG", str(REPO_ROOT / "data" / "settings.example.json")
+            )
+        )
+        stack.enter_context(
+            mock.patch.object(
+                constants,
+                "SETTINGS",
+                {
+                    "paperless_url": "http://localhost:8100",
+                    "document_type": "Medical",
+                    "paperless_viewer_url": "https://paperless.example.com",
+                },
+            )
+        )
+        stack.enter_context(mock.patch.object(constants, "PAPERLESS_URL", "http://localhost:8100"))
         stack.enter_context(mock.patch.object(constants, "PEOPLE_CONFIG", str(people_file)))
         stack.enter_context(mock.patch.object(people, "PEOPLE_CONFIG", str(people_file)))
         stack.enter_context(mock.patch.object(drive_sync, "PEOPLE_CONFIG", str(people_file)))
